@@ -94,7 +94,7 @@
       const z = +b.dataset.pz, zn = game && game.zones[z];
       if (!zn || !cssW) { b.hidden = true; return; }
       // the sector's on-screen rect, clipped to the stage; the button sits in its visible bottom-right corner
-      const [x0, y0] = P(z * ZONE, 0), [x1, y1] = P((z + 1) * ZONE, WIDTH);
+      const [x0, y0] = P(z * ZONE, 0), [x1, y1] = P((z + 1) * ZONE, WIDTH - FAR_VESSEL);
       const L = Math.max(0, vox + x0 * vs * SX), T = Math.max(0, voy + y0 * vs), R = Math.min(cssW, vox + x1 * vs * SX), B = Math.min(cssH, voy + y1 * vs);
       const sx = R - 26, sy = B - 26, vis = R - L > 60 && B - T > 60;
       b.hidden = !vis || !!(game && game.result);
@@ -228,6 +228,12 @@
     if (portrait) { g.translate(VESSEL * 1.1, 0); g.rotate(Math.PI / 2); }
     for (let x = 0; x < L; x += sw) g.drawImage(vb, x, -VESSEL * 0.15, sw + 0.5, sh);
     g.restore();
+    // the thinner second vessel on the far edge
+    const fh = FAR_VESSEL * 1.25;
+    g.save();
+    if (portrait) { g.translate(WIDTH - FAR_VESSEL * 1.1, L); g.rotate(-Math.PI / 2); } else { g.translate(0, WIDTH - FAR_VESSEL * 1.1); }
+    for (let x = 0; x < L; x += sw) g.drawImage(vb, x, -FAR_VESSEL * 0.15, sw + 0.5, fh);
+    g.restore();
     const [wx, wy] = P(WOUND.u, WOUND.v);
     g.save(); g.translate(wx, wy); g.scale(1 / SX, 1); if (portrait) g.rotate(Math.PI / 2);
     g.globalAlpha = 0.9; g.drawImage(img.wound, -70, -35, 140, 70);
@@ -238,7 +244,7 @@
     g.fillStyle = gr; g.fillRect(0, 0, VW, VH);
     g.strokeStyle = 'rgba(221,230,245,0.16)'; g.lineWidth = 1.5 / scale; g.setLineDash([6 / scale, 6 / scale]);
     for (let z = 1; z < 3; z++) {
-      const [x0, y0] = P(z * ZONE, VESSEL), [x1, y1] = P(z * ZONE, WIDTH);
+      const [x0, y0] = P(z * ZONE, VESSEL), [x1, y1] = P(z * ZONE, WIDTH - FAR_VESSEL);
       g.beginPath(); g.moveTo(x0, y0); g.lineTo(x1, y1); g.stroke();
     }
     g.setLineDash([]);
@@ -529,7 +535,7 @@
     }
   }
   function zoneRect(z) {
-    const [x0, y0] = P(z * ZONE, VESSEL), [x1, y1] = P((z + 1) * ZONE, WIDTH);
+    const [x0, y0] = P(z * ZONE, VESSEL), [x1, y1] = P((z + 1) * ZONE, WIDTH - FAR_VESSEL);
     return [Math.min(x0, x1), Math.min(y0, y1), Math.abs(x1 - x0), Math.abs(y1 - y0)];
   }
   const FONT = '"Instrument Sans", "Helvetica Neue", Arial, sans-serif', MONO = '"IBM Plex Mono", ui-monospace, Menlo, monospace';

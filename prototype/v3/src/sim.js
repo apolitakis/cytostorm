@@ -217,8 +217,8 @@ const UNIT_NAMES = { neut: 'Neutrophils', net: 'Net neutrophils', nk: 'NK cells'
 const LEVELS = {
   papercut: {
     name: 'Papercut', blurb: 'Staph spills out of a small cut. Learn the basics.', duration: 240, units: ['neut', 'mac'],
-    waves: [{ t: 0, staph: 60 }, { t: 45, staph: 60 }, { t: 100, staph: 120 }, { t: 160, staph: 90 }, { t: 200, staph: 160, final: true }],
-    stream: { start: 0.8, end: 2.0, clump: 4, kinds: [{ k: 'staph', w: 1 }] }, toxins: [130],
+    waves: [{ t: 0, staph: 72 }, { t: 45, staph: 72 }, { t: 100, staph: 144 }, { t: 160, staph: 108 }, { t: 200, staph: 192, final: true }],
+    stream: { start: 0.96, end: 2.4, clump: 4, kinds: [{ k: 'staph', w: 1 }] }, toxins: [130], // waves x1.2 (2026-10-08): with the second vessel, doing nothing won at x1
   },
   hospital: {
     name: 'Hospital visit', blurb: 'MRSA shrugs off plain shots and slips out of macrophages. Only Support rings kill it.', duration: 300, units: ['neut', 'mac'],
@@ -232,8 +232,8 @@ const LEVELS = {
   },
   flu: {
     name: 'Flu season', blurb: 'Influenza swarms in by the dozen and splits in the Tissue. Net neutrophils wipe out whole clusters.', duration: 300, units: ['neut', 'net', 'mac'],
-    waves: [{ t: 0, staph: 80 }, { t: 35, flu: 104 }, { t: 90, flu: 128, staph: 64 }, { t: 150, flu: 160 }, { t: 210, staph: 112, flu: 104 }, { t: 250, flu: 208, staph: 80, final: true }],
-    stream: { start: 0.96, end: 2.24, clump: 4, kinds: [{ k: 'staph', w: 1 }] }, toxins: [120, 220], // waves x1.6 (2026-10-07): with breach clocks, doing nothing won at x1
+    waves: [{ t: 0, staph: 96 }, { t: 35, flu: 125 }, { t: 90, flu: 154, staph: 77 }, { t: 150, flu: 192 }, { t: 210, staph: 134, flu: 125 }, { t: 250, flu: 250, staph: 96, final: true }],
+    stream: { start: 1.152, end: 2.688, clump: 4, kinds: [{ k: 'staph', w: 1 }] }, toxins: [120, 220], // waves x1.6 (2026-10-07, breach clocks), then x1.2 (2026-10-08, second vessel): doing nothing won before each
   },
   soil: {
     name: 'Soil cut', blurb: 'Clostridium spores sit harmless, then hatch all at once. Rest before the hatch, push hard on it.', duration: 300, units: ['neut', 'net', 'mac'],
@@ -252,8 +252,8 @@ const LEVELS = {
   },
   throat: {
     name: 'Sore throat', blurb: 'Strep chains sprint for the Lymph node, and Toxic-shock Staph makes you tire twice as fast.', duration: 300, units: ['neut', 'net', 'mac'],
-    waves: [{ t: 0, staph: 50 }, { t: 40, strep: 5 }, { t: 90, toxic: 30, staph: 40 }, { t: 140, strep: 8 }, { t: 200, toxic: 35, strep: 6 }, { t: 250, strep: 12, staph: 100, toxic: 30, final: true }],
-    stream: { start: 0.7, end: 1.7, clump: 4, kinds: [{ k: 'staph', w: 1 }, { k: 'toxic', w: 0.1, from: 80 }] }, toxins: [110, 210],
+    waves: [{ t: 0, staph: 60 }, { t: 40, strep: 6 }, { t: 90, toxic: 36, staph: 48 }, { t: 140, strep: 10 }, { t: 200, toxic: 42, strep: 7 }, { t: 250, strep: 14, staph: 120, toxic: 36, final: true }],
+    stream: { start: 0.84, end: 2.04, clump: 4, kinds: [{ k: 'staph', w: 1 }, { k: 'toxic', w: 0.1, from: 80 }] }, toxins: [110, 210], // waves x1.2 (2026-10-08): with the second vessel, doing nothing won at x1
   },
   coldsore: {
     name: 'Cold sore', blurb: 'Herpes hides inside your own neutrophils and bursts out later. NK cells find and pop infected cells.', duration: 300, units: ['neut', 'net', 'nk', 'mac'],
@@ -295,6 +295,8 @@ function mulberry32(a) {
 
 // Map: three zones of 300 along the flow; the blood vessel is a strip along v < VESSEL.
 const L = 900, WIDTH = 460, ZONE = 300, VESSEL = 44;
+// Second, thinner vessel on the far edge (Alex, 2026-10-08): half of new cells enter there, so the fight no longer drifts away from the left vessel
+const FAR_VESSEL = 20;
 const ZONES = ['Wound', 'Tissue', 'Lymph node'];
 const zoneOf = u => (u < ZONE ? 0 : u < 2 * ZONE ? 1 : 2);
 const WOUND = { u: 70, v: 270 };
@@ -543,7 +545,10 @@ class Game {
     if (!start) {
       c.u = u != null ? u : home * ZONE + 20 + r() * (ZONE - 40);
       c.v = v != null ? v : VESSEL * 0.5;
-      if (v == null) c.vv = 60 + r() * 40; // pushed out of the vessel into the tissue
+      if (v == null) {
+        c.vv = 60 + r() * 40; // pushed out of the vessel into the tissue
+        if (type !== 'mac' && r() < 0.5) { c.v = WIDTH - FAR_VESSEL * 0.5; c.vv = -c.vv; } // or out of the far vessel
+      }
     }
     this.cells.push(c);
     if (!start) this.tick('made.' + type);
@@ -1022,7 +1027,7 @@ class Game {
     const F = CONFIG.fungus;
     dir *= 0.9; // drift back toward the Lymph node (downstream)
     let u = tip.u + Math.cos(dir) * F.seg, v = tip.v + Math.sin(dir) * F.seg;
-    if (v < VESSEL + 10 || v > WIDTH - 10) { dir = -dir; v = Math.max(VESSEL + 10, Math.min(WIDTH - 10, tip.v + Math.sin(dir) * F.seg)); }
+    if (v < VESSEL + 10 || v > WIDTH - FAR_VESSEL - 10) { dir = -dir; v = Math.max(VESSEL + 10, Math.min(WIDTH - FAR_VESSEL - 10, tip.v + Math.sin(dir) * F.seg)); }
     u = Math.max(6, Math.min(L - 20, u));
     return this.addHypha(f, tip, u, v, dir);
   }
@@ -1162,7 +1167,7 @@ class Game {
       a.u += a.vu * dt; a.v += a.vv * dt;
       a.u = Math.max(4, Math.min(L - 6, a.u));
       if (a.v < VESSEL + 6) { a.v = VESSEL + 6; a.vv = Math.abs(a.vv) * 0.3; }
-      if (a.v > WIDTH - 6) { a.v = WIDTH - 6; a.vv = -Math.abs(a.vv) * 0.3; }
+      if (a.v > WIDTH - FAR_VESSEL - 6) { a.v = WIDTH - FAR_VESSEL - 6; a.vv = -Math.abs(a.vv) * 0.3; }
       a.rot += dt * (K.chain ? 0 : 0.3);
       if (K.chain) a.rot = a.prev ? Math.atan2(a.prev.v - a.v, a.prev.u - a.u) : Math.atan2(a.vv, a.vu);
       // flu splits once when it reaches the Tissue
@@ -1276,4 +1281,4 @@ class Game {
   }
 }
 
-if (typeof module !== 'undefined') module.exports = { BLINK, BLINK_WARN, ORGAN_KEYS, ORGAN_NAMES, Game, DEFAULTS, CONFIG, LEVELS, LEVEL_ORDER, KINDS, UNIT_NAMES, HINTS, mergeConfig, mulberry32, zoneOf, L, WIDTH, ZONE, VESSEL, WOUND, NODE, ZONES };
+if (typeof module !== 'undefined') module.exports = { BLINK, BLINK_WARN, ORGAN_KEYS, ORGAN_NAMES, Game, DEFAULTS, CONFIG, LEVELS, LEVEL_ORDER, KINDS, UNIT_NAMES, HINTS, mergeConfig, mulberry32, zoneOf, L, WIDTH, ZONE, VESSEL, FAR_VESSEL, WOUND, NODE, ZONES };

@@ -49,7 +49,13 @@ for v in $(env | cut -d= -f1 | grep -iE 'key|token|secret|pass'); do
 done
 
 git add -A
-if git diff --cached --quiet; then echo "no changes since the last snapshot"; exit 0; fi
+if git diff --cached --quiet; then
+  # Nothing new, but an earlier snapshot may not have reached GitHub (a refused push).
+  if [ "$(git ls-remote origin refs/heads/main | cut -f1)" != "$(git rev-parse -q --verify HEAD || true)" ] && git rev-parse -q --verify HEAD >/dev/null; then
+    git push -u origin main && echo "pushed an earlier snapshot $(git rev-parse --short HEAD)"; exit 0
+  fi
+  echo "no changes since the last snapshot"; exit 0
+fi
 # Top-level folders that changed, for the message.
 DIRS=$(git diff --cached --name-only | awk -F/ 'NF>1{print $1"/"} NF==1{print "(top level)"}' | sort -u | tr '\n' ' ')
 git -c user.name=Claude -c user.email=noreply@anthropic.com commit -q -m "Nightly snapshot $(TZ=America/New_York date +%Y-%m-%d): ${DIRS% }
