@@ -1,0 +1,250 @@
+<title>Cytostorm OST</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Instrument+Sans:wdth,wght@75..100,400..700&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+/* Layout: a single phone-width column. Player on top (scope, transport, intensity), track list under it.
+   Same single dark theme and tokens as the Sound Lab and the Cytostorm hub. */
+:root {
+  color-scheme: dark;
+  --void: #04050A; --panel: #0A0D18; --panel2: #10152A; --line: #1E2540;
+  --ink: #DDE6F5; --dim: #7A86A0; --cell: #3FE6FF; --germ: #FF3DCB; --gold: #FFD23F;
+  --risky: #FF9A3C; --lethal: #FF4057;
+  --display: "Instrument Sans", "Helvetica Neue", Arial, sans-serif;
+  --mono: "IBM Plex Mono", ui-monospace, Menlo, monospace;
+}
+* { box-sizing: border-box; }
+html { background: var(--void); }
+body {
+  margin: 0; color: var(--ink); font: 16px/1.45 var(--display);
+  background: radial-gradient(120% 50% at 50% -10%, rgba(63,230,255,.10), transparent 60%), var(--void);
+  padding-inline: 16px; padding-block: 0 48px;
+  -webkit-tap-highlight-color: transparent;
+}
+main { max-width: 560px; margin: 0 auto; display: grid; gap: 22px; }
+header { display: grid; gap: 8px; padding-top: 28px; }
+.kicker { font: 500 12px var(--mono); letter-spacing: .18em; text-transform: uppercase; color: var(--dim); margin: 0; }
+h1 { font: 700 48px/1 var(--display); font-stretch: 85%; margin: 0; letter-spacing: -.01em; }
+h1 span { color: var(--germ); text-shadow: 0 0 18px rgba(255,61,203,.45); }
+p { margin: 0; color: var(--dim); text-wrap: pretty; max-width: 62ch; }
+.tip { font-size: 14px; border-left: 2px solid var(--gold); padding-left: 10px; }
+
+.player { display: grid; gap: 14px; padding: 16px; background: var(--panel); border: 1px solid var(--line); border-radius: 16px; }
+.now { display: grid; grid-template-columns: 1fr auto; gap: 2px 12px; align-items: end; }
+.now b { font: 650 24px/1.15 var(--display); font-stretch: 90%; }
+.now small { font: 500 12px var(--mono); letter-spacing: .08em; color: var(--dim); text-transform: uppercase; }
+.time { font: 500 14px var(--mono); color: var(--dim); font-variant-numeric: tabular-nums; grid-row: span 2; }
+canvas { width: 100%; height: 96px; display: block; border-radius: 10px; background: var(--void); }
+.bars { display: grid; grid-template-columns: repeat(var(--n, 8), 1fr); gap: 4px; }
+.bars i { height: 4px; border-radius: 2px; background: var(--line); }
+.bars i.on { background: var(--cell); box-shadow: 0 0 8px rgba(63,230,255,.5); }
+.transport { display: flex; flex-wrap: wrap; align-items: center; gap: 10px 14px; }
+button { font: inherit; color: inherit; cursor: pointer; touch-action: manipulation; }
+button:focus-visible, input:focus-visible { outline: 2px solid var(--cell); outline-offset: 2px; }
+.big {
+  width: 56px; height: 56px; border-radius: 50%; border: 1px solid var(--cell); background: var(--panel2);
+  display: grid; place-items: center; box-shadow: 0 0 16px rgba(63,230,255,.25);
+}
+.big::before { content: ""; border-left: 16px solid var(--cell); border-top: 10px solid transparent; border-bottom: 10px solid transparent; margin-left: 4px; }
+.big.on::before { border: 0; margin: 0; width: 16px; height: 18px; background: linear-gradient(90deg, var(--cell) 0 35%, transparent 35% 65%, var(--cell) 65%); }
+.chip { min-height: 36px; padding: 0 12px; border-radius: 999px; border: 1px solid var(--line); background: none; color: var(--dim); font: 600 14px var(--display); }
+.chip[aria-pressed=true] { color: var(--ink); border-color: var(--cell); }
+.vol { display: flex; align-items: center; gap: 8px; flex: 1 1 140px; min-width: 0; font: 500 12px var(--mono); letter-spacing: .1em; text-transform: uppercase; color: var(--dim); }
+.vol input { flex: 1; min-width: 0; accent-color: var(--cell); }
+
+.heat { display: grid; gap: 8px; }
+.heat[hidden] { display: none !important; }
+.heat .lbl { font: 500 12px var(--mono); letter-spacing: .1em; text-transform: uppercase; color: var(--dim); }
+.seg { display: flex; flex-wrap: wrap; gap: 6px; }
+.seg button { min-height: 34px; padding: 0 12px; border-radius: 999px; border: 1px solid var(--line); background: none; color: var(--dim); font: 600 14px var(--display); }
+.seg button[aria-pressed=true] { color: var(--void); background: var(--cell); border-color: var(--cell); }
+.seg button[data-k="2"][aria-pressed=true] { background: var(--risky); border-color: var(--risky); }
+.seg button[data-k="3"][aria-pressed=true], .seg button[data-k="4"][aria-pressed=true] { background: var(--lethal); border-color: var(--lethal); }
+.seg button.auto[aria-pressed=true] { background: var(--germ); border-color: var(--germ); color: var(--void); }
+
+ol.tracks { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; counter-reset: t; }
+.track {
+  width: 100%; text-align: left; display: grid; grid-template-columns: 32px 1fr auto; gap: 2px 12px; align-items: center;
+  padding: 14px; border-radius: 14px; border: 1px solid var(--line); background: var(--panel);
+}
+.track .no { font: 500 14px var(--mono); color: var(--dim); grid-column: 1; grid-row: 1 / span 2; font-variant-numeric: tabular-nums; }
+.track b { font: 650 18px/1.2 var(--display); grid-column: 2; grid-row: 1; }
+.track span { font-size: 14px; color: var(--dim); grid-column: 2; grid-row: 2; }
+.track em { font: 500 12px var(--mono); font-style: normal; color: var(--dim); grid-row: 1 / span 2; grid-column: 3; font-variant-numeric: tabular-nums; }
+.track.main b::after { content: "Main theme"; margin-left: 8px; padding: 2px 8px; border-radius: 999px; border: 1px solid var(--germ); color: var(--germ); font: 500 11px var(--mono); letter-spacing: .06em; text-transform: uppercase; vertical-align: 3px; white-space: nowrap; display: inline-block; }
+.track[aria-current=true] { border-color: var(--cell); background: var(--panel2); }
+.track[aria-current=true] .no { color: var(--cell); }
+footer p { font-size: 14px; }
+@media (max-width: 420px) { h1 { font-size: 40px; } }
+@media (prefers-reduced-motion: reduce) { canvas { display: none; } }
+</style>
+
+<main>
+  <header>
+    <p class="kicker">Cytostorm · Original soundtrack</p>
+    <h1>The sound of a <span>storm</span></h1>
+    <p>Music from Cytostorm. Every track is played live in your browser by code, and each one loops the way it does in the game. Bloodstream follows the fight: it gets louder and meaner as the danger rises.</p>
+    <p class="tip">No sound on iPhone? Flip the silent switch off and turn the volume up.</p>
+  </header>
+
+  <section class="player" aria-label="Player">
+    <div class="now">
+      <small id="nowsub">Pick a track</small>
+      <span class="time" id="time">0:00</span>
+      <b id="nowname">Bloodstream</b>
+    </div>
+    <canvas id="scope" width="1040" height="192" aria-hidden="true"></canvas>
+    <div class="bars" id="bars" aria-hidden="true"></div>
+    <div class="transport">
+      <button class="big" id="play" type="button" aria-label="Play"></button>
+      <button class="chip" id="loop" type="button" aria-pressed="true">Loop</button>
+      <label class="vol" for="vol">Vol <input id="vol" type="range" min="0" max="1" step="0.01" value="0.8"></label>
+    </div>
+    <div class="heat" id="heat">
+      <span class="lbl">Danger level</span>
+      <div class="seg" id="seg"></div>
+      <p id="heatnote">Auto walks through a whole fight, from a calm start to a crisis and back. Pick a level to hold it.</p>
+    </div>
+  </section>
+
+  <section aria-label="Tracks">
+    <ol class="tracks" id="tracks"></ol>
+  </section>
+
+  <footer><p>Made for Cytostorm, a tower defense game about your immune system.</p></footer>
+</main>
+
+<script>
+/*ENGINE*/
+</script>
+<script>
+const C = CytoSound;
+const LIST = [
+  { id: 'blood', name: 'Bloodstream', sub: 'The fight', note: 'Plays during every wave and follows the danger: Calm, Fight, Hot, Fever, Crisis.', main: true },
+  { id: 'petri', name: 'Petri Dish', sub: 'Between waves', note: 'Slow and glassy. For menus and the quiet before a wave.' },
+  { id: 'parade', name: 'Germ Parade', sub: 'Side B', note: 'Playful 8-bit, closer to Plants vs Zombies.' },
+  { id: 'fever', name: 'Fever', sub: 'Side B', note: 'Tense and dark, for the late waves.' }
+];
+const LEVELS = ['Calm', 'Fight', 'Hot', 'Fever', 'Crisis'];
+// Auto: one fight told in 4-bar steps, then back to calm, then around again.
+const JOURNEY = [0, 1, 1, 2, 2, 3, 4, 4, 3, 2, 1, 0];
+
+let ctx = null, bus = null, player = null, an = null, vol = 0.8;
+let cur = 0, playing = false, startAt = 0, loopOn = true, auto = true, held = 1, barsDone = 0, lastBar = -1;
+const $ = id => document.getElementById(id);
+const fmt = s => Math.floor(s / 60) + ':' + String(Math.floor(s % 60)).padStart(2, '0');
+
+function audio() {
+  if (!ctx) {
+    try { if (navigator.audioSession) navigator.audioSession.type = 'playback'; } catch (e) {}
+    const AC = window.AudioContext || window.webkitAudioContext;
+    ctx = new AC({ latencyHint: 'playback' });
+    an = ctx.createAnalyser(); an.fftSize = 1024; an.connect(ctx.destination);
+    bus = C.makeBus(ctx, an); bus.master.gain.value = vol;
+    player = new C.Player(bus); player.quantize = true;
+    const b = ctx.createBuffer(1, 1, 22050), s = ctx.createBufferSource(); s.buffer = b; s.connect(ctx.destination); s.start(0);
+  }
+  if (ctx.state !== 'running') ctx.resume();
+}
+
+function renderList() {
+  const ol = $('tracks'); ol.textContent = '';
+  LIST.forEach((t, i) => {
+    const li = document.createElement('li'), b = document.createElement('button');
+    b.type = 'button'; b.className = 'track' + (t.main ? ' main' : '');
+    b.setAttribute('aria-current', i === cur);
+    const no = document.createElement('span'); no.className = 'no'; no.textContent = String(i + 1).padStart(2, '0');
+    const nm = document.createElement('b'); nm.textContent = t.name;
+    const len = document.createElement('em'); len.textContent = fmt(C.loopLength(t.id)) + ' loop';
+    const nt = document.createElement('span'); nt.textContent = t.note;
+    b.append(no, nm, len, nt);
+    b.onclick = () => { select(i); start(); };
+    li.append(b); ol.append(li);
+  });
+}
+function renderSeg() {
+  const seg = $('seg'); seg.textContent = '';
+  const a = document.createElement('button'); a.type = 'button'; a.className = 'auto'; a.textContent = 'Auto';
+  a.setAttribute('aria-pressed', auto); a.onclick = () => { auto = true; renderSeg(); };
+  seg.append(a);
+  LEVELS.forEach((l, i) => {
+    const b = document.createElement('button'); b.type = 'button'; b.textContent = l; b.dataset.k = i;
+    b.setAttribute('aria-pressed', !auto && held === i);
+    b.onclick = () => { auto = false; held = i; if (player) player.level = i; renderSeg(); };
+    seg.append(b);
+  });
+}
+function select(i) {
+  cur = i; const t = LIST[i];
+  $('nowname').textContent = t.name; $('nowsub').textContent = (i + 1 + '').padStart(2, '0') + ' · ' + t.sub;
+  $('heat').hidden = t.id !== 'blood';
+  const n = C.TRACKS[t.id].bars; $('bars').style.setProperty('--n', n);
+  $('bars').textContent = ''; for (let k = 0; k < n; k++) $('bars').append(document.createElement('i'));
+  renderList();
+}
+function start() {
+  audio();
+  const t = LIST[cur];
+  barsDone = 0; lastBar = -1;
+  player.level = t.id === 'blood' ? (auto ? JOURNEY[0] : held) : 1;
+  player.play(t.id); startAt = ctx.currentTime;
+  playing = true; $('play').classList.add('on'); $('play').setAttribute('aria-label', 'Stop');
+}
+function stop() {
+  if (player) player.stop();
+  playing = false; $('play').classList.remove('on'); $('play').setAttribute('aria-label', 'Play');
+}
+
+// Per frame: time, bar lights, Auto intensity, end of track when Loop is off, and the scope.
+const cv = $('scope'), g = cv.getContext('2d');
+let wave = null;
+function frame() {
+  requestAnimationFrame(frame);
+  if (!playing || !ctx) { drawIdle(); return; }
+  const t = LIST[cur], tr = C.TRACKS[t.id], el = Math.max(0, ctx.currentTime - startAt - 0.08);
+  const barLen = 60 / tr.bpm * 4, bar = Math.floor(el / barLen);
+  $('time').textContent = fmt(el);
+  if (bar !== lastBar) {
+    lastBar = bar;
+    [...$('bars').children].forEach((x, k) => x.classList.toggle('on', k === bar % tr.bars));
+    if (t.id === 'blood' && auto) {
+      // Auto: a level rise is announced the way a new wave is in the game, with a riser into the bar and a crash
+      const nowL = JOURNEY[Math.floor(bar / 4) % JOURNEY.length], nextL = JOURNEY[Math.floor((bar + 1) / 4) % JOURNEY.length];
+      if (bar % 4 === 3 && nextL > nowL && !player.queued) player.swell(nextL, nextL === 4);
+      else if (!player.queued) player.level = nowL;
+    }
+    if (t.id === 'blood' && auto) $('heatnote').textContent = 'Auto: ' + LEVELS[player.level] + '. Pick a level to hold it.';
+    // Loop off: play each track twice through (Bloodstream: one whole fight), then the next one.
+    const len = t.id === 'blood' ? JOURNEY.length * 4 : tr.bars * 2;
+    if (!loopOn && bar >= len) { select((cur + 1) % LIST.length); start(); return; }
+  }
+  draw();
+}
+function draw() {
+  const w = cv.width, h = cv.height;
+  if (!wave || wave.length !== an.fftSize) wave = new Uint8Array(an.fftSize);
+  an.getByteTimeDomainData(wave);
+  g.fillStyle = 'rgba(4,5,10,0.35)'; g.fillRect(0, 0, w, h);
+  const lvl = LIST[cur].id === 'blood' ? player.level : 1;
+  const col = lvl >= 3 ? '255,64,87' : lvl === 2 ? '255,154,60' : '63,230,255';
+  g.lineWidth = 3; g.strokeStyle = 'rgba(' + col + ',0.9)'; g.shadowColor = 'rgba(' + col + ',0.8)'; g.shadowBlur = 14;
+  g.beginPath();
+  for (let i = 0; i < wave.length; i++) {
+    const x = i / (wave.length - 1) * w, y = h / 2 + (wave[i] - 128) / 128 * h * 0.9;
+    i ? g.lineTo(x, y) : g.moveTo(x, y);
+  }
+  g.stroke(); g.shadowBlur = 0;
+}
+function drawIdle() {
+  const w = cv.width, h = cv.height;
+  g.fillStyle = 'rgb(4,5,10)'; g.fillRect(0, 0, w, h);
+  g.strokeStyle = 'rgba(63,230,255,0.35)'; g.lineWidth = 2;
+  g.beginPath(); g.moveTo(0, h / 2); g.lineTo(w, h / 2); g.stroke();
+}
+
+$('play').onclick = () => playing ? stop() : start();
+$('loop').onclick = () => { loopOn = !loopOn; $('loop').setAttribute('aria-pressed', loopOn); };
+$('vol').addEventListener('input', e => { vol = +e.target.value; if (bus) bus.master.gain.setTargetAtTime(vol, ctx.currentTime, 0.02); });
+document.addEventListener('visibilitychange', () => { if (document.hidden && playing) stop(); });
+select(0); renderSeg(); requestAnimationFrame(frame);
+</script>

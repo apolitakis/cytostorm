@@ -1,0 +1,283 @@
+<title>Cytostorm v3 Tuner</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Instrument+Sans:wdth,wght@75..100,400..700&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+/* Layout: pick a level, then results first (what the bots did), then the level's knobs, then saved difficulties.
+   On wide screens the knobs sit left and the results stay in view on the right.
+   Deliberately single-theme, matching the game: glowing cells on black. */
+:root {
+  color-scheme: dark;
+  --void: #05060C;
+  --panel: #0B0F1C;
+  --panel2: #111730;
+  --line: #1F2744;
+  --ink: #DDE6F5;
+  --dim: #7F8BA6;
+  --faint: #47506B;
+  --cell: #3FE6FF;
+  --germ: #FF3DCB;
+  --gold: #FFD23F;
+  --kill: #FF7A3D;
+  --repair: #5CFFA1;
+  --damage: #FF3B4E;
+  --toxin: #B45CFF;
+  --display: "Instrument Sans", "Helvetica Neue", Arial, sans-serif;
+  --mono: "IBM Plex Mono", ui-monospace, Menlo, monospace;
+}
+html { background: var(--void); }
+body { background: var(--void); color: var(--ink); font: 15px/1.45 var(--display); margin: 0; }
+button, input, textarea, select { font: inherit; color: inherit; }
+button { cursor: pointer; touch-action: manipulation; }
+[hidden] { display: none !important; }
+:focus-visible { outline: 2px solid var(--gold); outline-offset: 2px; }
+@media (prefers-reduced-motion: reduce) { * { transition: none !important; animation: none !important; } }
+
+#app { max-width: 1180px; margin: 0 auto; padding-inline: 16px; padding-block: 18px 0; box-sizing: border-box; }
+.top { display: grid; gap: 6px; padding-bottom: 14px; }
+.top h1 { margin: 0; font-weight: 700; font-stretch: 78%; font-size: clamp(26px, 6vw, 38px); letter-spacing: .01em; line-height: 1.05; text-wrap: balance; }
+.top h1 b { color: var(--cell); font-weight: 700; }
+.top p { margin: 0; color: var(--dim); max-width: 64ch; }
+.fair { display: inline-flex; gap: 8px; align-items: baseline; font-size: 13px; color: var(--dim); }
+.fair::before { content: ""; width: 8px; height: 8px; border-radius: 50%; background: var(--repair); box-shadow: 0 0 8px var(--repair); flex: none; transform: translateY(-1px); }
+
+/* Level picker */
+.lvlbar { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 6px 14px; align-items: center; margin-bottom: 18px; }
+.lvlbar label { font-size: 13px; font-weight: 600; letter-spacing: .08em; text-transform: uppercase; color: var(--dim); }
+.lvlbar select { font: 650 17px var(--display); padding: 8px 10px; max-width: 100%; }
+.lvlbar .blurb { grid-column: 1 / -1; margin: 0; color: var(--dim); font-size: 14px; max-width: 72ch; }
+.lvlbar .blurb b { color: var(--ink); font-weight: 600; }
+@media (min-width: 640px) { .lvlbar { grid-template-columns: auto auto minmax(0, 1fr); } .lvlbar .blurb { grid-column: auto; } }
+
+.cols { display: grid; gap: 18px; grid-template-columns: minmax(0, 1fr); }
+@media (min-width: 980px) {
+  .cols { grid-template-columns: minmax(0, 5fr) minmax(0, 6fr); align-items: start; }
+  .cols > .results { position: sticky; top: calc(env(safe-area-inset-top, 0px) + 12px); max-height: calc(100vh - 110px); overflow: auto; order: 2; }
+  .cols > .knobs { order: 1; }
+}
+
+.panel { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 14px; min-width: 0; }
+h2 { margin: 0; font-size: 13px; font-weight: 600; letter-spacing: .08em; text-transform: uppercase; color: var(--dim); }
+h3 { margin: 0; font-size: 17px; font-weight: 650; text-wrap: balance; }
+.muted { color: var(--dim); }
+.small { font-size: 13px; }
+.mono, .num { font-family: var(--mono); font-variant-numeric: tabular-nums; }
+.stack { display: grid; gap: 12px; }
+
+/* Tabs */
+.tabs { display: flex; gap: 4px; background: var(--panel2); padding: 4px; border-radius: 9px; }
+.tabs button { flex: 1; border: 0; background: none; padding: 8px 6px; border-radius: 6px; color: var(--dim); font-weight: 600; font-size: 14px; }
+.tabs button[aria-selected="true"] { background: var(--line); color: var(--ink); }
+
+.stale { border: 1px dashed var(--gold); color: var(--gold); border-radius: 8px; padding: 8px 10px; font-size: 13px; }
+
+/* Standing rules */
+.checks { display: grid; gap: 6px; margin: 0; padding: 0; list-style: none; }
+.checks li { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 2px 10px; align-items: baseline; padding: 8px 10px; border-radius: 8px; background: var(--panel2); }
+.checks .mark { font: 600 12px var(--mono); letter-spacing: .04em; padding: 2px 7px; border-radius: 99px; border: 1px solid currentColor; }
+.checks .ok .mark { color: var(--repair); } .checks .bad .mark { color: var(--damage); } .checks .wait .mark { color: var(--faint); }
+.checks b { font-weight: 600; }
+.checks small { grid-column: 2; color: var(--dim); font: 12px var(--mono); }
+
+/* Skill ladder */
+.ladder { display: grid; gap: 10px; }
+.skill { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 2px 12px; align-items: center; }
+.skill .name { display: flex; gap: 8px; align-items: center; font-weight: 600; min-width: 0; }
+.skill .name i { width: 10px; height: 10px; border-radius: 50%; flex: none; }
+.skill .pct { font: 500 18px var(--mono); font-variant-numeric: tabular-nums; text-align: right; }
+.skill .bar { grid-column: 1 / -1; position: relative; height: 8px; background: var(--panel2); border-radius: 4px; }
+.skill .bar span { position: absolute; inset: 0 auto 0 0; border-radius: 4px; }
+.skill .bar em { position: absolute; top: -4px; bottom: -4px; width: 2px; background: var(--ink); opacity: .55; }
+.skill .about { grid-column: 1 / -1; font-size: 12.5px; color: var(--dim); }
+.dots { grid-column: 1 / -1; display: flex; flex-wrap: wrap; gap: 3px; }
+.dots b { width: 9px; height: 9px; border-radius: 2px; background: var(--panel2); border: 1px solid var(--line); box-sizing: border-box; }
+.dots b.w1 { background: #6b5a1e; border-color: #6b5a1e; } .dots b.w2 { background: #b3922a; border-color: #b3922a; } .dots b.w3 { background: var(--gold); border-color: var(--gold); }
+.dots b.of { background: none; border: 2px solid var(--damage); }
+.legend { display: flex; flex-wrap: wrap; gap: 4px 14px; font-size: 12px; color: var(--dim); }
+.legend span { display: inline-flex; align-items: center; gap: 5px; }
+.legend b { width: 9px; height: 9px; border-radius: 2px; display: inline-block; box-sizing: border-box; }
+.legend .line { width: 14px; height: 2px; border-radius: 1px; }
+.of-txt { color: var(--damage); }
+
+.chart { width: 100%; height: auto; display: block; }
+.chart text { fill: var(--dim); font: 10px var(--mono); }
+.chart .grid { stroke: var(--line); stroke-width: 1; }
+@media (max-width: 599px) { .chart.big text { font-size: 17px; } }
+
+/* All levels */
+.glance { width: 100%; border-collapse: collapse; font-size: 13px; }
+.glance th { text-align: left; font-weight: 600; color: var(--dim); font-size: 11px; letter-spacing: .04em; text-transform: uppercase; padding: 0 6px 6px; white-space: nowrap; }
+.glance td { padding: 7px 6px; border-top: 1px solid var(--line); white-space: nowrap; font-family: var(--mono); font-variant-numeric: tabular-nums; }
+.glance td:first-child { font-family: var(--display); font-weight: 600; }
+.glance tr[data-lv] { cursor: pointer; }
+.glance tr[data-lv]:hover td { background: var(--panel2); }
+.glance tr.cur td:first-child { color: var(--cell); }
+.glance .ok { color: var(--repair); } .glance .bad { color: var(--damage); } .glance .na { color: var(--faint); }
+.glance button { border: 0; background: none; padding: 0; font: inherit; color: inherit; text-align: left; }
+
+/* Strategies */
+.headline { display: flex; flex-wrap: wrap; align-items: baseline; gap: 6px 14px; }
+.headline .big { font: 600 40px/1 var(--mono); font-variant-numeric: tabular-nums; color: var(--gold); }
+.pill { display: inline-block; font-size: 12px; font-weight: 650; letter-spacing: .04em; padding: 3px 9px; border-radius: 99px; border: 1px solid currentColor; }
+.pill.wide { color: var(--repair); } .pill.some { color: var(--cell); } .pill.narrow { color: var(--kill); } .pill.none { color: var(--damage); }
+.recipe { margin: 0; padding-left: 18px; display: grid; gap: 4px; }
+.recipe li::marker { color: var(--gold); }
+.inputs { display: grid; gap: 14px; grid-template-columns: repeat(auto-fill, minmax(min(100%, 250px), 1fr)); }
+.inp { display: grid; gap: 4px; min-width: 0; align-content: start; }
+.inp .hd { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 2px 8px; align-items: baseline; }
+.inp .hd span { font-size: 13px; font-weight: 600; min-width: 0; }
+.inp .hd .tag { margin-left: auto; }
+.tag { font-size: 11px; font-weight: 650; letter-spacing: .05em; text-transform: uppercase; white-space: nowrap; }
+.tag.t2 { color: var(--gold); } .tag.t1 { color: var(--cell); } .tag.t0 { color: var(--faint); }
+.inp .band { font: 12px var(--mono); color: var(--dim); }
+.inp .band b { color: var(--ink); font-weight: 500; }
+
+/* Knobs */
+.knobs details { border-top: 1px solid var(--line); }
+.knobs details:first-of-type { border-top: 0; }
+.knobs summary { cursor: pointer; padding: 11px 0; font-weight: 650; display: flex; justify-content: space-between; align-items: baseline; gap: 8px; list-style: none; }
+.knobs summary::-webkit-details-marker { display: none; }
+.knobs summary::after { content: "+"; color: var(--dim); font: 16px var(--mono); }
+.knobs details[open] > summary::after { content: "−"; }
+.knobs summary .here { font: 600 10.5px var(--display); letter-spacing: .06em; text-transform: uppercase; color: var(--cell); }
+.knobs summary.off { color: var(--dim); font-weight: 600; }
+.knobs summary .cnt { margin-left: auto; color: var(--gold); font: 12px var(--mono); }
+.knobs .sect { display: grid; gap: 10px; padding-bottom: 14px; }
+.kh { display: flex; gap: 6px 10px; align-items: baseline; justify-content: space-between; flex-wrap: wrap; padding-top: 6px; }
+.kh p { margin: 0; }
+.kh.div { padding-top: 16px; margin-top: 4px; border-top: 1px solid var(--line); }
+.field { display: grid; grid-template-columns: minmax(0, 1fr) 92px; gap: 2px 10px; align-items: center; }
+.field label { font-size: 14px; }
+.field small { grid-column: 1 / -1; color: var(--dim); font-size: 12px; }
+.field.changed label { color: var(--gold); }
+input[type=number], input[type=text], textarea, select { background: var(--void); border: 1px solid var(--line); border-radius: 6px; padding: 7px 8px; width: 100%; box-sizing: border-box; font-family: var(--mono); font-size: 14px; font-variant-numeric: tabular-nums; }
+.field.changed input { border-color: var(--gold); }
+textarea { min-height: 88px; resize: vertical; font-size: 12px; }
+.sub { font-size: 13px; font-weight: 650; }
+
+.pressure { display: grid; grid-template-columns: minmax(0, 1fr) 92px; gap: 6px 10px; align-items: center; padding: 10px; border-radius: 8px; background: var(--panel2); }
+.pressure label { font-weight: 650; }
+.pressure input[type=range] { grid-column: 1 / -1; width: 100%; accent-color: var(--gold); margin: 0; }
+.pressure small { grid-column: 1 / -1; color: var(--dim); font-size: 12px; }
+.pressure.changed label, .pressure.changed input[type=number] { color: var(--gold); border-color: var(--gold); }
+
+.waves { border-collapse: collapse; font-size: 13px; }
+.waves th { text-align: left; font-weight: 600; color: var(--dim); font-size: 11px; letter-spacing: .04em; text-transform: uppercase; padding: 0 3px 4px; white-space: nowrap; }
+.waves th i { display: inline-block; width: 8px; height: 8px; border-radius: 50%; margin-right: 4px; }
+.waves td { padding: 3px; vertical-align: top; }
+.waves input[type=number] { padding: 6px; width: 68px; }
+.waves input[type=checkbox] { margin: 9px 4px; width: 18px; height: 18px; accent-color: var(--gold); }
+.waves .x { border: 0; background: none; color: var(--dim); font-size: 18px; padding: 4px 6px; }
+.waves .clock, .waves .eff { font: 11px var(--mono); color: var(--dim); }
+.waves .eff { color: var(--gold); }
+.wrap-x { overflow-x: auto; }
+.row { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.row select { width: auto; }
+.btn { border: 1px solid var(--line); background: var(--panel2); border-radius: 7px; padding: 8px 12px; font-weight: 600; font-size: 14px; }
+.btn:hover { border-color: var(--dim); }
+.btn.go { background: var(--cell); color: #021015; border-color: var(--cell); }
+.btn.gold { background: var(--gold); color: #1a1300; border-color: var(--gold); }
+.btn.quiet { background: none; }
+.btn:disabled { opacity: .45; cursor: default; }
+.toxlist { display: flex; flex-wrap: wrap; gap: 8px; }
+.toxlist label { display: flex; align-items: center; gap: 4px; }
+.toxlist input { width: 74px; }
+
+/* Saved */
+.saved { display: grid; gap: 8px; }
+.slot { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 4px 10px; align-items: center; padding: 10px; border: 1px solid var(--line); border-radius: 8px; }
+.slot .sum { grid-column: 1 / -1; font: 12px var(--mono); color: var(--dim); overflow-wrap: anywhere; }
+
+/* Run bar: stays at the bottom on a phone */
+.runbar { position: sticky; bottom: 0; z-index: 5; margin-top: 18px; background: color-mix(in srgb, var(--void) 88%, transparent); backdrop-filter: blur(8px); border-top: 1px solid var(--line); padding: 10px 0 calc(10px + env(safe-area-inset-bottom, 0px)); }
+.runbar .inner { display: flex; flex-wrap: wrap; gap: 8px 12px; align-items: center; }
+.runbar .grp { display: flex; flex-wrap: wrap; gap: 6px 8px; align-items: center; }
+.runbar label { display: flex; gap: 6px; align-items: center; font-size: 13px; color: var(--dim); }
+.runbar select { width: auto; padding: 6px; }
+.prog { flex: 1 1 160px; display: grid; gap: 3px; min-width: 0; }
+.prog .track { height: 6px; background: var(--panel2); border-radius: 3px; overflow: hidden; }
+.prog .track span { display: block; height: 100%; width: 0; background: var(--cell); transition: width .2s; }
+.prog small { font: 12px var(--mono); color: var(--dim); }
+@media (max-width: 599px) { .runbar .wide { display: none; } .runbar .inner { gap: 8px; } .runbar .btn { padding: 8px 10px; } }
+.toast { position: fixed; left: 50%; bottom: calc(96px + env(safe-area-inset-bottom, 0px)); transform: translateX(-50%); background: var(--panel2); border: 1px solid var(--line); padding: 8px 14px; border-radius: 8px; font-size: 14px; z-index: 9; max-width: calc(100vw - 48px); box-sizing: border-box; }
+footer { color: var(--faint); font-size: 12px; padding-block: 18px 8px; }
+</style>
+
+<div id="app">
+  <header class="top">
+    <h1>Cytostorm v3 <b>Tuner</b></h1>
+    <p>Pick a level, change its pressure or the rules, then let bots play it. The bots tab shows who wins and checks the standing rules. Winning strategies tries many different ways to play and shows which choices win.</p>
+    <span class="fair">Every knob is part of a level's script or a fixed rule. Nothing reacts to how the player is doing.</span>
+  </header>
+
+  <section class="lvlbar" aria-label="Level">
+    <label for="level">Level</label>
+    <select id="level"></select>
+    <p class="blurb" id="blurb"></p>
+  </section>
+
+  <div class="cols">
+    <section class="results panel stack" aria-label="Results">
+      <div class="tabs" role="tablist">
+        <button role="tab" id="tabLadder" aria-selected="true" type="button">Bots</button>
+        <button role="tab" id="tabStrat" aria-selected="false" type="button">Strategies</button>
+        <button role="tab" id="tabAll" aria-selected="false" type="button">All levels</button>
+      </div>
+      <div id="paneLadder" class="stack"></div>
+      <div id="paneStrat" class="stack" hidden></div>
+      <div id="paneAll" class="stack" hidden></div>
+    </section>
+
+    <section class="knobs panel" aria-label="Difficulty settings">
+      <div class="kh">
+        <h2>Difficulty</h2>
+        <div class="row"><span id="changeCount" class="small muted"></span></div>
+      </div>
+      <div class="row" style="padding:8px 0 4px"><button class="btn quiet" id="resetLevel" type="button">Reset this level</button><button class="btn quiet" id="resetAll" type="button">Reset everything</button></div>
+      <div id="knobs"></div>
+    </section>
+  </div>
+
+  <section class="panel stack" style="margin-top:18px" aria-label="Saved difficulties and export">
+    <h2>Saved difficulties</h2>
+    <p class="small muted" style="margin:0">Saved on this device only. A saved difficulty holds every level's script and every rule. Save one per difficulty (Easy, Normal, Hard) to compare them.</p>
+    <div class="row"><input type="text" id="slotName" placeholder="Name, like Hard" style="flex:1 1 160px"><button class="btn" id="slotSave" type="button">Save current</button></div>
+    <div class="saved" id="saved"></div>
+    <h2 style="margin-top:8px">Use these numbers</h2>
+    <div class="row">
+      <button class="btn gold" id="play" type="button">Play these settings</button>
+      <button class="btn" id="copy" type="button">Copy settings</button>
+    </div>
+    <p class="small muted" style="margin:0">Play opens a copy of the game on the level picked above, with these settings on every level. The live game link is not changed. To make them the real game's numbers, paste the copied settings into the build thread.</p>
+    <label class="small muted" for="paste">Load settings someone copied</label>
+    <textarea id="paste" placeholder='{"tune": {...}, "levels": {...}, "pressure": {...}}'></textarea>
+    <div class="row"><button class="btn" id="load" type="button">Load pasted settings</button></div>
+  </section>
+
+  <div class="runbar">
+    <div class="inner">
+      <div class="grp">
+        <button class="btn go" id="runLadder" type="button">Run bots</button>
+        <label for="ladderN"><span class="wide">games each</span> <select id="ladderN" aria-label="Games per bot"><option>4</option><option selected>8</option><option>16</option></select></label>
+        <label for="ladderScope"><span class="wide">on</span> <select id="ladderScope" aria-label="Which levels"><option value="one" selected>this level</option><option value="all">all levels</option></select></label>
+      </div>
+      <div class="grp">
+        <button class="btn go" id="runStrat" type="button">Find <span class="wide">winning </span>strategies</button>
+        <label for="stratN"><span class="wide">strategies</span> <select id="stratN" aria-label="How many strategies"><option>60</option><option selected>120</option><option>240</option><option>480</option></select></label>
+      </div>
+      <div class="prog" id="prog" hidden><div class="track"><span id="progBar"></span></div><small id="progTxt"></small></div>
+      <button class="btn quiet" id="stop" type="button" hidden>Stop</button>
+    </div>
+  </div>
+  <footer>Bots play the same simulation as the game, at full detail, using only the buttons a player has.</footer>
+</div>
+<div class="toast" id="toast" role="status" hidden></div>
+
+<script>
+/*SIM*/
+/*BOTS*/
+const BASELINE = /*BASELINE*/;
+const SRC_HASH = /*SRCHASH*/;
+const WORKER_SRC = /*WORKERSRC*/;
+/*TUNER*/
+</script>

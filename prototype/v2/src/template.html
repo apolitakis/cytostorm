@@ -1,0 +1,241 @@
+<title>Immune RTS v2</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Instrument+Sans:wdth,wght@75..100,400..700&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+/* v2 layout: progress bar on top, the three-zone map in the middle, one control row at the bottom.
+   Deliberately single-theme: the art is fluorescence microscopy, glowing cells on black. */
+:root {
+  color-scheme: dark;
+  --void: #04050A;
+  --panel: #0A0D18;
+  --panel2: #10152A;
+  --line: #1E2540;
+  --ink: #DDE6F5;
+  --dim: #7A86A0;
+  --cell: #3FE6FF;
+  --germ: #FF3DCB;
+  --gold: #FFD23F;
+  --kill: #FF7A3D;
+  --repair: #5CFFA1;
+  --damage: #FF3B4E;
+  --toxin: #B45CFF;
+  --display: "Instrument Sans", "Helvetica Neue", Arial, sans-serif;
+  --mono: "IBM Plex Mono", ui-monospace, Menlo, monospace;
+}
+[hidden] { display: none !important; }
+html, body { height: 100%; background: var(--void); color: var(--ink); }
+body { margin: 0; font: 14px/1.4 var(--display); overflow: hidden; -webkit-user-select: none; user-select: none; -webkit-tap-highlight-color: transparent; }
+button, input { font: inherit; color: inherit; }
+button { touch-action: manipulation; cursor: pointer; }
+button:focus-visible, input:focus-visible, summary:focus-visible { outline: 2px solid var(--gold); outline-offset: 2px; }
+img.ico { width: 18px; height: 18px; flex: none; }
+
+#app { height: 100%; max-width: 1100px; margin: 0 auto; display: flex; flex-direction: column; padding-inline: 16px; box-sizing: border-box; }
+
+/* HUD */
+#hud { display: grid; gap: 4px; padding-block: 8px 2px; min-width: 0; }
+.hudrow { display: flex; align-items: center; gap: 8px; min-width: 0; }
+#prog { flex: 1; min-width: 0; height: 30px; display: block; }
+#clock { flex: none; font: 500 13px var(--mono); font-variant-numeric: tabular-nums; color: var(--dim); min-width: 2.8em; text-align: right; }
+.hbtn { flex: none; display: grid; place-items: center; background: var(--panel); border: 1px solid var(--line); border-radius: 8px; padding: 4px 8px; font: 500 12px var(--mono); min-width: 34px; height: 30px; box-sizing: border-box; }
+.hbtn img { width: 16px; height: 16px; }
+#speedTag { font: 500 12px var(--mono); color: var(--gold); }
+/* Fatigue meter: fills as the body overworks; ticks at each tier */
+.fatigue { display: flex; align-items: center; gap: 8px; font-size: 11.5px; color: var(--dim); min-width: 0; }
+.fatigue > span:first-child { flex: none; }
+.ftrack { flex: 1; min-width: 40px; height: 10px; display: flex; }
+.ftrack svg { display: block; }
+#fIcon { width: 18px; height: 18px; flex: none; }
+#fTier { flex: none; min-width: 5.4em; font: 600 11.5px var(--display); color: var(--dim); text-align: right; }
+.fatigue[data-tier="1"] #fTier { color: var(--gold); }
+.fatigue[data-tier="2"] #fTier { color: var(--kill); }
+.fatigue[data-tier="3"] #fTier { color: var(--damage); }
+#banner { min-height: 1.4em; font-size: 12.5px; line-height: 1.35; color: var(--dim); text-wrap: pretty; }
+#banner b { color: var(--ink); font-weight: 600; }
+#banner.alarm b { color: var(--toxin); }
+#banner.bad b { color: var(--damage); }
+
+/* Stage */
+#stage { position: relative; flex: 1; min-height: 0; }
+#cv { position: absolute; inset: 0; width: 100%; height: 100%; display: block; touch-action: manipulation; }
+#toasts { position: absolute; left: 0; right: 0; bottom: 8px; display: grid; justify-items: center; gap: 4px; pointer-events: none; }
+.toast { background: rgba(10, 13, 24, .9); border: 1px solid var(--line); border-radius: 999px; padding: 4px 12px; font-size: 12.5px; animation: toast 2.2s ease forwards; }
+.toast.bad { border-color: var(--damage); }
+.toast.good { border-color: var(--gold); }
+.toast.toxin { border-color: var(--toxin); }
+@keyframes toast { 0% { opacity: 0; transform: translateY(6px); } 10%, 80% { opacity: 1; transform: none; } 100% { opacity: 0; } }
+
+/* Bottom controls: marrow switch, pause */
+#bar { display: flex; align-items: stretch; gap: 8px; padding-block: 6px 10px; min-width: 0; }
+.marrow { flex: 1; min-width: 0; display: grid; grid-template-columns: auto 1fr; align-items: center; gap: 4px 10px; background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 6px 8px; }
+.mlabel { display: grid; gap: 2px; font-size: 12px; color: var(--dim); white-space: nowrap; }
+.mlabel b { color: var(--ink); font: 600 12.5px var(--display); }
+.mlabel span { font: 500 11px var(--mono); font-variant-numeric: tabular-nums; }
+.seg { display: grid; grid-template-columns: 1fr 1fr; gap: 4px; min-width: 0; }
+.seg button { position: relative; display: flex; align-items: center; justify-content: center; gap: 6px; background: var(--panel2); border: 1px solid var(--line); border-radius: 9px; padding: 7px 4px; font-size: 13px; font-weight: 600; overflow: hidden; min-width: 0; white-space: nowrap; }
+.seg button img { width: 20px; height: 20px; flex: none; }
+.seg button .nm { overflow: hidden; text-overflow: ellipsis; }
+.seg button[aria-pressed="true"] { border-color: var(--cell); color: var(--cell); }
+.seg button .fill { position: absolute; left: 0; bottom: 0; height: 3px; width: 0; background: var(--cell); box-shadow: 0 0 8px var(--cell); }
+.seg button .ct { font: 500 11px var(--mono); color: var(--dim); }
+#pauseBtn { height: auto; min-width: 48px; border-radius: 12px; }
+.output { flex: 0 1 300px; min-width: 0; display: grid; gap: 2px; align-content: center; background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 6px 10px; }
+.output .mlabel { display: flex; align-items: center; gap: 6px; }
+.output .mlabel span { margin-left: auto; }
+#output { width: 100%; margin: 4px 0 2px; -webkit-appearance: none; appearance: none; height: 18px; background: none; }
+#output::-webkit-slider-runnable-track { height: 6px; border-radius: 3px; background: var(--track, var(--panel2)); }
+#output::-moz-range-track { height: 6px; border-radius: 3px; background: var(--track, var(--panel2)); }
+#output::-webkit-slider-thumb { -webkit-appearance: none; width: 20px; height: 20px; margin-top: -7px; border-radius: 50%; background: var(--ink); border: 2px solid var(--void); box-shadow: 0 0 8px rgba(255, 210, 63, .6); }
+#output::-moz-range-thumb { width: 18px; height: 18px; border-radius: 50%; background: var(--ink); border: 2px solid var(--void); }
+
+/* Modals */
+#modal { position: fixed; inset: 0; background: rgba(4, 5, 10, .8); display: grid; place-items: center; padding: 16px; z-index: 20; }
+.mbox { width: 100%; max-width: 460px; max-height: calc(100% - 8px); overflow: auto; background: var(--panel); border: 1px solid var(--line); border-radius: 16px; padding: 18px; display: grid; gap: 12px; box-sizing: border-box; }
+.mbox h2 { margin: 0; font-size: 24px; font-weight: 650; font-stretch: 80%; line-height: 1.05; text-wrap: balance; }
+.mbox h2 .glow { color: var(--cell); }
+.mbox h2 .bad { color: var(--damage); }
+.mbox p { margin: 0; color: var(--dim); }
+.eyebrow { font: 500 11px/1 var(--mono); letter-spacing: .14em; text-transform: uppercase; color: var(--dim); }
+.howto { margin: 0; padding-left: 18px; display: grid; gap: 5px; color: var(--ink); font-size: 13.5px; }
+.howto li::marker { color: var(--cell); }
+.btnrow { display: flex; gap: 8px; flex-wrap: wrap; }
+.btn { flex: 1; background: var(--panel2); border: 1px solid var(--line); border-radius: 10px; padding: 9px 12px; font-weight: 600; white-space: nowrap; }
+.btn.primary { border-color: var(--cell); color: var(--cell); }
+.linkbtn { background: none; border: 0; color: var(--cell); text-decoration: underline; padding: 2px; justify-self: start; font-size: 13.5px; }
+.stars { display: flex; gap: 6px; }
+.stars img { width: 34px; height: 34px; }
+.goals { list-style: none; margin: 0; padding: 0; display: grid; gap: 3px; font-size: 13px; }
+.goals li { display: flex; gap: 8px; color: var(--dim); }
+.goals li::before { content: "\2606"; }
+.goals li.hit { color: var(--ink); }
+.goals li.hit::before { content: "\2605"; color: var(--gold); }
+.stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+.stats div { display: grid; gap: 1px; }
+.stats b { font: 500 16px var(--mono); font-variant-numeric: tabular-nums; }
+.stats span { font-size: 11px; color: var(--dim); }
+#graph { width: 100%; height: 130px; display: block; }
+.legend { display: flex; flex-wrap: wrap; gap: 4px 14px; font-size: 11.5px; color: var(--dim); margin-top: -6px; }
+.legend span::before { content: ""; display: inline-block; width: 10px; height: 3px; margin-right: 5px; vertical-align: middle; background: var(--c); }
+/* Guide */
+.tabs { display: grid; grid-template-columns: repeat(4, 1fr); gap: 4px; position: sticky; top: -18px; background: var(--panel); padding-block: 6px; z-index: 1; }
+.tabs button { background: var(--panel2); border: 1px solid var(--line); border-radius: 8px; padding: 6px 2px; font-size: 12.5px; }
+.tabs button[aria-pressed="true"] { border-color: var(--cell); color: var(--cell); }
+.gsec { display: grid; gap: 14px; }
+.unit { display: grid; grid-template-columns: 44px 1fr; gap: 2px 12px; align-items: start; }
+.unit > img { grid-row: span 3; width: 44px; height: 44px; }
+.unit h4 { margin: 0; font-size: 16px; font-weight: 650; font-stretch: 85%; }
+.unit .why { margin: 0; color: var(--ink); font-size: 13.5px; }
+.unit ul { margin: 2px 0 0; padding-left: 16px; display: grid; gap: 3px; color: var(--dim); font-size: 13px; }
+.unit ul b { color: var(--ink); font-weight: 600; }
+
+/* Dev panel */
+#dev { position: fixed; top: 0; right: 0; bottom: 0; width: min(360px, 100%); background: rgba(10, 13, 24, .97); border-left: 1px solid var(--line); z-index: 30; overflow: auto; padding: 14px 16px 40px; box-sizing: border-box; display: grid; gap: 12px; align-content: start; font-size: 13px; }
+#dev h3 { margin: 0; font-size: 16px; font-weight: 650; font-stretch: 85%; display: flex; align-items: center; }
+#dev h3 button { margin-left: auto; }
+#dev .grp { display: grid; gap: 6px; padding-bottom: 10px; border-bottom: 1px solid var(--line); }
+#dev label.row { display: grid; grid-template-columns: 1fr auto; gap: 8px; align-items: center; }
+#dev input[type="number"] { width: 5.5em; background: var(--panel2); border: 1px solid var(--line); border-radius: 6px; padding: 3px 6px; font: 12px var(--mono); }
+#dev input[type="number"].changed { border-color: var(--gold); color: var(--gold); }
+#dev details summary { cursor: pointer; font: 500 12px var(--mono); text-transform: uppercase; letter-spacing: .08em; color: var(--dim); padding: 4px 0; }
+#dev details[open] summary { color: var(--ink); }
+#dev details .field { display: grid; gap: 2px; padding: 4px 0; }
+#dev details .field small { color: var(--dim); font-size: 11px; line-height: 1.3; }
+#dev .devbtns { display: flex; gap: 6px; flex-wrap: wrap; }
+#dev .devbtns button { background: var(--panel2); border: 1px solid var(--line); border-radius: 8px; padding: 5px 9px; font-size: 12px; }
+#devJson { width: 100%; min-height: 80px; background: var(--panel2); color: var(--ink); border: 1px solid var(--line); border-radius: 8px; font: 11px var(--mono); box-sizing: border-box; }
+#speed { width: 100%; accent-color: var(--gold); }
+
+/* Narrow portrait phones: the marrow label sits above the switch so both names fit */
+@media (max-width: 640px) {
+  #bar { flex-wrap: wrap; }
+  .marrow { flex-basis: 100%; }
+  .output { flex: 1 1 auto; }
+}
+@media (max-width: 480px) {
+  .marrow { grid-template-columns: 1fr; padding: 5px 6px 6px; }
+  .mlabel { display: flex; align-items: baseline; gap: 8px; }
+  .seg button { font-size: 12.5px; gap: 4px; padding: 6px 3px; }
+  .seg button img { width: 18px; height: 18px; }
+  #pauseBtn { min-width: 40px; }
+}
+/* Short landscape phones: tighten the chrome so the map keeps its height */
+@media (max-height: 480px) {
+  #hud { padding-block: 4px 0; }
+  #banner { min-height: 0; font-size: 12px; }
+  #bar { padding-block: 4px 6px; }
+  .seg button { padding: 5px 4px; }
+}
+@media (prefers-reduced-motion: reduce) { .toast { animation-duration: .01s; animation-delay: 2s; } }
+</style>
+
+<div id="app">
+  <header id="hud">
+    <div class="hudrow">
+      <canvas id="prog" aria-label="Level progress: waves and toxin bursts still to come"></canvas>
+      <span id="clock">0:00</span>
+      <span id="speedTag" hidden></span>
+      <button id="helpBtn" class="hbtn" type="button" aria-label="Guide">?</button>
+      <button id="devBtn" class="hbtn" type="button">Dev</button>
+    </div>
+    <div id="banner" aria-live="polite"></div>
+  </header>
+
+  <main id="stage">
+    <canvas id="cv" aria-label="The map: Wound, Tissue and Lymph node. Tap a zone to flip its macrophages between Offense and Support."></canvas>
+    <div id="toasts"></div>
+  </main>
+
+  <footer id="bar">
+    <div class="marrow">
+      <div class="mlabel"><b>Marrow</b><span id="cellCount">0/20</span></div>
+      <div class="seg" id="marrowSeg">
+        <button type="button" data-make="neut" aria-pressed="true"><img data-art="neutrophil" alt=""><span class="nm">Neutrophils</span><span class="ct" id="nCount">0</span><i class="fill"></i></button>
+        <button type="button" data-make="mac" aria-pressed="false"><img data-art="macrophage-offense" alt=""><span class="nm">Macrophages</span><span class="ct" id="mCount">0</span><i class="fill"></i></button>
+      </div>
+    </div>
+    <div class="output">
+      <div class="mlabel"><img class="ico" data-art="body-output" alt=""><b>Body output</b><span id="outVal">1.0×</span></div>
+      <input type="range" id="output" min="0" max="100" step="5" value="50" aria-label="Body output: how fast the marrow makes cells">
+      <div class="fatigue" id="fatigue" data-tier="0"><span>Fatigue</span><div class="ftrack" id="ftrack"></div><img id="fIcon" alt=""><span id="fTier">Fine</span></div>
+    </div>
+    <button id="pauseBtn" class="hbtn" type="button" aria-label="Pause"><img data-art="pause" alt=""></button>
+  </footer>
+</div>
+
+<div id="modal" hidden><div class="mbox" id="mbox" role="dialog" aria-modal="true"></div></div>
+
+<aside id="dev" hidden aria-label="Dev tools">
+  <h3>Dev tools <button type="button" class="hbtn" id="devClose">Close</button></h3>
+  <div class="grp">
+    <label class="row" for="speed"><span>Speed <b id="speedVal">1×</b></span></label>
+    <input type="range" id="speed" min="0" max="6" step="1" value="2">
+    <div class="devbtns"><button type="button" id="devPause">Pause</button><button type="button" id="devStep">Step 1 s</button><button type="button" id="devSkip">Skip 15 s</button></div>
+  </div>
+  <div class="grp">
+    <label class="row" for="seed"><span>Random seed</span><input type="number" id="seed" value="1" min="1" step="1"></label>
+    <div class="devbtns"><button type="button" id="devRestart">Restart with seed</button><button type="button" id="devNewSeed">New seed</button></div>
+  </div>
+  <div class="grp">
+    <span>Cheats and overlays</span>
+    <div class="devbtns"><button type="button" id="cheatBact">+10 bacteria</button><button type="button" id="cheatArmor">+4 armored</button><button type="button" id="cheatClear">Kill all bacteria</button></div>
+    <label class="row" for="ovRange"><span>Show neutrophil range</span><input type="checkbox" id="ovRange"></label>
+    <label class="row" for="ovRotate"><span>Force portrait layout</span><input type="checkbox" id="ovRotate"></label>
+  </div>
+  <div class="grp">
+    <span>Tuning <small style="color:var(--dim)">(live; gold = changed from default; saved in this browser)</small></span>
+    <div id="tuning"></div>
+    <div class="devbtns"><button type="button" id="tuneCopy">Copy changes as JSON</button><button type="button" id="tuneReset">Reset all</button></div>
+    <textarea id="devJson" hidden readonly aria-label="Tuning JSON"></textarea>
+  </div>
+</aside>
+
+<script>
+/*ART*/
+</script>
+<script>
+/*SIM*/
+</script>
+<script>
+/*UI*/
+</script>

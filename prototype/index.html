@@ -1,0 +1,1875 @@
+<title>Immune RTS Prototype</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Instrument+Sans:wdth,wght@75..100,400..700&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+/* Layout: one phone-height column. Meters on top, the tissue field in the middle, the four control cards along the bottom.
+   Deliberately single-theme: the art is fluorescence microscopy, glowing cells on black. */
+:root {
+  color-scheme: dark;
+  --void: #04050A;
+  --panel: #0A0D18;
+  --panel2: #10152A;
+  --line: #1E2540;
+  --ink: #DDE6F5;
+  --dim: #7A86A0;
+  --cell: #3FE6FF;
+  --germ: #FF3DCB;
+  --pollen: #C9F25C;
+  --gold: #FFD23F;
+  --kill: #FF7A3D;
+  --repair: #5CFFA1;
+  --damage: #FF3B4E;
+  --scar: #8A2433;
+  --quiet: #7F8FB0;
+  --display: "Instrument Sans", "Helvetica Neue", Arial, sans-serif;
+  --mono: "IBM Plex Mono", ui-monospace, Menlo, monospace;
+}
+[hidden] { display: none !important; }
+html, body { height: 100%; background: var(--void); color: var(--ink); }
+body { margin: 0; font: 14px/1.4 var(--display); overflow: hidden; -webkit-user-select: none; user-select: none; -webkit-tap-highlight-color: transparent; }
+button, input { font: inherit; color: inherit; }
+button { touch-action: manipulation; cursor: pointer; }
+button:focus-visible, input:focus-visible, summary:focus-visible { outline: 2px solid var(--gold); outline-offset: 2px; }
+img.ico { width: 18px; height: 18px; flex: none; }
+
+#app { height: 100%; max-width: 520px; margin: 0 auto; display: flex; flex-direction: column; padding-inline: 16px; box-sizing: border-box; }
+
+/* HUD */
+#hud { display: grid; gap: 6px; padding-block: 8px 4px; min-width: 0; }
+#hud > * { min-width: 0; }
+.meters { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+.meter { display: grid; gap: 4px; min-width: 0; }
+.mlabel { display: flex; align-items: center; gap: 6px; font-size: 12px; color: var(--dim); white-space: nowrap; }
+.mlabel b { margin-left: auto; font: 500 13px var(--mono); color: var(--ink); font-variant-numeric: tabular-nums; }
+.track { position: relative; height: 8px; border-radius: 4px; background: var(--panel2); overflow: hidden; }
+.track i { position: absolute; inset: 0 auto 0 0; width: 0; border-radius: 4px; }
+#fLoad { background: var(--germ); box-shadow: 0 0 10px var(--germ); }
+#mLoad.pollen #fLoad { background: var(--pollen); box-shadow: 0 0 10px var(--pollen); }
+#fHost { background: var(--damage); box-shadow: 0 0 10px var(--damage); }
+#fScar { background: var(--scar); z-index: 1; }
+.meter.warn b { color: var(--damage); }
+.hudrow { display: flex; align-items: center; gap: 8px; }
+#clock { flex: none; font: 500 13px var(--mono); font-variant-numeric: tabular-nums; color: var(--dim); min-width: 3.2em; }
+#sampleBtn { flex: 1; min-width: 0; display: flex; align-items: center; gap: 8px; background: none; border: 1px solid var(--line); border-radius: 999px; padding: 4px 10px 4px 6px; text-align: left; }
+#sampleBtn .strack { position: relative; flex: 1 0 28px; height: 6px; border-radius: 3px; background: var(--panel2); overflow: hidden; }
+#sampleBtn .strack i { position: absolute; inset: 0 auto 0 0; width: 0; background: var(--gold); }
+#sampleLabel { flex: 0 1 auto; min-width: 0; font-size: 12px; color: var(--dim); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+#sampleBtn.ready { border-color: var(--gold); animation: pulse 1.2s ease-in-out infinite; }
+#sampleBtn.ready #sampleLabel { color: var(--gold); }
+@keyframes pulse { 50% { box-shadow: 0 0 14px rgba(255, 210, 63, .5); } }
+.hbtn { flex: none; background: var(--panel); border: 1px solid var(--line); border-radius: 8px; padding: 5px 9px; font: 500 12px var(--mono); min-width: 34px; }
+#speedTag { font: 500 12px var(--mono); color: var(--gold); }
+
+/* Stage */
+#stage { position: relative; flex: 1; min-height: 0; }
+#cv { position: absolute; inset: 0; width: 100%; height: 100%; display: block; touch-action: manipulation; }
+#banner { min-height: 2.7em; font-size: 12.5px; line-height: 1.35; color: var(--ink); text-wrap: pretty; }
+#banner b { color: var(--gold); font-weight: 600; }
+#toasts { position: absolute; left: 0; right: 0; bottom: 8px; display: grid; justify-items: center; gap: 4px; pointer-events: none; }
+.toast { background: rgba(10, 13, 24, .9); border: 1px solid var(--line); border-radius: 999px; padding: 4px 12px; font-size: 12.5px; animation: toast 2.8s ease forwards; }
+.toast.bad { border-color: var(--damage); }
+.toast.good { border-color: var(--gold); }
+@keyframes toast { 0% { opacity: 0; transform: translateY(6px); } 10%, 80% { opacity: 1; transform: none; } 100% { opacity: 0; } }
+
+/* Sector sheet */
+#sheet { position: absolute; left: 8px; right: 8px; bottom: 8px; background: rgba(10, 13, 24, .96); border: 1px solid var(--line); border-radius: 14px; padding: 10px 12px 12px; display: grid; gap: 8px; }
+.sheethead { display: grid; grid-template-columns: auto 1fr auto; align-items: center; gap: 0 8px; }
+.sheethead .ico { grid-row: span 2; width: 26px; height: 26px; }
+.sheethead h3 { margin: 0; font-size: 15px; font-weight: 650; font-stretch: 85%; white-space: nowrap; }
+.sheethead span { grid-column: 2; color: var(--dim); font: 11.5px var(--mono); }
+.sheethead button { grid-column: 3; grid-row: 1 / span 2; background: none; border: 0; color: var(--dim); font-size: 22px; line-height: 1; padding: 4px 8px; }
+.levels { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; }
+.levels button { display: grid; justify-items: center; gap: 2px; background: var(--panel2); border: 1px solid var(--line); border-radius: 10px; padding: 6px 2px; font-size: 12px; }
+.levels button img { width: 22px; height: 22px; }
+.levels button[aria-pressed="true"] { border-color: var(--lv); color: var(--lv); background: color-mix(in srgb, var(--lv) 12%, var(--panel2)); }
+#sheetHint { margin: 0; font-size: 12.5px; color: var(--dim); }
+
+/* Bottom cards */
+#bar { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; padding-block: 6px 10px; }
+.card { background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 7px 8px; display: grid; gap: 5px; min-width: 0; align-content: start; }
+.chead { display: flex; align-items: center; gap: 6px; font-size: 12.5px; font-weight: 600; white-space: nowrap; }
+.chead b { margin-left: auto; font: 500 12px var(--mono); color: var(--dim); font-variant-numeric: tabular-nums; }
+.seg { display: grid; grid-template-columns: 1fr 1fr; gap: 4px; }
+.seg button { display: flex; align-items: center; justify-content: center; gap: 4px; background: var(--panel2); border: 1px solid var(--line); border-radius: 8px; padding: 5px 4px; font-size: 12.5px; }
+.seg button img { width: 16px; height: 16px; }
+.seg button[aria-pressed="true"] { border-color: var(--cell); color: var(--cell); }
+.seg button[data-st="kill"][aria-pressed="true"] { border-color: var(--kill); color: var(--kill); }
+.seg button[data-st="repair"][aria-pressed="true"] { border-color: var(--repair); color: var(--repair); }
+.seg button[data-st="trap"][aria-pressed="true"] { border-color: var(--damage); color: var(--damage); }
+.hint { margin: 0; font-size: 11.5px; line-height: 1.3; color: var(--dim); }
+.hint.switching { color: var(--gold); }
+#mix { width: 100%; margin: 2px 0; accent-color: var(--cell); }
+.mixlabels { display: flex; justify-content: space-between; font: 11px var(--mono); color: var(--dim); font-variant-numeric: tabular-nums; }
+#feverBtn { display: flex; align-items: center; gap: 6px; background: var(--panel2); border: 1px solid var(--line); border-radius: 8px; padding: 5px 8px; font-size: 12.5px; }
+#feverBtn small { margin-left: auto; font: 500 11px var(--mono); color: var(--dim); }
+#feverBtn.active { border-color: var(--kill); color: var(--kill); }
+#feverBtn:disabled { opacity: .55; cursor: default; }
+
+/* Modals */
+#modal { position: fixed; inset: 0; background: rgba(4, 5, 10, .78); display: grid; place-items: center; padding: 16px; z-index: 20; }
+.mbox { width: 100%; max-width: 460px; max-height: calc(100% - 8px); overflow: auto; background: var(--panel); border: 1px solid var(--line); border-radius: 16px; padding: 18px; display: grid; gap: 12px; box-sizing: border-box; }
+.mbox h2 { margin: 0; font-size: 24px; font-weight: 650; font-stretch: 80%; line-height: 1.05; text-wrap: balance; }
+.mbox h2 .glow { color: var(--cell); }
+.mbox p { margin: 0; color: var(--dim); }
+.eyebrow { font: 500 11px/1 var(--mono); letter-spacing: .14em; text-transform: uppercase; color: var(--dim); }
+.howto { margin: 0; padding-left: 18px; display: grid; gap: 4px; color: var(--ink); font-size: 13.5px; }
+.howto li::marker { color: var(--cell); }
+.opts { display: grid; gap: 8px; }
+.opt { display: grid; grid-template-columns: 40px 1fr; gap: 2px 12px; align-items: center; text-align: left; background: var(--panel2); border: 1px solid var(--line); border-radius: 12px; padding: 10px 12px; }
+.opt img { grid-row: span 2; width: 40px; height: 40px; }
+.opt b { font-size: 16px; font-weight: 650; font-stretch: 85%; }
+.opt span { font-size: 12.5px; color: var(--dim); }
+.opt:hover { border-color: var(--cell); }
+/* Guide */
+.tabs { display: grid; grid-template-columns: repeat(4, 1fr); gap: 4px; position: sticky; top: -18px; background: var(--panel); padding-block: 6px; z-index: 1; }
+.tabs button { background: var(--panel2); border: 1px solid var(--line); border-radius: 8px; padding: 6px 2px; font-size: 12.5px; }
+.tabs button[aria-pressed="true"] { border-color: var(--cell); color: var(--cell); }
+.gsec { display: grid; gap: 14px; }
+.unit { display: grid; grid-template-columns: 44px 1fr; gap: 2px 12px; align-items: start; }
+.unit > img { grid-row: span 3; width: 44px; height: 44px; }
+.unit h4 { margin: 0; font-size: 16px; font-weight: 650; font-stretch: 85%; }
+.unit h4 small { font: 500 11px var(--mono); letter-spacing: .08em; text-transform: uppercase; color: var(--dim); margin-left: 6px; }
+.unit .why { margin: 0; color: var(--ink); font-size: 13.5px; }
+.unit ul { margin: 2px 0 0; padding-left: 16px; display: grid; gap: 3px; color: var(--dim); font-size: 13px; }
+.unit ul b { color: var(--ink); font-weight: 600; }
+.phases { margin: 0; padding-left: 20px; display: grid; gap: 6px; font-size: 13.5px; }
+.phases b { color: var(--cell); }
+.linkbtn { background: none; border: 0; color: var(--cell); text-decoration: underline; padding: 2px; justify-self: start; font-size: 13.5px; }
+.ghost { background: none; border: 0; color: var(--dim); text-decoration: underline; padding: 4px; justify-self: center; }
+.btnrow { display: flex; gap: 8px; flex-wrap: wrap; }
+.btn { flex: 1; background: var(--panel2); border: 1px solid var(--line); border-radius: 10px; padding: 9px 12px; font-weight: 600; white-space: nowrap; }
+.btn.primary { border-color: var(--cell); color: var(--cell); }
+.stars { font-size: 26px; letter-spacing: 4px; color: var(--gold); line-height: 1; }
+.stars .off { color: var(--line); }
+.goals { list-style: none; margin: 0; padding: 0; display: grid; gap: 3px; font-size: 13px; }
+.goals li { display: flex; gap: 8px; }
+.goals li::before { content: "\2606"; color: var(--dim); }
+.goals li.hit::before { content: "\2605"; color: var(--gold); }
+.stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+.stats div { display: grid; gap: 1px; }
+.stats b { font: 500 16px var(--mono); font-variant-numeric: tabular-nums; }
+.stats span { font-size: 11px; color: var(--dim); }
+.bars { display: grid; gap: 4px; font-size: 12px; }
+.bars .row { display: grid; grid-template-columns: 7.5em 1fr 3em; gap: 8px; align-items: center; }
+.bars .row span:last-child { font: 12px var(--mono); text-align: right; color: var(--dim); }
+.bars .bar { height: 6px; border-radius: 3px; background: var(--panel2); overflow: hidden; }
+.bars .bar i { display: block; height: 100%; background: var(--damage); }
+.sub { font-size: 12px; font-weight: 600; color: var(--dim); margin: 2px 0 -4px; }
+#graph { width: 100%; height: 170px; display: block; }
+.legend { display: flex; flex-wrap: wrap; gap: 4px 14px; font-size: 11.5px; color: var(--dim); margin-top: -4px; }
+.legend span::before { content: ""; display: inline-block; width: 10px; height: 3px; margin-right: 5px; vertical-align: middle; background: var(--c); }
+
+/* Dev panel */
+#dev { position: fixed; top: 0; right: 0; bottom: 0; width: min(360px, 100%); background: rgba(10, 13, 24, .97); border-left: 1px solid var(--line); z-index: 30; overflow: auto; padding: 14px 16px 40px; box-sizing: border-box; display: grid; gap: 12px; align-content: start; font-size: 13px; }
+#dev h3 { margin: 0; font-size: 16px; font-weight: 650; font-stretch: 85%; display: flex; align-items: center; }
+#dev h3 button { margin-left: auto; }
+#dev .grp { display: grid; gap: 6px; padding-bottom: 10px; border-bottom: 1px solid var(--line); }
+#dev label.row { display: grid; grid-template-columns: 1fr auto; gap: 8px; align-items: center; }
+#dev input[type="number"] { width: 5.5em; background: var(--panel2); border: 1px solid var(--line); border-radius: 6px; padding: 3px 6px; font: 12px var(--mono); }
+#dev input[type="number"].changed { border-color: var(--gold); color: var(--gold); }
+#dev .arr { display: flex; gap: 4px; }
+#dev .arr input { width: 4em; }
+#dev details summary { cursor: pointer; font: 500 12px var(--mono); text-transform: uppercase; letter-spacing: .08em; color: var(--dim); padding: 4px 0; }
+#dev details[open] summary { color: var(--ink); }
+#dev details .field { display: grid; gap: 2px; padding: 4px 0; }
+#dev details .field small { color: var(--dim); font-size: 11px; line-height: 1.3; }
+#dev .devbtns { display: flex; gap: 6px; flex-wrap: wrap; }
+#dev .devbtns button { background: var(--panel2); border: 1px solid var(--line); border-radius: 8px; padding: 5px 9px; font-size: 12px; }
+#devJson { width: 100%; min-height: 80px; background: var(--panel2); color: var(--ink); border: 1px solid var(--line); border-radius: 8px; font: 11px var(--mono); box-sizing: border-box; }
+#speed { width: 100%; accent-color: var(--gold); }
+@media (prefers-reduced-motion: reduce) { #sampleBtn.ready { animation: none; } .toast { animation-duration: .01s; animation-delay: 2.6s; } }
+</style>
+
+<div id="app">
+  <header id="hud">
+    <div class="meters">
+      <div class="meter" id="mLoad">
+        <div class="mlabel"><img class="ico" data-art="meter-pathogen" alt=""><span>Pathogen Load</span><b id="vLoad">0%</b></div>
+        <div class="track"><i id="fLoad"></i></div>
+      </div>
+      <div class="meter" id="mHost">
+        <div class="mlabel"><img class="ico" data-art="meter-host" alt=""><span>Host Damage</span><b id="vHost">0%</b></div>
+        <div class="track"><i id="fScar"></i><i id="fHost"></i></div>
+      </div>
+    </div>
+    <div class="hudrow">
+      <span id="clock">0:00</span>
+      <button id="sampleBtn" type="button" aria-label="Lymph node"><img class="ico" data-art="lymph-node" alt=""><span id="sampleLabel">Sample 0%</span><span class="strack"><i id="fSample"></i></span></button>
+      <span id="speedTag" hidden></span>
+      <button id="pauseBtn" class="hbtn" type="button" aria-label="Pause">II</button>
+      <button id="helpBtn" class="hbtn" type="button" aria-label="Guide">?</button>
+      <button id="devBtn" class="hbtn" type="button">Dev</button>
+    </div>
+    <div id="banner" aria-live="polite"></div>
+  </header>
+
+  <main id="stage">
+    <canvas id="cv" aria-label="Tissue map. Tap a sector to set its alert level."></canvas>
+    <div id="toasts"></div>
+    <div id="sheet" hidden>
+      <div class="sheethead"><img class="ico" id="sheetIcon" alt=""><h3 id="sheetTitle">Wound</h3><span id="sheetStats"></span><button type="button" id="sheetClose" aria-label="Close">&times;</button></div>
+      <div class="levels" id="levels"></div>
+      <p id="sheetHint"></p>
+    </div>
+  </main>
+
+  <footer id="bar">
+    <div class="card">
+      <div class="chead"><span>Neutrophils</span><b id="nCount">0</b></div>
+      <div class="seg" data-type="neut">
+        <button type="button" data-st="eat"><img data-art="stance-eat" alt="">Eat</button>
+        <button type="button" data-st="trap"><img data-art="stance-trap" alt="">Trap</button>
+      </div>
+      <p class="hint" id="nHint"></p>
+    </div>
+    <div class="card">
+      <div class="chead"><span>Macrophages</span><b id="mCount">0</b></div>
+      <div class="seg" data-type="mac">
+        <button type="button" data-st="kill"><img data-art="stance-kill" alt="">Kill</button>
+        <button type="button" data-st="repair"><img data-art="stance-repair" alt="">Repair</button>
+      </div>
+      <p class="hint" id="mHint"></p>
+    </div>
+    <div class="card">
+      <div class="chead"><img class="ico" data-art="marrow" alt=""><span>Bone marrow</span><b id="rate"></b></div>
+      <input type="range" id="mix" min="0" max="100" step="5" value="70" aria-label="Production mix, neutrophils to macrophages">
+      <div class="mixlabels"><span id="mixN">70% neut.</span><span id="mixM">30% macro.</span></div>
+    </div>
+    <div class="card">
+      <button type="button" id="feverBtn"><img class="ico" data-art="fever" alt=""><span>Fever</span><small id="feverState">Ready</small></button>
+      <p class="hint">Halves bacterial growth. Hurts the host while on.</p>
+    </div>
+  </footer>
+</div>
+
+<div id="modal" hidden><div class="mbox" id="mbox" role="dialog" aria-modal="true"></div></div>
+
+<aside id="dev" hidden aria-label="Dev tools">
+  <h3>Dev tools <button type="button" class="hbtn" id="devClose">Close</button></h3>
+  <div class="grp">
+    <label class="row" for="speed"><span>Speed <b id="speedVal">1×</b></span></label>
+    <input type="range" id="speed" min="0" max="6" step="1" value="2">
+    <div class="devbtns"><button type="button" id="devPause">Pause</button><button type="button" id="devStep">Step 1 s</button></div>
+  </div>
+  <div class="grp">
+    <label class="row" for="seed"><span>Random seed</span><input type="number" id="seed" value="1" min="1" step="1"></label>
+    <div class="devbtns"><button type="button" id="devRestart">Restart with seed</button><button type="button" id="devNewSeed">New seed</button><button type="button" id="devMenu">Scenario menu</button></div>
+  </div>
+  <div class="grp">
+    <span>Cheats and overlays</span>
+    <div class="devbtns"><button type="button" id="cheatBact">+50 bacteria</button><button type="button" id="cheatSample">Fill sample</button><button type="button" id="cheatClear">Kill all pathogens</button></div>
+    <label class="row" for="ovAlarm"><span>Show alarm field</span><input type="checkbox" id="ovAlarm"></label>
+    <label class="row" for="ovStats"><span>Show sector stats</span><input type="checkbox" id="ovStats"></label>
+  </div>
+  <div class="grp">
+    <span>Tuning <small style="color:var(--dim)">(live; gold = changed from default; saved in this browser)</small></span>
+    <div id="tuning"></div>
+    <div class="devbtns"><button type="button" id="tuneCopy">Copy changes as JSON</button><button type="button" id="tuneReset">Reset all</button></div>
+    <textarea id="devJson" hidden readonly aria-label="Tuning JSON"></textarea>
+  </div>
+</aside>
+
+<script>
+// Immune RTS prototype art. Generated; edit gen.py, not this file.
+// Usage: const img = await ART.load('neutrophil'); ctx.drawImage(img, x - s/2, y - s/2, s, s)
+// Map sprites share a 64x64 box centred on the cell; `radius` is the body radius in those units.
+// Non-square sprites (shots, trails) give meta.box [w,h] and meta.anchor [x,y]: put the anchor on the object and rotate to its heading.
+// Draw cells and fields with ctx.globalCompositeOperation = 'lighter' for the fluorescence look.
+const ART = {
+  palette: {"void": "#04050A", "cell": "#3FE6FF", "cellHi": "#C8FAFF", "germ": "#FF3DCB", "germHi": "#FFC4EF", "toxin": "#B45CFF", "pollen": "#C9F25C", "pollenHi": "#F1FFC9", "antibody": "#FFD23F", "kill": "#FF7A3D", "repair": "#5CFFA1", "tissue": "#2B3A8C", "tissueHi": "#5468E0", "damage": "#FF3B4E", "blood": "#C2334F", "lymph": "#2FB89A", "ui": "#DDE6F5", "uiDim": "#6E7B96"},
+  alert: {"quiet": "#7F8FB0", "watch": "#FFD23F", "inflamed": "#FF7A3D", "max": "#FF3B4E"},
+  meta: {"neutrophil": {"kind": "unit", "size": 64, "radius": 13, "note": "Neutrophil, Eat stance (default). Small, fast swarm cell; the three-lobed nucleus is its tell."}, "net": {"kind": "effect", "size": 64, "radius": 28, "note": "DNA net left by a Trap neutrophil. Pins bacteria; tint the sector toward damage while it lasts."}, "neutrophil-trap": {"kind": "unit", "size": 64, "radius": 13, "note": "Neutrophil casting a net (Trap stance, one-way). Broken rim plus strands: it dies doing this."}, "macrophage-kill": {"kind": "unit", "size": 64, "radius": 22, "note": "Macrophage, Kill stance. Big, slow tank. Orange core = inflammatory (adds Host Damage)."}, "macrophage-repair": {"kind": "unit", "size": 64, "radius": 22, "note": "Macrophage, Repair stance. Same body, green core = healing tissue and calming the sector."}, "bacterium": {"kind": "enemy", "size": 64, "radius": 9, "note": "Bacterium (rod). Faces +x; rotate to heading. Rod silhouette keeps it distinct from round friendly cells."}, "bacterium-dividing": {"kind": "enemy", "size": 64, "radius": 12, "note": "Bacterium mid-division. Swap in for the last moments before a doubling so growth is visible."}, "bacterium-opsonized": {"kind": "enemy", "size": 64, "radius": 9, "note": "Bacterium coated in antibodies (Opsonize). Gold tags = macrophages eat it faster."}, "bacterium-complement": {"kind": "enemy", "size": 64, "radius": 9, "note": "Bacterium being holed by complement. Orange-rimmed pores; the orange is the inflammation it costs."}, "toxin-burst": {"kind": "effect", "size": 64, "radius": 30, "note": "Toxin burst (area damage). Draw at the blast radius, grow from 40% to 100% and fade out."}, "pollen": {"kind": "enemy", "size": 64, "radius": 18, "note": "Pollen grain (Pollen scenario). Harmless, so it gets its own hue and a calm spiky silhouette, not magenta."}, "antibody": {"kind": "particle", "size": 16, "radius": 2, "note": "Antibody particle (16px box). Draw at 3-6px, hundreds at once: random spin, slow drift, short fade. Spawn rate follows the antibody field."}, "antibody-cloud": {"kind": "field", "size": 64, "radius": 30, "note": "Faint gold haze under dense antibody particles. One stamp per field cell, alpha = density, additive."}, "tissue": {"kind": "tile", "size": 128, "radius": null, "note": "Healthy tissue, seamless 128px tile. Sits under everything; keep it dim."}, "tissue-damaged": {"kind": "tile", "size": 128, "radius": null, "note": "Damaged tissue tile. Cross-fade over 'tissue' by the sector's Host Damage share."}, "vessel-blood": {"kind": "tile", "size": 128, "radius": null, "note": "Blood vessel strip, tiles horizontally (128x64). Edge of the blood-entry sector; new cells emerge from it."}, "vessel-lymph": {"kind": "tile", "size": 128, "radius": null, "note": "Lymph vessel strip, tiles horizontally (128x64). Chevron valves point the way out."}, "wound": {"kind": "tile", "size": 128, "radius": null, "note": "Wound gash overlay (transparent background, 128x64). Lay across the wound sector where bacteria pour in."}, "alert-quiet": {"kind": "icon", "size": 48, "radius": null, "note": "Sector alert: Quiet. Bars = level, colour ramps toward inflammation."}, "alert-watch": {"kind": "icon", "size": 48, "radius": null, "note": "Sector alert: Watch. Bars = level, colour ramps toward inflammation."}, "alert-inflamed": {"kind": "icon", "size": 48, "radius": null, "note": "Sector alert: Inflamed. Bars = level, colour ramps toward inflammation."}, "alert-max": {"kind": "icon", "size": 48, "radius": null, "note": "Sector alert: Max. Bars = level, colour ramps toward inflammation."}, "fever": {"kind": "icon", "size": 48, "radius": null, "note": "Fever (body-wide ability). Slows bacterial growth, costs Host Damage, has a cooldown."}, "stance-eat": {"kind": "icon", "size": 48, "radius": null, "note": "Neutrophil stance: Eat (default). Engulf bacteria one at a time."}, "stance-trap": {"kind": "icon", "size": 48, "radius": null, "note": "Neutrophil stance: Trap (one-way). Cells die casting nets that pin bacteria but damage tissue."}, "stance-kill": {"kind": "icon", "size": 48, "radius": null, "note": "Macrophage stance: Kill. Fights hard, adds inflammation."}, "stance-repair": {"kind": "icon", "size": 48, "radius": null, "note": "Macrophage stance: Repair. Heals tissue and calms the sector."}, "marrow": {"kind": "icon", "size": 48, "radius": null, "note": "Bone marrow (production mix). Pair with the neutrophil and macrophage sprites at each end of the slider."}, "meter-pathogen": {"kind": "icon", "size": 48, "radius": null, "note": "Pathogen Load meter icon. Fill the bar in the bacteria magenta."}, "meter-host": {"kind": "icon", "size": 48, "radius": null, "note": "Host Damage meter icon (cracked tissue cell). Fill the bar in damage red."}, "lymph-node": {"kind": "icon", "size": 48, "radius": null, "note": "Lymph node / sample bar. Fills as macrophages eat bacteria; full = antibody choice."}, "choice-opsonize": {"kind": "icon", "size": 48, "radius": null, "note": "Adaptive choice: Opsonize. Macrophages eat tagged bacteria faster, with no extra inflammation."}, "choice-complement": {"kind": "icon", "size": 48, "radius": null, "note": "Adaptive choice: Complement. Punches holes in bacteria directly; adds inflammation."}, "sector-blood": {"kind": "icon", "size": 48, "radius": null, "note": "Sector label: blood entry. Reinforcements arrive here."}, "sector-wound": {"kind": "icon", "size": 48, "radius": null, "note": "Sector label: wound. Where the infection starts."}, "sector-lymph": {"kind": "icon", "size": 48, "radius": null, "note": "Sector label: lymph exit. Samples leave here for the lymph node."}, "scenario-papercut": {"kind": "icon", "size": 48, "radius": null, "note": "Scenario: Papercut (rout). Clear the infection."}, "scenario-pollen": {"kind": "icon", "size": 48, "radius": null, "note": "Scenario: Pollen (restraint). Harmless invader; win by not hurting the host."}, "shot": {"kind": "projectile", "size": 64, "radius": 2.2, "note": "Neutrophil shot: a gold antibody tracer (64x16). Faces +x, head at the anchor. About 14px long on a phone.", "box": [64, 16], "anchor": [54, 8]}, "shot-tuned": {"kind": "projectile", "size": 64, "radius": 3.4, "note": "Tuned shot from inside a Support ring: thicker, white-hot, with a piercing tip. Draw ~1.4x the plain shot.", "box": [64, 16], "anchor": [54, 8]}, "hit-spark": {"kind": "effect", "size": 32, "radius": 14, "note": "Hit spark. Flash for ~80 ms where a shot lands; also the ricochet when a plain shot bounces off armor."}, "kill-shard": {"kind": "particle", "size": 16, "radius": 4, "note": "Kill fragment (16px). On a kill, throw 4-6 outward with random spin and fade over ~0.4 s."}, "bacterium-hit": {"kind": "enemy", "size": 64, "radius": 9, "note": "Bacterium flashed white on a hit. Swap in for ~80 ms and nudge it back along the shot."}, "bacterium-armored": {"kind": "enemy", "size": 64, "radius": 19, "note": "Armored bacterium: the rod inside a thick plated ring. Plain shots bounce off; tuned shots and Offense macrophages kill it."}, "bacterium-armored-dividing": {"kind": "enemy", "size": 64, "radius": 22, "note": "Armored bacterium mid-division (every 20 s). The shell stretches around both halves."}, "macrophage-offense": {"kind": "unit", "size": 64, "radius": 22, "note": "Macrophage on Offense (v2). Orange core: swallows the nearest bacterium, one every 2 s."}, "macrophage-support": {"kind": "unit", "size": 64, "radius": 22, "note": "Macrophage on Support (v2). Green core: stays put; pair with support-ring under it."}, "support-ring": {"kind": "field", "size": 128, "radius": 60, "note": "Support macrophage's ring (128 box, edge at 60). Width on screen = ring radius x 128/60. Pulse gently: scale 0.97-1.03 and alpha 0.7-1 over ~1.6 s."}, "speed-trail": {"kind": "effect", "size": 48, "radius": null, "note": "Speed trail behind a boosted neutrophil (48x16). Faces +x; put the anchor on the neutrophil's centre, rotate to its heading, draw before the cell. Height ~ the cell's body diameter.", "box": [48, 16], "anchor": [36, 8]}, "wound-flash": {"kind": "effect", "size": 128, "radius": null, "note": "Toxin warning: stretch over the Wound zone and blink it (about 3 Hz) for the 2 s before a burst."}, "toxin-shockwave": {"kind": "effect", "size": 256, "radius": 118, "note": "Toxin shockwave (256 box, front at 118). Grow from the wound until it covers the zone in ~0.5 s, fade out, shake the screen lightly. Kills your cells it passes."}, "marker-wave": {"kind": "marker", "size": 24, "radius": null, "note": "Progress bar: a wave of bacteria still to come."}, "marker-wave-armored": {"kind": "marker", "size": 24, "radius": null, "note": "Progress bar: a wave of armored bacteria."}, "marker-wave-final": {"kind": "marker", "size": 24, "radius": null, "note": "Progress bar: the final wave (bigger, ringed)."}, "marker-toxin": {"kind": "marker", "size": 24, "radius": null, "note": "Progress bar: a toxin burst in the Wound (diamond)."}, "mode-offense": {"kind": "icon", "size": 48, "radius": null, "note": "Zone chip: Offense. Macrophages here swallow bacteria."}, "mode-support": {"kind": "icon", "size": 48, "radius": null, "note": "Zone chip: Support. Neutrophils in the ring move faster and fire tuned shots."}, "sector-tissue": {"kind": "icon", "size": 48, "radius": null, "note": "Zone label: Tissue (the middle zone)."}, "pause": {"kind": "icon", "size": 48, "radius": null, "note": "Pause button."}, "star": {"kind": "icon", "size": 48, "radius": null, "note": "Win star (earned)."}, "star-empty": {"kind": "icon", "size": 48, "radius": null, "note": "Win star (not earned)."}},
+  svg: {
+    "neutrophil": "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 64 64\" width=\"64\" height=\"64\"><defs><radialGradient id=\"neu-h\"><stop offset=\"0\" stop-color=\"#3FE6FF\" stop-opacity=\"0.5\"/><stop offset=\"0.42\" stop-color=\"#3FE6FF\" stop-opacity=\"0.14\"/><stop offset=\"1\" stop-color=\"#3FE6FF\" stop-opacity=\"0\"/></radialGradient><radialGradient id=\"neu-b\" cx=\"0.42\" cy=\"0.38\" r=\"0.7\"><stop offset=\"0\" stop-color=\"#9FF4FF\" stop-opacity=\"0.5\"/><stop offset=\"1\" stop-color=\"#3FE6FF\" stop-opacity=\"0.18\"/></radialGradient></defs><circle cx=\"32\" cy=\"32\" r=\"26\" fill=\"url(#neu-h)\"/><circle cx=\"32\" cy=\"32\" r=\"13\" fill=\"url(#neu-b)\" stroke=\"#7FF0FF\" stroke-width=\"1.6\"/><path d=\"M26.5 30Q30 27 34.5 27.5M34.5 27.5Q36.5 32 34 36\" fill=\"none\" stroke=\"#C8FAFF\" stroke-width=\"2.2\" stroke-linecap=\"round\" opacity=\".85\"/><circle cx=\"26.5\" cy=\"30\" r=\"3.7\" fill=\"#C8FAFF\"/><circle cx=\"34.5\" cy=\"27.5\" r=\"3.7\" fill=\"#C8FAFF\"/><circle cx=\"34\" cy=\"36\" r=\"3.7\" fill=\"#C8FAFF\"/></svg>",
+    "net": "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 64 64\" width=\"64\" height=\"64\"><defs><radialGradient id=\"net-h\"><stop offset=\"0\" stop-color=\"#3FE6FF\" stop-opacity=\"0.28\"/><stop offset=\"0.5\" stop-color=\"#3FE6FF\" stop-opacity=\"0.1\"/><stop offset=\"1\" stop-color=\"#3FE6FF\" stop-opacity=\"0\"/></radialGradient></defs><circle cx=\"32\" cy=\"32\" r=\"30\" fill=\"url(#net-h)\"/><path d=\"M32 32L42.71 31.32L49.24 30.9L57.31 30.39M42.71 31.32Q40.67 34.25 40.99 37.79M49.24 30.9Q47.1 36.36 49.07 43M57.31 30.39Q52.57 37.37 53.43 45.81M32 32L40.99 37.79L49.07 43L53.43 45.81M40.99 37.79Q36.48 38.87 33.19 41.82M49.07 43Q40.54 45.36 34.34 51.37M53.43 45.81Q42.95 50.65 35.45 60.58M32 32L33.19 41.82L34.34 51.37L35.45 60.58M33.19 41.82Q30.72 40.96 27.91 42.54M34.34 51.37Q30.07 48.15 25.28 49.33M35.45 60.58Q28.92 56.44 21.56 58.95M32 32L27.91 42.54L25.28 49.33L21.56 58.95M27.91 42.54Q26.39 37.97 23.33 35.03M25.28 49.33Q20.56 42.59 12.71 38.74M21.56 58.95Q16.54 47.66 7.31 40.63M32 32L23.33 35.03L12.71 38.74L7.31 40.63M23.33 35.03Q24.16 32.09 22.85 29.16M12.71 38.74Q16.17 32.69 15.31 26.83M7.31 40.63Q10.11 32.38 6.94 24.23M32 32L22.85 29.16L15.31 26.83L6.94 24.23M22.85 29.16Q24.57 26.56 24.26 22.48M15.31 26.83Q19.74 23.67 20.82 18.25M6.94 24.23Q13.39 19.25 14.76 10.8M32 32L24.26 22.48L20.82 18.25L14.76 10.8M24.26 22.48Q29.49 22.81 34.04 20.63M20.82 18.25Q28.51 17.94 35.26 13.8M14.76 10.8Q26.52 10.89 36.79 5.23M32 32L34.04 20.63L35.26 13.8L36.79 5.23M34.04 20.63Q35.54 23.9 38 24.96M35.26 13.8Q38.36 18.22 43.19 18.88M36.79 5.23Q41.48 11.58 48.76 12.35M32 32L38 24.96L43.19 18.88L48.76 12.35M38 24.96Q39.36 28.6 42.71 31.32M43.19 18.88Q44.51 25.75 49.24 30.9M48.76 12.35Q50.51 22.65 57.31 30.39\" fill=\"none\" stroke=\"#C8FAFF\" stroke-width=\".9\" stroke-linecap=\"round\" opacity=\".75\"/><g fill=\"#C8FAFF\" opacity=\".9\"><circle cx=\"42.71\" cy=\"31.32\" r=\"1.1\"/><circle cx=\"49.24\" cy=\"30.9\" r=\"1.1\"/><circle cx=\"57.31\" cy=\"30.39\" r=\"1.1\"/><circle cx=\"40.99\" cy=\"37.79\" r=\"1.1\"/><circle cx=\"49.07\" cy=\"43\" r=\"1.1\"/><circle cx=\"53.43\" cy=\"45.81\" r=\"1.1\"/><circle cx=\"33.19\" cy=\"41.82\" r=\"1.1\"/><circle cx=\"34.34\" cy=\"51.37\" r=\"1.1\"/><circle cx=\"35.45\" cy=\"60.58\" r=\"1.1\"/><circle cx=\"27.91\" cy=\"42.54\" r=\"1.1\"/><circle cx=\"25.28\" cy=\"49.33\" r=\"1.1\"/><circle cx=\"21.56\" cy=\"58.95\" r=\"1.1\"/><circle cx=\"23.33\" cy=\"35.03\" r=\"1.1\"/><circle cx=\"12.71\" cy=\"38.74\" r=\"1.1\"/><circle cx=\"7.31\" cy=\"40.63\" r=\"1.1\"/><circle cx=\"22.85\" cy=\"29.16\" r=\"1.1\"/><circle cx=\"15.31\" cy=\"26.83\" r=\"1.1\"/><circle cx=\"6.94\" cy=\"24.23\" r=\"1.1\"/><circle cx=\"24.26\" cy=\"22.48\" r=\"1.1\"/><circle cx=\"20.82\" cy=\"18.25\" r=\"1.1\"/><circle cx=\"14.76\" cy=\"10.8\" r=\"1.1\"/><circle cx=\"34.04\" cy=\"20.63\" r=\"1.1\"/><circle cx=\"35.26\" cy=\"13.8\" r=\"1.1\"/><circle cx=\"36.79\" cy=\"5.23\" r=\"1.1\"/><circle cx=\"38\" cy=\"24.96\" r=\"1.1\"/><circle cx=\"43.19\" cy=\"18.88\" r=\"1.1\"/><circle cx=\"48.76\" cy=\"12.35\" r=\"1.1\"/></g></svg>",
+    "neutrophil-trap": "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 64 64\" width=\"64\" height=\"64\"><defs><radialGradient id=\"neut-h\"><stop offset=\"0\" stop-color=\"#3FE6FF\" stop-opacity=\"0.5\"/><stop offset=\"0.42\" stop-color=\"#3FE6FF\" stop-opacity=\"0.14\"/><stop offset=\"1\" stop-color=\"#3FE6FF\" stop-opacity=\"0\"/></radialGradient><radialGradient id=\"neut-b\" cx=\"0.42\" cy=\"0.38\" r=\"0.7\"><stop offset=\"0\" stop-color=\"#9FF4FF\" stop-opacity=\"0.5\"/><stop offset=\"1\" stop-color=\"#3FE6FF\" stop-opacity=\"0.18\"/></radialGradient></defs><circle cx=\"32\" cy=\"32\" r=\"30\" fill=\"url(#neut-h)\"/><path d=\"M32 32L42.71 31.32L49.24 30.9L57.31 30.39M42.71 31.32Q40.67 34.25 40.99 37.79M49.24 30.9Q47.1 36.36 49.07 43M57.31 30.39Q52.57 37.37 53.43 45.81M32 32L40.99 37.79L49.07 43L53.43 45.81M40.99 37.79Q36.48 38.87 33.19 41.82M49.07 43Q40.54 45.36 34.34 51.37M53.43 45.81Q42.95 50.65 35.45 60.58M32 32L33.19 41.82L34.34 51.37L35.45 60.58M33.19 41.82Q30.72 40.96 27.91 42.54M34.34 51.37Q30.07 48.15 25.28 49.33M35.45 60.58Q28.92 56.44 21.56 58.95M32 32L27.91 42.54L25.28 49.33L21.56 58.95M27.91 42.54Q26.39 37.97 23.33 35.03M25.28 49.33Q20.56 42.59 12.71 38.74M21.56 58.95Q16.54 47.66 7.31 40.63M32 32L23.33 35.03L12.71 38.74L7.31 40.63M23.33 35.03Q24.16 32.09 22.85 29.16M12.71 38.74Q16.17 32.69 15.31 26.83M7.31 40.63Q10.11 32.38 6.94 24.23M32 32L22.85 29.16L15.31 26.83L6.94 24.23M22.85 29.16Q24.57 26.56 24.26 22.48M15.31 26.83Q19.74 23.67 20.82 18.25M6.94 24.23Q13.39 19.25 14.76 10.8M32 32L24.26 22.48L20.82 18.25L14.76 10.8M24.26 22.48Q29.49 22.81 34.04 20.63M20.82 18.25Q28.51 17.94 35.26 13.8M14.76 10.8Q26.52 10.89 36.79 5.23M32 32L34.04 20.63L35.26 13.8L36.79 5.23M34.04 20.63Q35.54 23.9 38 24.96M35.26 13.8Q38.36 18.22 43.19 18.88M36.79 5.23Q41.48 11.58 48.76 12.35M32 32L38 24.96L43.19 18.88L48.76 12.35M38 24.96Q39.36 28.6 42.71 31.32M43.19 18.88Q44.51 25.75 49.24 30.9M48.76 12.35Q50.51 22.65 57.31 30.39\" fill=\"none\" stroke=\"#C8FAFF\" stroke-width=\".9\" stroke-linecap=\"round\" opacity=\".55\"/><g fill=\"#C8FAFF\" opacity=\".9\"><circle cx=\"42.71\" cy=\"31.32\" r=\"1.1\"/><circle cx=\"49.24\" cy=\"30.9\" r=\"1.1\"/><circle cx=\"57.31\" cy=\"30.39\" r=\"1.1\"/><circle cx=\"40.99\" cy=\"37.79\" r=\"1.1\"/><circle cx=\"49.07\" cy=\"43\" r=\"1.1\"/><circle cx=\"53.43\" cy=\"45.81\" r=\"1.1\"/><circle cx=\"33.19\" cy=\"41.82\" r=\"1.1\"/><circle cx=\"34.34\" cy=\"51.37\" r=\"1.1\"/><circle cx=\"35.45\" cy=\"60.58\" r=\"1.1\"/><circle cx=\"27.91\" cy=\"42.54\" r=\"1.1\"/><circle cx=\"25.28\" cy=\"49.33\" r=\"1.1\"/><circle cx=\"21.56\" cy=\"58.95\" r=\"1.1\"/><circle cx=\"23.33\" cy=\"35.03\" r=\"1.1\"/><circle cx=\"12.71\" cy=\"38.74\" r=\"1.1\"/><circle cx=\"7.31\" cy=\"40.63\" r=\"1.1\"/><circle cx=\"22.85\" cy=\"29.16\" r=\"1.1\"/><circle cx=\"15.31\" cy=\"26.83\" r=\"1.1\"/><circle cx=\"6.94\" cy=\"24.23\" r=\"1.1\"/><circle cx=\"24.26\" cy=\"22.48\" r=\"1.1\"/><circle cx=\"20.82\" cy=\"18.25\" r=\"1.1\"/><circle cx=\"14.76\" cy=\"10.8\" r=\"1.1\"/><circle cx=\"34.04\" cy=\"20.63\" r=\"1.1\"/><circle cx=\"35.26\" cy=\"13.8\" r=\"1.1\"/><circle cx=\"36.79\" cy=\"5.23\" r=\"1.1\"/><circle cx=\"38\" cy=\"24.96\" r=\"1.1\"/><circle cx=\"43.19\" cy=\"18.88\" r=\"1.1\"/><circle cx=\"48.76\" cy=\"12.35\" r=\"1.1\"/></g><circle cx=\"32\" cy=\"32\" r=\"12\" fill=\"url(#neut-b)\" stroke=\"#7FF0FF\" stroke-width=\"1.3\" stroke-dasharray=\"3.2 2.4\" opacity=\".9\"/><path d=\"M26.5 30Q30 27 34.5 27.5M34.5 27.5Q36.5 32 34 36\" fill=\"none\" stroke=\"#C8FAFF\" stroke-width=\"2.2\" stroke-linecap=\"round\" opacity=\".85\"/><circle cx=\"26.5\" cy=\"30\" r=\"3.7\" fill=\"#C8FAFF\"/><circle cx=\"34.5\" cy=\"27.5\" r=\"3.7\" fill=\"#C8FAFF\"/><circle cx=\"34\" cy=\"36\" r=\"3.7\" fill=\"#C8FAFF\"/></svg>",
+    "macrophage-kill": "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 64 64\" width=\"64\" height=\"64\"><defs><radialGradient id=\"macill-h\"><stop offset=\"0\" stop-color=\"#3FE6FF\" stop-opacity=\"0.42\"/><stop offset=\"0.5\" stop-color=\"#3FE6FF\" stop-opacity=\"0.12\"/><stop offset=\"1\" stop-color=\"#3FE6FF\" stop-opacity=\"0\"/></radialGradient><radialGradient id=\"macill-b\" cx=\"0.42\" cy=\"0.38\" r=\"0.7\"><stop offset=\"0\" stop-color=\"#9FF4FF\" stop-opacity=\"0.32\"/><stop offset=\"1\" stop-color=\"#3FE6FF\" stop-opacity=\"0.16\"/></radialGradient><radialGradient id=\"macill-c\"><stop offset=\"0\" stop-color=\"#FF7A3D\" stop-opacity=\"0.85\"/><stop offset=\"0.55\" stop-color=\"#FF7A3D\" stop-opacity=\"0.35\"/><stop offset=\"1\" stop-color=\"#FF7A3D\" stop-opacity=\"0\"/></radialGradient></defs><circle cx=\"32\" cy=\"32\" r=\"32\" fill=\"url(#macill-h)\"/><path d=\"M54.11 32C54.29 32.98 54.58 33.94 54.94 35.02C55.3 36.1 56.03 37.33 56.25 38.5C56.48 39.67 56.69 41.04 56.28 42.06C55.87 43.07 54.83 43.95 53.8 44.59C52.78 45.23 51.27 45.52 50.11 45.89C48.95 46.27 47.83 46.51 46.84 46.84C45.85 47.16 45.03 47.54 44.16 47.85C43.29 48.16 42.48 48.46 41.64 48.69C40.8 48.92 39.95 49.06 39.13 49.2C38.3 49.35 37.5 49.42 36.7 49.55C35.91 49.69 35.15 49.81 34.37 50.01C33.59 50.2 32.83 50.46 32 50.72C31.17 50.99 30.33 51.34 29.42 51.61C28.51 51.89 27.54 52.19 26.54 52.36C25.55 52.53 24.51 52.63 23.45 52.64C22.4 52.64 21.34 52.52 20.22 52.4C19.1 52.28 17.91 52.16 16.72 51.92C15.52 51.67 14.08 51.52 13.05 50.95C12.03 50.37 10.96 49.56 10.55 48.46C10.14 47.36 10.3 45.74 10.61 44.35C10.91 42.96 11.85 41.38 12.36 40.14C12.87 38.9 13.45 37.86 13.69 36.91C13.93 35.95 13.87 35.21 13.79 34.4C13.72 33.58 13.41 32.82 13.23 32C13.06 31.18 12.81 30.32 12.72 29.46C12.63 28.6 12.6 27.69 12.7 26.83C12.8 25.96 13.02 25.08 13.32 24.26C13.63 23.44 14.07 22.66 14.52 21.91C14.98 21.16 15.55 20.49 16.07 19.77C16.58 19.05 17.14 18.43 17.6 17.6C18.05 16.77 18.43 15.91 18.79 14.78C19.15 13.66 19.32 12.18 19.78 10.84C20.24 9.49 20.7 7.72 21.53 6.72C22.35 5.72 23.54 4.94 24.72 4.84C25.9 4.74 27.38 5.45 28.59 6.11C29.81 6.78 30.98 7.97 32 8.85C33.02 9.74 33.89 10.64 34.71 11.43C35.53 12.22 36.24 12.93 36.93 13.61C37.61 14.29 38.21 14.94 38.83 15.52C39.44 16.09 40 16.62 40.62 17.07C41.25 17.52 41.87 17.87 42.58 18.21C43.29 18.56 44.06 18.81 44.87 19.13C45.68 19.45 46.58 19.74 47.43 20.16C48.28 20.58 49.19 21.04 49.96 21.63C50.73 22.22 51.48 22.92 52.04 23.7C52.6 24.47 53.04 25.38 53.34 26.28C53.65 27.18 53.73 28.17 53.86 29.12C53.99 30.08 53.93 31.02 54.11 32Z\" fill=\"url(#macill-b)\" stroke=\"#7FF0FF\" stroke-width=\"1.6\" stroke-linejoin=\"round\"/><circle cx=\"32\" cy=\"31\" r=\"13\" fill=\"url(#macill-c)\"/><circle cx=\"20\" cy=\"40\" r=\"2.6\" fill=\"none\" stroke=\"#C8FAFF\" stroke-width=\".9\" opacity=\".6\"/><circle cx=\"43\" cy=\"39\" r=\"2.1\" fill=\"none\" stroke=\"#C8FAFF\" stroke-width=\".9\" opacity=\".6\"/><circle cx=\"37\" cy=\"18\" r=\"1.8\" fill=\"none\" stroke=\"#C8FAFF\" stroke-width=\".9\" opacity=\".6\"/><circle cx=\"21\" cy=\"22\" r=\"1.5\" fill=\"none\" stroke=\"#C8FAFF\" stroke-width=\".9\" opacity=\".6\"/><path d=\"M24.5 30.5C24 25.5 30 23.5 34 25.5C38 27.5 41 26 40.5 31C40 35.5 35.5 38.5 31.5 37C29.5 36.3 30.5 33.5 28.5 33.6C26.5 33.7 24.8 33.5 24.5 30.5Z\" fill=\"#FF7A3D\" opacity=\".9\"/></svg>",
+    "macrophage-repair": "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 64 64\" width=\"64\" height=\"64\"><defs><radialGradient id=\"macair-h\"><stop offset=\"0\" stop-color=\"#3FE6FF\" stop-opacity=\"0.42\"/><stop offset=\"0.5\" stop-color=\"#3FE6FF\" stop-opacity=\"0.12\"/><stop offset=\"1\" stop-color=\"#3FE6FF\" stop-opacity=\"0\"/></radialGradient><radialGradient id=\"macair-b\" cx=\"0.42\" cy=\"0.38\" r=\"0.7\"><stop offset=\"0\" stop-color=\"#9FF4FF\" stop-opacity=\"0.32\"/><stop offset=\"1\" stop-color=\"#3FE6FF\" stop-opacity=\"0.16\"/></radialGradient><radialGradient id=\"macair-c\"><stop offset=\"0\" stop-color=\"#5CFFA1\" stop-opacity=\"0.85\"/><stop offset=\"0.55\" stop-color=\"#5CFFA1\" stop-opacity=\"0.35\"/><stop offset=\"1\" stop-color=\"#5CFFA1\" stop-opacity=\"0\"/></radialGradient></defs><circle cx=\"32\" cy=\"32\" r=\"32\" fill=\"url(#macair-h)\"/><path d=\"M54.11 32C54.29 32.98 54.58 33.94 54.94 35.02C55.3 36.1 56.03 37.33 56.25 38.5C56.48 39.67 56.69 41.04 56.28 42.06C55.87 43.07 54.83 43.95 53.8 44.59C52.78 45.23 51.27 45.52 50.11 45.89C48.95 46.27 47.83 46.51 46.84 46.84C45.85 47.16 45.03 47.54 44.16 47.85C43.29 48.16 42.48 48.46 41.64 48.69C40.8 48.92 39.95 49.06 39.13 49.2C38.3 49.35 37.5 49.42 36.7 49.55C35.91 49.69 35.15 49.81 34.37 50.01C33.59 50.2 32.83 50.46 32 50.72C31.17 50.99 30.33 51.34 29.42 51.61C28.51 51.89 27.54 52.19 26.54 52.36C25.55 52.53 24.51 52.63 23.45 52.64C22.4 52.64 21.34 52.52 20.22 52.4C19.1 52.28 17.91 52.16 16.72 51.92C15.52 51.67 14.08 51.52 13.05 50.95C12.03 50.37 10.96 49.56 10.55 48.46C10.14 47.36 10.3 45.74 10.61 44.35C10.91 42.96 11.85 41.38 12.36 40.14C12.87 38.9 13.45 37.86 13.69 36.91C13.93 35.95 13.87 35.21 13.79 34.4C13.72 33.58 13.41 32.82 13.23 32C13.06 31.18 12.81 30.32 12.72 29.46C12.63 28.6 12.6 27.69 12.7 26.83C12.8 25.96 13.02 25.08 13.32 24.26C13.63 23.44 14.07 22.66 14.52 21.91C14.98 21.16 15.55 20.49 16.07 19.77C16.58 19.05 17.14 18.43 17.6 17.6C18.05 16.77 18.43 15.91 18.79 14.78C19.15 13.66 19.32 12.18 19.78 10.84C20.24 9.49 20.7 7.72 21.53 6.72C22.35 5.72 23.54 4.94 24.72 4.84C25.9 4.74 27.38 5.45 28.59 6.11C29.81 6.78 30.98 7.97 32 8.85C33.02 9.74 33.89 10.64 34.71 11.43C35.53 12.22 36.24 12.93 36.93 13.61C37.61 14.29 38.21 14.94 38.83 15.52C39.44 16.09 40 16.62 40.62 17.07C41.25 17.52 41.87 17.87 42.58 18.21C43.29 18.56 44.06 18.81 44.87 19.13C45.68 19.45 46.58 19.74 47.43 20.16C48.28 20.58 49.19 21.04 49.96 21.63C50.73 22.22 51.48 22.92 52.04 23.7C52.6 24.47 53.04 25.38 53.34 26.28C53.65 27.18 53.73 28.17 53.86 29.12C53.99 30.08 53.93 31.02 54.11 32Z\" fill=\"url(#macair-b)\" stroke=\"#7FF0FF\" stroke-width=\"1.6\" stroke-linejoin=\"round\"/><circle cx=\"32\" cy=\"31\" r=\"13\" fill=\"url(#macair-c)\"/><circle cx=\"20\" cy=\"40\" r=\"2.6\" fill=\"none\" stroke=\"#C8FAFF\" stroke-width=\".9\" opacity=\".6\"/><circle cx=\"43\" cy=\"39\" r=\"2.1\" fill=\"none\" stroke=\"#C8FAFF\" stroke-width=\".9\" opacity=\".6\"/><circle cx=\"37\" cy=\"18\" r=\"1.8\" fill=\"none\" stroke=\"#C8FAFF\" stroke-width=\".9\" opacity=\".6\"/><circle cx=\"21\" cy=\"22\" r=\"1.5\" fill=\"none\" stroke=\"#C8FAFF\" stroke-width=\".9\" opacity=\".6\"/><path d=\"M24.5 30.5C24 25.5 30 23.5 34 25.5C38 27.5 41 26 40.5 31C40 35.5 35.5 38.5 31.5 37C29.5 36.3 30.5 33.5 28.5 33.6C26.5 33.7 24.8 33.5 24.5 30.5Z\" fill=\"#5CFFA1\" opacity=\".9\"/></svg>",
+    "bacterium": "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 64 64\" width=\"64\" height=\"64\"><defs><radialGradient id=\"bac-h\"><stop offset=\"0\" stop-color=\"#FF3DCB\" stop-opacity=\"0.55\"/><stop offset=\"0.4\" stop-color=\"#FF3DCB\" stop-opacity=\"0.15\"/><stop offset=\"1\" stop-color=\"#FF3DCB\" stop-opacity=\"0\"/></radialGradient><radialGradient id=\"bac-b\" cx=\"0.42\" cy=\"0.38\" r=\"0.7\"><stop offset=\"0\" stop-color=\"#FF9BE5\" stop-opacity=\"0.6\"/><stop offset=\"1\" stop-color=\"#FF3DCB\" stop-opacity=\"0.28\"/></radialGradient></defs><ellipse cx=\"32\" cy=\"32\" rx=\"24\" ry=\"17\" fill=\"url(#bac-h)\"/><rect x=\"20\" y=\"26\" width=\"24\" height=\"12\" rx=\"6.0\" fill=\"url(#bac-b)\" stroke=\"#FF7FDD\" stroke-width=\"1.5\"/><path d=\"M24.8 32q2.4 -2.4 4.8 0t4.8 0t4.8 0\" fill=\"none\" stroke=\"#FFC4EF\" stroke-width=\"1.3\" stroke-linecap=\"round\" opacity=\".85\"/></svg>",
+    "bacterium-dividing": "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 64 64\" width=\"64\" height=\"64\"><defs><radialGradient id=\"bad-h\"><stop offset=\"0\" stop-color=\"#FF3DCB\" stop-opacity=\"0.55\"/><stop offset=\"0.4\" stop-color=\"#FF3DCB\" stop-opacity=\"0.15\"/><stop offset=\"1\" stop-color=\"#FF3DCB\" stop-opacity=\"0\"/></radialGradient><radialGradient id=\"bad-b\" cx=\"0.42\" cy=\"0.38\" r=\"0.7\"><stop offset=\"0\" stop-color=\"#FF9BE5\" stop-opacity=\"0.6\"/><stop offset=\"1\" stop-color=\"#FF3DCB\" stop-opacity=\"0.28\"/></radialGradient></defs><ellipse cx=\"32\" cy=\"32\" rx=\"28\" ry=\"17\" fill=\"url(#bad-h)\"/><rect x=\"14.5\" y=\"26\" width=\"18\" height=\"12\" rx=\"6.0\" fill=\"url(#bad-b)\" stroke=\"#FF7FDD\" stroke-width=\"1.5\"/><rect x=\"31.5\" y=\"26\" width=\"18\" height=\"12\" rx=\"6.0\" fill=\"url(#bad-b)\" stroke=\"#FF7FDD\" stroke-width=\"1.5\"/><line x1=\"32\" y1=\"27\" x2=\"32\" y2=\"37\" stroke=\"#FFC4EF\" stroke-width=\"2\" stroke-linecap=\"round\"/><path d=\"M18.7 32q1.6 -2.4 3.2 0t3.2 0t3.2 0\" fill=\"none\" stroke=\"#FFC4EF\" stroke-width=\"1.3\" stroke-linecap=\"round\" opacity=\".85\"/><path d=\"M35.7 32q1.6 -2.4 3.2 0t3.2 0t3.2 0\" fill=\"none\" stroke=\"#FFC4EF\" stroke-width=\"1.3\" stroke-linecap=\"round\" opacity=\".85\"/></svg>",
+    "bacterium-opsonized": "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 64 64\" width=\"64\" height=\"64\"><defs><radialGradient id=\"bao-h\"><stop offset=\"0\" stop-color=\"#FF3DCB\" stop-opacity=\"0.55\"/><stop offset=\"0.4\" stop-color=\"#FF3DCB\" stop-opacity=\"0.15\"/><stop offset=\"1\" stop-color=\"#FF3DCB\" stop-opacity=\"0\"/></radialGradient><radialGradient id=\"bao-b\" cx=\"0.42\" cy=\"0.38\" r=\"0.7\"><stop offset=\"0\" stop-color=\"#FF9BE5\" stop-opacity=\"0.6\"/><stop offset=\"1\" stop-color=\"#FF3DCB\" stop-opacity=\"0.28\"/></radialGradient><radialGradient id=\"bao-h\"><stop offset=\"0\" stop-color=\"#FFD23F\" stop-opacity=\"0.35\"/><stop offset=\"0.45\" stop-color=\"#FFD23F\" stop-opacity=\"0.12\"/><stop offset=\"1\" stop-color=\"#FFD23F\" stop-opacity=\"0\"/></radialGradient></defs><ellipse cx=\"32\" cy=\"32\" rx=\"26\" ry=\"20\" fill=\"url(#bao-h)\"/><rect x=\"20\" y=\"26\" width=\"24\" height=\"12\" rx=\"6.0\" fill=\"url(#bao-b)\" stroke=\"#FF7FDD\" stroke-width=\"1.5\"/><path d=\"M24.8 32q2.4 -2.4 4.8 0t4.8 0t4.8 0\" fill=\"none\" stroke=\"#FFC4EF\" stroke-width=\"1.3\" stroke-linecap=\"round\" opacity=\".85\"/><g transform=\"translate(19.44 30.19) rotate(-75)\"><path d=\"M0 0V-2M0 -2L-1.4 -3.6M0 -2L1.4 -3.6\" fill=\"none\" stroke=\"#FFD23F\" stroke-width=\"1\" stroke-linecap=\"round\"/></g><g transform=\"translate(22.81 27.05) rotate(-45)\"><path d=\"M0 0V-2M0 -2L-1.4 -3.6M0 -2L1.4 -3.6\" fill=\"none\" stroke=\"#FFD23F\" stroke-width=\"1\" stroke-linecap=\"round\"/></g><g transform=\"translate(28.64 25.24) rotate(-15)\"><path d=\"M0 0V-2M0 -2L-1.4 -3.6M0 -2L1.4 -3.6\" fill=\"none\" stroke=\"#FFD23F\" stroke-width=\"1\" stroke-linecap=\"round\"/></g><g transform=\"translate(35.36 25.24) rotate(15)\"><path d=\"M0 0V-2M0 -2L-1.4 -3.6M0 -2L1.4 -3.6\" fill=\"none\" stroke=\"#FFD23F\" stroke-width=\"1\" stroke-linecap=\"round\"/></g><g transform=\"translate(41.19 27.05) rotate(45)\"><path d=\"M0 0V-2M0 -2L-1.4 -3.6M0 -2L1.4 -3.6\" fill=\"none\" stroke=\"#FFD23F\" stroke-width=\"1\" stroke-linecap=\"round\"/></g><g transform=\"translate(44.56 30.19) rotate(75)\"><path d=\"M0 0V-2M0 -2L-1.4 -3.6M0 -2L1.4 -3.6\" fill=\"none\" stroke=\"#FFD23F\" stroke-width=\"1\" stroke-linecap=\"round\"/></g><g transform=\"translate(44.56 33.81) rotate(105)\"><path d=\"M0 0V-2M0 -2L-1.4 -3.6M0 -2L1.4 -3.6\" fill=\"none\" stroke=\"#FFD23F\" stroke-width=\"1\" stroke-linecap=\"round\"/></g><g transform=\"translate(41.19 36.95) rotate(135)\"><path d=\"M0 0V-2M0 -2L-1.4 -3.6M0 -2L1.4 -3.6\" fill=\"none\" stroke=\"#FFD23F\" stroke-width=\"1\" stroke-linecap=\"round\"/></g><g transform=\"translate(35.36 38.76) rotate(165)\"><path d=\"M0 0V-2M0 -2L-1.4 -3.6M0 -2L1.4 -3.6\" fill=\"none\" stroke=\"#FFD23F\" stroke-width=\"1\" stroke-linecap=\"round\"/></g><g transform=\"translate(28.64 38.76) rotate(195)\"><path d=\"M0 0V-2M0 -2L-1.4 -3.6M0 -2L1.4 -3.6\" fill=\"none\" stroke=\"#FFD23F\" stroke-width=\"1\" stroke-linecap=\"round\"/></g><g transform=\"translate(22.81 36.95) rotate(225)\"><path d=\"M0 0V-2M0 -2L-1.4 -3.6M0 -2L1.4 -3.6\" fill=\"none\" stroke=\"#FFD23F\" stroke-width=\"1\" stroke-linecap=\"round\"/></g><g transform=\"translate(19.44 33.81) rotate(255)\"><path d=\"M0 0V-2M0 -2L-1.4 -3.6M0 -2L1.4 -3.6\" fill=\"none\" stroke=\"#FFD23F\" stroke-width=\"1\" stroke-linecap=\"round\"/></g></svg>",
+    "bacterium-complement": "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 64 64\" width=\"64\" height=\"64\"><defs><radialGradient id=\"bam-h\"><stop offset=\"0\" stop-color=\"#FF3DCB\" stop-opacity=\"0.55\"/><stop offset=\"0.4\" stop-color=\"#FF3DCB\" stop-opacity=\"0.15\"/><stop offset=\"1\" stop-color=\"#FF3DCB\" stop-opacity=\"0\"/></radialGradient><radialGradient id=\"bam-b\" cx=\"0.42\" cy=\"0.38\" r=\"0.7\"><stop offset=\"0\" stop-color=\"#FF9BE5\" stop-opacity=\"0.6\"/><stop offset=\"1\" stop-color=\"#FF3DCB\" stop-opacity=\"0.28\"/></radialGradient><radialGradient id=\"bam-h\"><stop offset=\"0\" stop-color=\"#FF7A3D\" stop-opacity=\"0.4\"/><stop offset=\"0.45\" stop-color=\"#FF7A3D\" stop-opacity=\"0.12\"/><stop offset=\"1\" stop-color=\"#FF7A3D\" stop-opacity=\"0\"/></radialGradient></defs><ellipse cx=\"32\" cy=\"32\" rx=\"24\" ry=\"17\" fill=\"url(#bam-h)\"/><rect x=\"20\" y=\"26\" width=\"24\" height=\"12\" rx=\"6.0\" fill=\"url(#bam-b)\" stroke=\"#FF7FDD\" stroke-width=\"1.5\"/><circle cx=\"26\" cy=\"30.5\" r=\"2.2\" fill=\"#04050A\" stroke=\"#FF7A3D\" stroke-width=\"1.2\"/><circle cx=\"34.5\" cy=\"34\" r=\"2.2\" fill=\"#04050A\" stroke=\"#FF7A3D\" stroke-width=\"1.2\"/><circle cx=\"39\" cy=\"29.5\" r=\"2.2\" fill=\"#04050A\" stroke=\"#FF7A3D\" stroke-width=\"1.2\"/></svg>",
+    "toxin-burst": "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 64 64\" width=\"64\" height=\"64\"><defs><radialGradient id=\"tox-h\"><stop offset=\".3\" stop-color=\"#B45CFF\" stop-opacity=\"0\"/><stop offset=\".75\" stop-color=\"#B45CFF\" stop-opacity=\".35\"/><stop offset=\"1\" stop-color=\"#B45CFF\" stop-opacity=\"0\"/></radialGradient></defs><circle cx=\"32\" cy=\"32\" r=\"31\" fill=\"url(#tox-h)\"/><path d=\"M59 32L53.28 35.06L57.91 39.61L51.56 40.93L54.71 46.6L48.25 46.08L49.68 52.41L43.62 50.09L43.22 56.56L38.06 52.63L35.84 58.73L32 53.5L28.16 58.73L25.94 52.63L20.78 56.56L20.38 50.09L14.32 52.41L15.75 46.08L9.29 46.6L12.44 40.93L6.09 39.61L10.72 35.06L5 32L10.72 28.94L6.09 24.39L12.44 23.07L9.29 17.4L15.75 17.92L14.32 11.59L20.38 13.91L20.78 7.44L25.94 11.37L28.16 5.27L32 10.5L35.84 5.27L38.06 11.37L43.22 7.44L43.62 13.91L49.68 11.59L48.25 17.92L54.71 17.4L51.56 23.07L57.91 24.39L53.28 28.94Z\" fill=\"none\" stroke=\"#B45CFF\" stroke-width=\"1.4\" stroke-linejoin=\"round\" opacity=\".9\"/><circle cx=\"32\" cy=\"32\" r=\"17\" fill=\"none\" stroke=\"#B45CFF\" stroke-width=\"2.4\" opacity=\".55\"/></svg>",
+    "pollen": "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 64 64\" width=\"64\" height=\"64\"><defs><radialGradient id=\"pol-h\"><stop offset=\"0\" stop-color=\"#C9F25C\" stop-opacity=\"0.4\"/><stop offset=\"0.55\" stop-color=\"#C9F25C\" stop-opacity=\"0.12\"/><stop offset=\"1\" stop-color=\"#C9F25C\" stop-opacity=\"0\"/></radialGradient><radialGradient id=\"pol-b\" cx=\"0.42\" cy=\"0.38\" r=\"0.7\"><stop offset=\"0\" stop-color=\"#E8FF9E\" stop-opacity=\"0.45\"/><stop offset=\"1\" stop-color=\"#C9F25C\" stop-opacity=\"0.2\"/></radialGradient></defs><circle cx=\"32\" cy=\"32\" r=\"31\" fill=\"url(#pol-h)\"/><path d=\"M54 32L49.28 34.74L52.92 38.8L47.59 39.94L49.8 44.93L44.37 44.37L44.93 49.8L39.94 47.59L38.8 52.92L34.74 49.28L32 54L29.26 49.28L25.2 52.92L24.06 47.59L19.07 49.8L19.63 44.37L14.2 44.93L16.41 39.94L11.08 38.8L14.72 34.74L10 32L14.72 29.26L11.08 25.2L16.41 24.06L14.2 19.07L19.63 19.63L19.07 14.2L24.06 16.41L25.2 11.08L29.26 14.72L32 10L34.74 14.72L38.8 11.08L39.94 16.41L44.93 14.2L44.37 19.63L49.8 19.07L47.59 24.06L52.92 25.2L49.28 29.26Z\" fill=\"url(#pol-b)\" stroke=\"#C9F25C\" stroke-width=\"1.3\" stroke-linejoin=\"round\"/><g fill=\"#F1FFC9\" opacity=\".7\"><circle cx=\"23.87\" cy=\"28.79\" r=\"1.1\"/><circle cx=\"19.79\" cy=\"34.68\" r=\"1.1\"/><circle cx=\"24.1\" cy=\"27.17\" r=\"1.1\"/><circle cx=\"26.43\" cy=\"31.58\" r=\"1.1\"/><circle cx=\"34.75\" cy=\"22.06\" r=\"1.1\"/><circle cx=\"30.69\" cy=\"35.77\" r=\"1.1\"/><circle cx=\"33.43\" cy=\"28.36\" r=\"1.1\"/><circle cx=\"42.45\" cy=\"34.82\" r=\"1.1\"/><circle cx=\"44.57\" cy=\"29.17\" r=\"1.1\"/><circle cx=\"24.14\" cy=\"25.02\" r=\"1.1\"/><circle cx=\"37.14\" cy=\"32.49\" r=\"1.1\"/><circle cx=\"40.8\" cy=\"35.45\" r=\"1.1\"/><circle cx=\"32.29\" cy=\"37.66\" r=\"1.1\"/><circle cx=\"29.8\" cy=\"32.51\" r=\"1.1\"/><circle cx=\"36.73\" cy=\"24.79\" r=\"1.1\"/><circle cx=\"26.04\" cy=\"24.77\" r=\"1.1\"/><circle cx=\"27.19\" cy=\"24.17\" r=\"1.1\"/><circle cx=\"30.45\" cy=\"40.65\" r=\"1.1\"/><circle cx=\"44.98\" cy=\"31.65\" r=\"1.1\"/><circle cx=\"28.88\" cy=\"20.5\" r=\"1.1\"/><circle cx=\"32.93\" cy=\"39.24\" r=\"1.1\"/><circle cx=\"38.32\" cy=\"34.98\" r=\"1.1\"/><circle cx=\"22.78\" cy=\"38.67\" r=\"1.1\"/><circle cx=\"22.95\" cy=\"39.83\" r=\"1.1\"/><circle cx=\"39.3\" cy=\"21.58\" r=\"1.1\"/><circle cx=\"32.08\" cy=\"32.29\" r=\"1.1\"/></g></svg>",
+    "antibody": "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 16 16\" width=\"16\" height=\"16\"><defs><radialGradient id=\"abd-h\"><stop offset=\"0\" stop-color=\"#FFD23F\" stop-opacity=\"0.45\"/><stop offset=\"0.4\" stop-color=\"#FFD23F\" stop-opacity=\"0.12\"/><stop offset=\"1\" stop-color=\"#FFD23F\" stop-opacity=\"0\"/></radialGradient></defs><circle cx=\"8\" cy=\"8\" r=\"8\" fill=\"url(#abd-h)\"/><g transform=\"translate(8 8.4) rotate(0) scale(0.62)\"><path d=\"M0 6V0M0 0L-5 -5.5M0 0L5 -5.5\" fill=\"none\" stroke=\"#FFD23F\" stroke-width=\"2.6\" stroke-linecap=\"round\" stroke-linejoin=\"round\"/></g></svg>",
+    "antibody-cloud": "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 64 64\" width=\"64\" height=\"64\"><defs><radialGradient id=\"abc-h\"><stop offset=\"0\" stop-color=\"#FFD23F\" stop-opacity=\"0.22\"/><stop offset=\"0.5\" stop-color=\"#FFD23F\" stop-opacity=\"0.08\"/><stop offset=\"1\" stop-color=\"#FFD23F\" stop-opacity=\"0\"/></radialGradient></defs><circle cx=\"32\" cy=\"32\" r=\"32\" fill=\"url(#abc-h)\"/></svg>",
+    "tissue": "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 128 128\" width=\"128\" height=\"128\"><rect width=\"128\" height=\"128\" fill=\"#04050A\"/><ellipse cx=\"13.99\" cy=\"17.14\" rx=\"13.77\" ry=\"12.46\" transform=\"rotate(38.88 13.99 17.14)\" fill=\"#090D22\" stroke=\"#161E48\" stroke-width=\"1.2\"/><circle cx=\"14.99\" cy=\"16.14\" r=\"4.2\" fill=\"#1F2A66\"/><ellipse cx=\"141.99\" cy=\"17.14\" rx=\"13.77\" ry=\"12.46\" transform=\"rotate(38.88 141.99 17.14)\" fill=\"#090D22\" stroke=\"#161E48\" stroke-width=\"1.2\"/><circle cx=\"142.99\" cy=\"16.14\" r=\"4.2\" fill=\"#1F2A66\"/><ellipse cx=\"33.76\" cy=\"49.85\" rx=\"13.52\" ry=\"12.51\" transform=\"rotate(42.49 33.76 49.85)\" fill=\"#090D22\" stroke=\"#161E48\" stroke-width=\"1.2\"/><circle cx=\"34.76\" cy=\"48.85\" r=\"4.2\" fill=\"#1F2A66\"/><ellipse cx=\"13.02\" cy=\"79.23\" rx=\"13.67\" ry=\"11.64\" transform=\"rotate(142.88 13.02 79.23)\" fill=\"#090D22\" stroke=\"#161E48\" stroke-width=\"1.2\"/><circle cx=\"14.02\" cy=\"78.23\" r=\"4.2\" fill=\"#1F2A66\"/><ellipse cx=\"141.02\" cy=\"79.23\" rx=\"13.67\" ry=\"11.64\" transform=\"rotate(142.88 141.02 79.23)\" fill=\"#090D22\" stroke=\"#161E48\" stroke-width=\"1.2\"/><circle cx=\"142.02\" cy=\"78.23\" r=\"4.2\" fill=\"#1F2A66\"/><ellipse cx=\"30.39\" cy=\"110.4\" rx=\"12.58\" ry=\"13.5\" transform=\"rotate(132.96 30.39 110.4)\" fill=\"#090D22\" stroke=\"#161E48\" stroke-width=\"1.2\"/><circle cx=\"31.39\" cy=\"109.4\" r=\"4.2\" fill=\"#1F2A66\"/><ellipse cx=\"50.25\" cy=\"16.7\" rx=\"12.57\" ry=\"12.16\" transform=\"rotate(89.56 50.25 16.7)\" fill=\"#090D22\" stroke=\"#161E48\" stroke-width=\"1.2\"/><circle cx=\"51.25\" cy=\"15.7\" r=\"4.2\" fill=\"#1F2A66\"/><ellipse cx=\"61.69\" cy=\"50.71\" rx=\"13.24\" ry=\"11.81\" transform=\"rotate(147.15 61.69 50.71)\" fill=\"#090D22\" stroke=\"#161E48\" stroke-width=\"1.2\"/><circle cx=\"62.69\" cy=\"49.71\" r=\"4.2\" fill=\"#1F2A66\"/><ellipse cx=\"45.75\" cy=\"82.57\" rx=\"13.41\" ry=\"12.6\" transform=\"rotate(61.73 45.75 82.57)\" fill=\"#090D22\" stroke=\"#161E48\" stroke-width=\"1.2\"/><circle cx=\"46.75\" cy=\"81.57\" r=\"4.2\" fill=\"#1F2A66\"/><ellipse cx=\"63.91\" cy=\"110.12\" rx=\"12.57\" ry=\"13.23\" transform=\"rotate(42.28 63.91 110.12)\" fill=\"#090D22\" stroke=\"#161E48\" stroke-width=\"1.2\"/><circle cx=\"64.91\" cy=\"109.12\" r=\"4.2\" fill=\"#1F2A66\"/><ellipse cx=\"81.68\" cy=\"14.25\" rx=\"14.44\" ry=\"13.29\" transform=\"rotate(135.86 81.68 14.25)\" fill=\"#090D22\" stroke=\"#161E48\" stroke-width=\"1.2\"/><circle cx=\"82.68\" cy=\"13.25\" r=\"4.2\" fill=\"#1F2A66\"/><ellipse cx=\"81.68\" cy=\"142.25\" rx=\"14.44\" ry=\"13.29\" transform=\"rotate(135.86 81.68 142.25)\" fill=\"#090D22\" stroke=\"#161E48\" stroke-width=\"1.2\"/><circle cx=\"82.68\" cy=\"141.25\" r=\"4.2\" fill=\"#1F2A66\"/><ellipse cx=\"97.58\" cy=\"48.48\" rx=\"13.96\" ry=\"11.74\" transform=\"rotate(85.74 97.58 48.48)\" fill=\"#090D22\" stroke=\"#161E48\" stroke-width=\"1.2\"/><circle cx=\"98.58\" cy=\"47.48\" r=\"4.2\" fill=\"#1F2A66\"/><ellipse cx=\"81.96\" cy=\"78.21\" rx=\"14.35\" ry=\"13.28\" transform=\"rotate(73.73 81.96 78.21)\" fill=\"#090D22\" stroke=\"#161E48\" stroke-width=\"1.2\"/><circle cx=\"82.96\" cy=\"77.21\" r=\"4.2\" fill=\"#1F2A66\"/><ellipse cx=\"95.19\" cy=\"111.71\" rx=\"13.27\" ry=\"13.49\" transform=\"rotate(69.59 95.19 111.71)\" fill=\"#090D22\" stroke=\"#161E48\" stroke-width=\"1.2\"/><circle cx=\"96.19\" cy=\"110.71\" r=\"4.2\" fill=\"#1F2A66\"/><ellipse cx=\"109.16\" cy=\"13.56\" rx=\"13.94\" ry=\"13.49\" transform=\"rotate(89.28 109.16 13.56)\" fill=\"#090D22\" stroke=\"#161E48\" stroke-width=\"1.2\"/><circle cx=\"110.16\" cy=\"12.56\" r=\"4.2\" fill=\"#1F2A66\"/><ellipse cx=\"109.16\" cy=\"141.56\" rx=\"13.94\" ry=\"13.49\" transform=\"rotate(89.28 109.16 141.56)\" fill=\"#090D22\" stroke=\"#161E48\" stroke-width=\"1.2\"/><circle cx=\"110.16\" cy=\"140.56\" r=\"4.2\" fill=\"#1F2A66\"/><ellipse cx=\"-0.05\" cy=\"48.3\" rx=\"14\" ry=\"11.94\" transform=\"rotate(109.6 -0.05 48.3)\" fill=\"#090D22\" stroke=\"#161E48\" stroke-width=\"1.2\"/><circle cx=\"0.95\" cy=\"47.3\" r=\"4.2\" fill=\"#1F2A66\"/><ellipse cx=\"127.95\" cy=\"48.3\" rx=\"14\" ry=\"11.94\" transform=\"rotate(109.6 127.95 48.3)\" fill=\"#090D22\" stroke=\"#161E48\" stroke-width=\"1.2\"/><circle cx=\"128.95\" cy=\"47.3\" r=\"4.2\" fill=\"#1F2A66\"/><ellipse cx=\"-15.66\" cy=\"80.74\" rx=\"12.86\" ry=\"11.84\" transform=\"rotate(62.68 -15.66 80.74)\" fill=\"#090D22\" stroke=\"#161E48\" stroke-width=\"1.2\"/><circle cx=\"-14.66\" cy=\"79.74\" r=\"4.2\" fill=\"#1F2A66\"/><ellipse cx=\"112.34\" cy=\"80.74\" rx=\"12.86\" ry=\"11.84\" transform=\"rotate(62.68 112.34 80.74)\" fill=\"#090D22\" stroke=\"#161E48\" stroke-width=\"1.2\"/><circle cx=\"113.34\" cy=\"79.74\" r=\"4.2\" fill=\"#1F2A66\"/><ellipse cx=\"2.56\" cy=\"111.08\" rx=\"13.69\" ry=\"12.11\" transform=\"rotate(18.59 2.56 111.08)\" fill=\"#090D22\" stroke=\"#161E48\" stroke-width=\"1.2\"/><circle cx=\"3.56\" cy=\"110.08\" r=\"4.2\" fill=\"#1F2A66\"/><ellipse cx=\"130.56\" cy=\"111.08\" rx=\"13.69\" ry=\"12.11\" transform=\"rotate(18.59 130.56 111.08)\" fill=\"#090D22\" stroke=\"#161E48\" stroke-width=\"1.2\"/><circle cx=\"131.56\" cy=\"110.08\" r=\"4.2\" fill=\"#1F2A66\"/></svg>",
+    "tissue-damaged": "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 128 128\" width=\"128\" height=\"128\"><rect width=\"128\" height=\"128\" fill=\"#04050A\"/><ellipse cx=\"13.99\" cy=\"17.14\" rx=\"13.77\" ry=\"12.46\" transform=\"rotate(38.88 13.99 17.14)\" fill=\"#1E0A12\" stroke=\"#5A1A2A\" stroke-width=\"1.2\"/><circle cx=\"14.99\" cy=\"16.14\" r=\"4.2\" fill=\"#7A2236\"/><ellipse cx=\"141.99\" cy=\"17.14\" rx=\"13.77\" ry=\"12.46\" transform=\"rotate(38.88 141.99 17.14)\" fill=\"#1E0A12\" stroke=\"#5A1A2A\" stroke-width=\"1.2\"/><circle cx=\"142.99\" cy=\"16.14\" r=\"4.2\" fill=\"#7A2236\"/><ellipse cx=\"33.85\" cy=\"48.07\" rx=\"13.51\" ry=\"11.97\" transform=\"rotate(0.57 33.85 48.07)\" fill=\"#1E0A12\" stroke=\"#5A1A2A\" stroke-width=\"1.2\"/><circle cx=\"34.85\" cy=\"47.07\" r=\"4.2\" fill=\"#7A2236\"/><ellipse cx=\"16.51\" cy=\"77.42\" rx=\"14.09\" ry=\"11.96\" transform=\"rotate(41.89 16.51 77.42)\" fill=\"#1E0A12\" stroke=\"#5A1A2A\" stroke-width=\"1.2\" stroke-dasharray=\"5 3\"/><circle cx=\"14.51\" cy=\"77.42\" r=\"1.4\" fill=\"#7A2236\"/><circle cx=\"19.51\" cy=\"79.42\" r=\"1\" fill=\"#7A2236\"/><ellipse cx=\"34.99\" cy=\"-14.57\" rx=\"14.25\" ry=\"12.73\" transform=\"rotate(6.13 34.99 -14.57)\" fill=\"#1E0A12\" stroke=\"#5A1A2A\" stroke-width=\"1.2\" stroke-dasharray=\"5 3\"/><circle cx=\"32.99\" cy=\"-14.57\" r=\"1.4\" fill=\"#7A2236\"/><circle cx=\"37.99\" cy=\"-12.57\" r=\"1\" fill=\"#7A2236\"/><ellipse cx=\"34.99\" cy=\"113.43\" rx=\"14.25\" ry=\"12.73\" transform=\"rotate(6.13 34.99 113.43)\" fill=\"#1E0A12\" stroke=\"#5A1A2A\" stroke-width=\"1.2\" stroke-dasharray=\"5 3\"/><circle cx=\"32.99\" cy=\"113.43\" r=\"1.4\" fill=\"#7A2236\"/><circle cx=\"37.99\" cy=\"115.43\" r=\"1\" fill=\"#7A2236\"/><ellipse cx=\"47.99\" cy=\"13.69\" rx=\"14.4\" ry=\"12.24\" transform=\"rotate(27.87 47.99 13.69)\" fill=\"#1E0A12\" stroke=\"#5A1A2A\" stroke-width=\"1.2\"/><circle cx=\"48.99\" cy=\"12.69\" r=\"4.2\" fill=\"#7A2236\"/><ellipse cx=\"47.99\" cy=\"141.69\" rx=\"14.4\" ry=\"12.24\" transform=\"rotate(27.87 47.99 141.69)\" fill=\"#1E0A12\" stroke=\"#5A1A2A\" stroke-width=\"1.2\"/><circle cx=\"48.99\" cy=\"140.69\" r=\"4.2\" fill=\"#7A2236\"/><ellipse cx=\"61.75\" cy=\"50.57\" rx=\"13.41\" ry=\"12.6\" transform=\"rotate(61.73 61.75 50.57)\" fill=\"#1E0A12\" stroke=\"#5A1A2A\" stroke-width=\"1.2\"/><circle cx=\"62.75\" cy=\"49.57\" r=\"4.2\" fill=\"#7A2236\"/><ellipse cx=\"46.12\" cy=\"77.22\" rx=\"14.23\" ry=\"11.97\" transform=\"rotate(140.45 46.12 77.22)\" fill=\"#1E0A12\" stroke=\"#5A1A2A\" stroke-width=\"1.2\" stroke-dasharray=\"5 3\"/><circle cx=\"44.12\" cy=\"77.22\" r=\"1.4\" fill=\"#7A2236\"/><circle cx=\"49.12\" cy=\"79.22\" r=\"1\" fill=\"#7A2236\"/><ellipse cx=\"66.81\" cy=\"-13.64\" rx=\"14.01\" ry=\"13.03\" transform=\"rotate(104.54 66.81 -13.64)\" fill=\"#1E0A12\" stroke=\"#5A1A2A\" stroke-width=\"1.2\"/><circle cx=\"67.81\" cy=\"-14.64\" r=\"4.2\" fill=\"#7A2236\"/><ellipse cx=\"66.81\" cy=\"114.36\" rx=\"14.01\" ry=\"13.03\" transform=\"rotate(104.54 66.81 114.36)\" fill=\"#1E0A12\" stroke=\"#5A1A2A\" stroke-width=\"1.2\"/><circle cx=\"67.81\" cy=\"113.36\" r=\"4.2\" fill=\"#7A2236\"/><ellipse cx=\"77.73\" cy=\"15.86\" rx=\"14.15\" ry=\"11.9\" transform=\"rotate(166.17 77.73 15.86)\" fill=\"#1E0A12\" stroke=\"#5A1A2A\" stroke-width=\"1.2\"/><circle cx=\"78.73\" cy=\"14.86\" r=\"4.2\" fill=\"#7A2236\"/><ellipse cx=\"77.73\" cy=\"143.86\" rx=\"14.15\" ry=\"11.9\" transform=\"rotate(166.17 77.73 143.86)\" fill=\"#1E0A12\" stroke=\"#5A1A2A\" stroke-width=\"1.2\"/><circle cx=\"78.73\" cy=\"142.86\" r=\"4.2\" fill=\"#7A2236\"/><ellipse cx=\"95.46\" cy=\"47.19\" rx=\"13.4\" ry=\"12.27\" transform=\"rotate(179.07 95.46 47.19)\" fill=\"#1E0A12\" stroke=\"#5A1A2A\" stroke-width=\"1.2\"/><circle cx=\"96.46\" cy=\"46.19\" r=\"4.2\" fill=\"#7A2236\"/><ellipse cx=\"77.16\" cy=\"77.56\" rx=\"13.94\" ry=\"13.49\" transform=\"rotate(89.28 77.16 77.56)\" fill=\"#1E0A12\" stroke=\"#5A1A2A\" stroke-width=\"1.2\"/><circle cx=\"78.16\" cy=\"76.56\" r=\"4.2\" fill=\"#7A2236\"/><ellipse cx=\"96.3\" cy=\"-14.51\" rx=\"12.94\" ry=\"12.72\" transform=\"rotate(100.17 96.3 -14.51)\" fill=\"#1E0A12\" stroke=\"#5A1A2A\" stroke-width=\"1.2\"/><circle cx=\"97.3\" cy=\"-15.51\" r=\"4.2\" fill=\"#7A2236\"/><ellipse cx=\"96.3\" cy=\"113.49\" rx=\"12.94\" ry=\"12.72\" transform=\"rotate(100.17 96.3 113.49)\" fill=\"#1E0A12\" stroke=\"#5A1A2A\" stroke-width=\"1.2\"/><circle cx=\"97.3\" cy=\"112.49\" r=\"4.2\" fill=\"#7A2236\"/><ellipse cx=\"110.08\" cy=\"14.02\" rx=\"13.2\" ry=\"13.35\" transform=\"rotate(62.39 110.08 14.02)\" fill=\"#1E0A12\" stroke=\"#5A1A2A\" stroke-width=\"1.2\"/><circle cx=\"111.08\" cy=\"13.02\" r=\"4.2\" fill=\"#7A2236\"/><ellipse cx=\"110.08\" cy=\"142.02\" rx=\"13.2\" ry=\"13.35\" transform=\"rotate(62.39 110.08 142.02)\" fill=\"#1E0A12\" stroke=\"#5A1A2A\" stroke-width=\"1.2\"/><circle cx=\"111.08\" cy=\"141.02\" r=\"4.2\" fill=\"#7A2236\"/><ellipse cx=\"-1.16\" cy=\"45.62\" rx=\"12.63\" ry=\"13.13\" transform=\"rotate(139.86 -1.16 45.62)\" fill=\"#1E0A12\" stroke=\"#5A1A2A\" stroke-width=\"1.2\"/><circle cx=\"-0.16\" cy=\"44.62\" r=\"4.2\" fill=\"#7A2236\"/><ellipse cx=\"126.84\" cy=\"45.62\" rx=\"12.63\" ry=\"13.13\" transform=\"rotate(139.86 126.84 45.62)\" fill=\"#1E0A12\" stroke=\"#5A1A2A\" stroke-width=\"1.2\"/><circle cx=\"127.84\" cy=\"44.62\" r=\"4.2\" fill=\"#7A2236\"/><ellipse cx=\"-14.9\" cy=\"81.06\" rx=\"14.3\" ry=\"13.42\" transform=\"rotate(73.26 -14.9 81.06)\" fill=\"#1E0A12\" stroke=\"#5A1A2A\" stroke-width=\"1.2\"/><circle cx=\"-13.9\" cy=\"80.06\" r=\"4.2\" fill=\"#7A2236\"/><ellipse cx=\"113.1\" cy=\"81.06\" rx=\"14.3\" ry=\"13.42\" transform=\"rotate(73.26 113.1 81.06)\" fill=\"#1E0A12\" stroke=\"#5A1A2A\" stroke-width=\"1.2\"/><circle cx=\"114.1\" cy=\"80.06\" r=\"4.2\" fill=\"#7A2236\"/><ellipse cx=\"2.77\" cy=\"-15.46\" rx=\"14.27\" ry=\"12.48\" transform=\"rotate(67.6 2.77 -15.46)\" fill=\"#1E0A12\" stroke=\"#5A1A2A\" stroke-width=\"1.2\" stroke-dasharray=\"5 3\"/><circle cx=\"0.77\" cy=\"-15.46\" r=\"1.4\" fill=\"#7A2236\"/><circle cx=\"5.77\" cy=\"-13.46\" r=\"1\" fill=\"#7A2236\"/><ellipse cx=\"2.77\" cy=\"112.54\" rx=\"14.27\" ry=\"12.48\" transform=\"rotate(67.6 2.77 112.54)\" fill=\"#1E0A12\" stroke=\"#5A1A2A\" stroke-width=\"1.2\" stroke-dasharray=\"5 3\"/><circle cx=\"0.77\" cy=\"112.54\" r=\"1.4\" fill=\"#7A2236\"/><circle cx=\"5.77\" cy=\"114.54\" r=\"1\" fill=\"#7A2236\"/><ellipse cx=\"130.77\" cy=\"-15.46\" rx=\"14.27\" ry=\"12.48\" transform=\"rotate(67.6 130.77 -15.46)\" fill=\"#1E0A12\" stroke=\"#5A1A2A\" stroke-width=\"1.2\" stroke-dasharray=\"5 3\"/><circle cx=\"128.77\" cy=\"-15.46\" r=\"1.4\" fill=\"#7A2236\"/><circle cx=\"133.77\" cy=\"-13.46\" r=\"1\" fill=\"#7A2236\"/><ellipse cx=\"130.77\" cy=\"112.54\" rx=\"14.27\" ry=\"12.48\" transform=\"rotate(67.6 130.77 112.54)\" fill=\"#1E0A12\" stroke=\"#5A1A2A\" stroke-width=\"1.2\" stroke-dasharray=\"5 3\"/><circle cx=\"128.77\" cy=\"112.54\" r=\"1.4\" fill=\"#7A2236\"/><circle cx=\"133.77\" cy=\"114.54\" r=\"1\" fill=\"#7A2236\"/></svg>",
+    "vessel-blood": "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 128 64\" width=\"128\" height=\"64\"><rect width=\"128\" height=\"64\" fill=\"#04050A\"/><rect y=\"15\" width=\"128\" height=\"34\" fill=\"#C2334F\" opacity=\".07\"/><ellipse cx=\"16\" cy=\"10.5\" rx=\"13\" ry=\"3\" fill=\"#C2334F\" opacity=\".35\"/><ellipse cx=\"18\" cy=\"10.5\" rx=\"3\" ry=\"1.4\" fill=\"#C2334F\" opacity=\".8\"/><ellipse cx=\"16\" cy=\"53.5\" rx=\"13\" ry=\"3\" fill=\"#C2334F\" opacity=\".35\"/><ellipse cx=\"18\" cy=\"53.5\" rx=\"3\" ry=\"1.4\" fill=\"#C2334F\" opacity=\".8\"/><ellipse cx=\"48\" cy=\"10.5\" rx=\"13\" ry=\"3\" fill=\"#C2334F\" opacity=\".35\"/><ellipse cx=\"50\" cy=\"10.5\" rx=\"3\" ry=\"1.4\" fill=\"#C2334F\" opacity=\".8\"/><ellipse cx=\"48\" cy=\"53.5\" rx=\"13\" ry=\"3\" fill=\"#C2334F\" opacity=\".35\"/><ellipse cx=\"50\" cy=\"53.5\" rx=\"3\" ry=\"1.4\" fill=\"#C2334F\" opacity=\".8\"/><ellipse cx=\"80\" cy=\"10.5\" rx=\"13\" ry=\"3\" fill=\"#C2334F\" opacity=\".35\"/><ellipse cx=\"82\" cy=\"10.5\" rx=\"3\" ry=\"1.4\" fill=\"#C2334F\" opacity=\".8\"/><ellipse cx=\"80\" cy=\"53.5\" rx=\"13\" ry=\"3\" fill=\"#C2334F\" opacity=\".35\"/><ellipse cx=\"82\" cy=\"53.5\" rx=\"3\" ry=\"1.4\" fill=\"#C2334F\" opacity=\".8\"/><ellipse cx=\"112\" cy=\"10.5\" rx=\"13\" ry=\"3\" fill=\"#C2334F\" opacity=\".35\"/><ellipse cx=\"114\" cy=\"10.5\" rx=\"3\" ry=\"1.4\" fill=\"#C2334F\" opacity=\".8\"/><ellipse cx=\"112\" cy=\"53.5\" rx=\"13\" ry=\"3\" fill=\"#C2334F\" opacity=\".35\"/><ellipse cx=\"114\" cy=\"53.5\" rx=\"3\" ry=\"1.4\" fill=\"#C2334F\" opacity=\".8\"/><path d=\"M0 6H128M0 58H128\" stroke=\"#C2334F\" stroke-width=\"2\" opacity=\".9\"/><path d=\"M0 15H128M0 49H128\" stroke=\"#C2334F\" stroke-width=\"1\" opacity=\".45\"/><ellipse cx=\"14\" cy=\"26\" rx=\"6\" ry=\"4\" fill=\"none\" stroke=\"#E0566F\" stroke-width=\"1.6\" opacity=\".45\"/><ellipse cx=\"44\" cy=\"38\" rx=\"6\" ry=\"4\" fill=\"none\" stroke=\"#E0566F\" stroke-width=\"1.6\" opacity=\".45\"/><ellipse cx=\"70\" cy=\"24\" rx=\"6\" ry=\"4\" fill=\"none\" stroke=\"#E0566F\" stroke-width=\"1.6\" opacity=\".45\"/><ellipse cx=\"100\" cy=\"36\" rx=\"6\" ry=\"4\" fill=\"none\" stroke=\"#E0566F\" stroke-width=\"1.6\" opacity=\".45\"/><ellipse cx=\"122\" cy=\"28\" rx=\"6\" ry=\"4\" fill=\"none\" stroke=\"#E0566F\" stroke-width=\"1.6\" opacity=\".45\"/></svg>",
+    "vessel-lymph": "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 128 64\" width=\"128\" height=\"64\"><rect width=\"128\" height=\"64\" fill=\"#04050A\"/><rect y=\"15\" width=\"128\" height=\"34\" fill=\"#2FB89A\" opacity=\".07\"/><ellipse cx=\"16\" cy=\"10.5\" rx=\"13\" ry=\"3\" fill=\"#2FB89A\" opacity=\".35\"/><ellipse cx=\"18\" cy=\"10.5\" rx=\"3\" ry=\"1.4\" fill=\"#2FB89A\" opacity=\".8\"/><ellipse cx=\"16\" cy=\"53.5\" rx=\"13\" ry=\"3\" fill=\"#2FB89A\" opacity=\".35\"/><ellipse cx=\"18\" cy=\"53.5\" rx=\"3\" ry=\"1.4\" fill=\"#2FB89A\" opacity=\".8\"/><ellipse cx=\"48\" cy=\"10.5\" rx=\"13\" ry=\"3\" fill=\"#2FB89A\" opacity=\".35\"/><ellipse cx=\"50\" cy=\"10.5\" rx=\"3\" ry=\"1.4\" fill=\"#2FB89A\" opacity=\".8\"/><ellipse cx=\"48\" cy=\"53.5\" rx=\"13\" ry=\"3\" fill=\"#2FB89A\" opacity=\".35\"/><ellipse cx=\"50\" cy=\"53.5\" rx=\"3\" ry=\"1.4\" fill=\"#2FB89A\" opacity=\".8\"/><ellipse cx=\"80\" cy=\"10.5\" rx=\"13\" ry=\"3\" fill=\"#2FB89A\" opacity=\".35\"/><ellipse cx=\"82\" cy=\"10.5\" rx=\"3\" ry=\"1.4\" fill=\"#2FB89A\" opacity=\".8\"/><ellipse cx=\"80\" cy=\"53.5\" rx=\"13\" ry=\"3\" fill=\"#2FB89A\" opacity=\".35\"/><ellipse cx=\"82\" cy=\"53.5\" rx=\"3\" ry=\"1.4\" fill=\"#2FB89A\" opacity=\".8\"/><ellipse cx=\"112\" cy=\"10.5\" rx=\"13\" ry=\"3\" fill=\"#2FB89A\" opacity=\".35\"/><ellipse cx=\"114\" cy=\"10.5\" rx=\"3\" ry=\"1.4\" fill=\"#2FB89A\" opacity=\".8\"/><ellipse cx=\"112\" cy=\"53.5\" rx=\"13\" ry=\"3\" fill=\"#2FB89A\" opacity=\".35\"/><ellipse cx=\"114\" cy=\"53.5\" rx=\"3\" ry=\"1.4\" fill=\"#2FB89A\" opacity=\".8\"/><path d=\"M0 6H128M0 58H128\" stroke=\"#2FB89A\" stroke-width=\"2\" opacity=\".9\"/><path d=\"M0 15H128M0 49H128\" stroke=\"#2FB89A\" stroke-width=\"1\" opacity=\".45\"/><path d=\"M26 16L38 32L26 48\" fill=\"none\" stroke=\"#2FB89A\" stroke-width=\"1.6\" stroke-linejoin=\"round\" opacity=\".75\"/><path d=\"M90 16L102 32L90 48\" fill=\"none\" stroke=\"#2FB89A\" stroke-width=\"1.6\" stroke-linejoin=\"round\" opacity=\".75\"/></svg>",
+    "wound": "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 128 64\" width=\"128\" height=\"64\"><defs><linearGradient id=\"wnd-g\" x1=\"0\" y1=\"0\" x2=\"0\" y2=\"1\"><stop offset=\"0\" stop-color=\"#FF3B4E\" stop-opacity=\"0\"/><stop offset=\".5\" stop-color=\"#FF3B4E\" stop-opacity=\".28\"/><stop offset=\"1\" stop-color=\"#FF3B4E\" stop-opacity=\"0\"/></linearGradient></defs><rect width=\"128\" height=\"64\" fill=\"url(#wnd-g)\"/><path d=\"M0 21.23L8.3 28.04L18.72 31.43L26.64 21.96L34.38 22.46L45.05 21.53L54.71 22.9L63.18 25.75L74.37 28.58L81.44 24.51L89.17 30.74L100.22 29.89L111.35 28.47L123.1 30.04L128 28.34L128 40.25L123.1 40.52L111.35 41.46L100.22 41.61L89.17 41.73L81.44 33.47L74.37 39.09L63.18 35.8L54.71 33.37L45.05 32.64L34.38 33.34L26.64 32.62L18.72 42.36L8.3 39.3L0 30.71Z\" fill=\"#04050A\" stroke=\"#FF3B4E\" stroke-width=\"1.4\" stroke-linejoin=\"round\" opacity=\".95\"/></svg>",
+    "alert-quiet": "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 48 48\" width=\"48\" height=\"48\"><rect x=\"9.0\" y=\"32\" width=\"6\" height=\"8\" rx=\"2\" fill=\"#7F8FB0\"/><rect x=\"17.5\" y=\"25\" width=\"6\" height=\"15\" rx=\"2\" fill=\"none\" stroke=\"#6E7B96\" stroke-width=\"1.2\" opacity=\".6\"/><rect x=\"26.0\" y=\"18\" width=\"6\" height=\"22\" rx=\"2\" fill=\"none\" stroke=\"#6E7B96\" stroke-width=\"1.2\" opacity=\".6\"/><rect x=\"34.5\" y=\"11\" width=\"6\" height=\"29\" rx=\"2\" fill=\"none\" stroke=\"#6E7B96\" stroke-width=\"1.2\" opacity=\".6\"/></svg>",
+    "alert-watch": "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 48 48\" width=\"48\" height=\"48\"><rect x=\"9.0\" y=\"32\" width=\"6\" height=\"8\" rx=\"2\" fill=\"#FFD23F\"/><rect x=\"17.5\" y=\"25\" width=\"6\" height=\"15\" rx=\"2\" fill=\"#FFD23F\"/><rect x=\"26.0\" y=\"18\" width=\"6\" height=\"22\" rx=\"2\" fill=\"none\" stroke=\"#6E7B96\" stroke-width=\"1.2\" opacity=\".6\"/><rect x=\"34.5\" y=\"11\" width=\"6\" height=\"29\" rx=\"2\" fill=\"none\" stroke=\"#6E7B96\" stroke-width=\"1.2\" opacity=\".6\"/></svg>",
+    "alert-inflamed": "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 48 48\" width=\"48\" height=\"48\"><defs><radialGradient id=\"al2-h\"><stop offset=\"0\" stop-color=\"#FF7A3D\" stop-opacity=\"0.35\"/><stop offset=\"0.5\" stop-color=\"#FF7A3D\" stop-opacity=\"0.1\"/><stop offset=\"1\" stop-color=\"#FF7A3D\" stop-opacity=\"0\"/></radialGradient></defs><circle cx=\"24\" cy=\"26\" r=\"22\" fill=\"url(#al2-h)\"/><rect x=\"9.0\" y=\"32\" width=\"6\" height=\"8\" rx=\"2\" fill=\"#FF7A3D\"/><rect x=\"17.5\" y=\"25\" width=\"6\" height=\"15\" rx=\"2\" fill=\"#FF7A3D\"/><rect x=\"26.0\" y=\"18\" width=\"6\" height=\"22\" rx=\"2\" fill=\"#FF7A3D\"/><rect x=\"34.5\" y=\"11\" width=\"6\" height=\"29\" rx=\"2\" fill=\"none\" stroke=\"#6E7B96\" stroke-width=\"1.2\" opacity=\".6\"/></svg>",
+    "alert-max": "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 48 48\" width=\"48\" height=\"48\"><defs><radialGradient id=\"al3-h\"><stop offset=\"0\" stop-color=\"#FF3B4E\" stop-opacity=\"0.35\"/><stop offset=\"0.5\" stop-color=\"#FF3B4E\" stop-opacity=\"0.1\"/><stop offset=\"1\" stop-color=\"#FF3B4E\" stop-opacity=\"0\"/></radialGradient></defs><circle cx=\"24\" cy=\"26\" r=\"22\" fill=\"url(#al3-h)\"/><rect x=\"9.0\" y=\"32\" width=\"6\" height=\"8\" rx=\"2\" fill=\"#FF3B4E\"/><rect x=\"17.5\" y=\"25\" width=\"6\" height=\"15\" rx=\"2\" fill=\"#FF3B4E\"/><rect x=\"26.0\" y=\"18\" width=\"6\" height=\"22\" rx=\"2\" fill=\"#FF3B4E\"/><rect x=\"34.5\" y=\"11\" width=\"6\" height=\"29\" rx=\"2\" fill=\"#FF3B4E\"/></svg>",
+    "fever": "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 48 48\" width=\"48\" height=\"48\"><defs><radialGradient id=\"fev-h\"><stop offset=\"0\" stop-color=\"#FF7A3D\" stop-opacity=\"0.3\"/><stop offset=\"0.5\" stop-color=\"#FF7A3D\" stop-opacity=\"0.08\"/><stop offset=\"1\" stop-color=\"#FF7A3D\" stop-opacity=\"0\"/></radialGradient></defs><circle cx=\"24\" cy=\"24\" r=\"23\" fill=\"url(#fev-h)\"/><path d=\"M20 30V10a4 4 0 0 1 8 0v20\" fill=\"none\" stroke=\"#DDE6F5\" stroke-width=\"2.4\" stroke-linecap=\"round\" stroke-linejoin=\"round\"/><circle cx=\"24\" cy=\"35\" r=\"7\" fill=\"#FF7A3D\"/><rect x=\"22\" y=\"16\" width=\"4\" height=\"18\" rx=\"2\" fill=\"#FF7A3D\"/><path d=\"M31 13h4M31 19h3M31 25h4\" fill=\"none\" stroke=\"#6E7B96\" stroke-width=\"1.8\" stroke-linecap=\"round\" stroke-linejoin=\"round\"/></svg>",
+    "stance-eat": "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 48 48\" width=\"48\" height=\"48\"><path d=\"M24 8a16 16 0 1 0 13.9 8L24 24Z\" fill=\"#3FE6FF\" fill-opacity=\".3\" stroke=\"#3FE6FF\" stroke-width=\"2.4\" stroke-linejoin=\"round\"/><rect x=\"31\" y=\"9\" width=\"9\" height=\"5\" rx=\"2.5\" transform=\"rotate(30 35.5 11.5)\" fill=\"#FF3DCB\"/></svg>",
+    "stance-trap": "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 48 48\" width=\"48\" height=\"48\"><clipPath id=\"stp-c\"><circle cx=\"24\" cy=\"25\" r=\"17\"/></clipPath><g clip-path=\"url(#stp-c)\"><path d=\"M-21 8Q-12 26 -3 42M15 8Q6 26 -3 42M-12 8Q-3 26 6 42M24 8Q15 26 6 42M-3 8Q6 26 15 42M33 8Q24 26 15 42M6 8Q15 26 24 42M42 8Q33 26 24 42M15 8Q24 26 33 42M51 8Q42 26 33 42M24 8Q33 26 42 42M60 8Q51 26 42 42M33 8Q42 26 51 42M69 8Q60 26 51 42\" fill=\"none\" stroke=\"#C8FAFF\" stroke-width=\"1.6\" stroke-linecap=\"round\" stroke-linejoin=\"round\"/></g><circle cx=\"24\" cy=\"25\" r=\"17\" fill=\"none\" stroke=\"#3FE6FF\" stroke-width=\"2\" stroke-dasharray=\"4 3\"/><rect x=\"19\" y=\"21\" width=\"10\" height=\"5\" rx=\"2.5\" fill=\"#FF3DCB\"/></svg>",
+    "stance-kill": "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 48 48\" width=\"48\" height=\"48\"><defs><radialGradient id=\"skl-h\"><stop offset=\"0\" stop-color=\"#FF7A3D\" stop-opacity=\"0.25\"/><stop offset=\"0.5\" stop-color=\"#FF7A3D\" stop-opacity=\"0.08\"/><stop offset=\"1\" stop-color=\"#FF7A3D\" stop-opacity=\"0\"/></radialGradient></defs><circle cx=\"24\" cy=\"24\" r=\"22\" fill=\"url(#skl-h)\"/><path d=\"M24 6v9M24 33v9M6 24h9M33 24h9\" fill=\"none\" stroke=\"#FF7A3D\" stroke-width=\"2.6\" stroke-linecap=\"round\" stroke-linejoin=\"round\"/><circle cx=\"24\" cy=\"24\" r=\"10\" fill=\"none\" stroke=\"#FF7A3D\" stroke-width=\"2.4\"/><circle cx=\"24\" cy=\"24\" r=\"3.2\" fill=\"#FF7A3D\"/></svg>",
+    "stance-repair": "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 48 48\" width=\"48\" height=\"48\"><defs><radialGradient id=\"srp-h\"><stop offset=\"0\" stop-color=\"#5CFFA1\" stop-opacity=\"0.25\"/><stop offset=\"0.5\" stop-color=\"#5CFFA1\" stop-opacity=\"0.08\"/><stop offset=\"1\" stop-color=\"#5CFFA1\" stop-opacity=\"0\"/></radialGradient></defs><circle cx=\"24\" cy=\"24\" r=\"22\" fill=\"url(#srp-h)\"/><path d=\"M19 8h10v11h11v10H29v11H19V29H8V19h11Z\" fill=\"#5CFFA1\" fill-opacity=\".25\" stroke=\"#5CFFA1\" stroke-width=\"2.2\" stroke-linejoin=\"round\"/></svg>",
+    "marrow": "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 48 48\" width=\"48\" height=\"48\"><path d=\"M15 12a5 5 0 1 0-4 7l18 18a5 5 0 1 0 7-4l-18-18a5 5 0 0 0-3-3Z\" fill=\"none\" stroke=\"#DDE6F5\" stroke-width=\"2.2\" stroke-linecap=\"round\" stroke-linejoin=\"round\"/><circle cx=\"21\" cy=\"21\" r=\"2.4\" fill=\"#3FE6FF\"/><circle cx=\"27\" cy=\"27\" r=\"2.4\" fill=\"#3FE6FF\"/></svg>",
+    "meter-pathogen": "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 48 48\" width=\"48\" height=\"48\"><defs><radialGradient id=\"mpt-h\"><stop offset=\"0\" stop-color=\"#FF3DCB\" stop-opacity=\"0.3\"/><stop offset=\"0.5\" stop-color=\"#FF3DCB\" stop-opacity=\"0.08\"/><stop offset=\"1\" stop-color=\"#FF3DCB\" stop-opacity=\"0\"/></radialGradient></defs><circle cx=\"24\" cy=\"24\" r=\"22\" fill=\"url(#mpt-h)\"/><rect x=\"7\" y=\"17\" width=\"20\" height=\"10\" rx=\"5\" fill=\"#FF3DCB\" opacity=\".85\"/><rect x=\"22\" y=\"25\" width=\"20\" height=\"10\" rx=\"5\" fill=\"#FF3DCB\" opacity=\".55\"/><rect x=\"15\" y=\"8\" width=\"16\" height=\"8\" rx=\"4\" fill=\"#FF3DCB\" opacity=\".4\"/></svg>",
+    "meter-host": "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 48 48\" width=\"48\" height=\"48\"><defs><radialGradient id=\"mht-h\"><stop offset=\"0\" stop-color=\"#FF3B4E\" stop-opacity=\"0.3\"/><stop offset=\"0.5\" stop-color=\"#FF3B4E\" stop-opacity=\"0.08\"/><stop offset=\"1\" stop-color=\"#FF3B4E\" stop-opacity=\"0\"/></radialGradient></defs><circle cx=\"24\" cy=\"24\" r=\"22\" fill=\"url(#mht-h)\"/><path d=\"M24 6l15 8.5v17L24 40 9 31.5v-17Z\" fill=\"#FF3B4E\" fill-opacity=\".18\" stroke=\"#FF3B4E\" stroke-width=\"2.2\" stroke-linejoin=\"round\"/><path d=\"M24 10l-3 9 6 4-4 8 2 6\" fill=\"none\" stroke=\"#FF3B4E\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\"/></svg>",
+    "lymph-node": "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 48 48\" width=\"48\" height=\"48\"><path d=\"M14 10C24 4 40 10 40 24S28 44 18 40 4 30 9 22C11 19 16 22 18 19S9 13 14 10Z\" fill=\"#2FB89A\" fill-opacity=\".18\" stroke=\"#2FB89A\" stroke-width=\"2.2\" stroke-linejoin=\"round\"/><circle cx=\"27\" cy=\"16\" r=\"2.6\" fill=\"#FFD23F\"/><circle cx=\"32\" cy=\"25\" r=\"2.6\" fill=\"#FFD23F\"/><circle cx=\"26\" cy=\"32\" r=\"2.6\" fill=\"#FFD23F\"/><circle cx=\"20\" cy=\"26\" r=\"2.6\" fill=\"#FFD23F\"/></svg>",
+    "choice-opsonize": "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 48 48\" width=\"48\" height=\"48\"><defs><radialGradient id=\"cop-h\"><stop offset=\"0\" stop-color=\"#FFD23F\" stop-opacity=\"0.3\"/><stop offset=\"0.5\" stop-color=\"#FFD23F\" stop-opacity=\"0.08\"/><stop offset=\"1\" stop-color=\"#FFD23F\" stop-opacity=\"0\"/></radialGradient></defs><circle cx=\"24\" cy=\"24\" r=\"23\" fill=\"url(#cop-h)\"/><rect x=\"11\" y=\"18\" width=\"26\" height=\"12\" rx=\"6\" fill=\"#FF3DCB\" opacity=\".7\"/><g transform=\"translate(14 13) rotate(-35) scale(0.75)\"><path d=\"M0 6V0M0 0L-5 -5.5M0 0L5 -5.5\" fill=\"none\" stroke=\"#FFD23F\" stroke-width=\"2.4\" stroke-linecap=\"round\" stroke-linejoin=\"round\"/></g><g transform=\"translate(24 11) rotate(0) scale(0.75)\"><path d=\"M0 6V0M0 0L-5 -5.5M0 0L5 -5.5\" fill=\"none\" stroke=\"#FFD23F\" stroke-width=\"2.4\" stroke-linecap=\"round\" stroke-linejoin=\"round\"/></g><g transform=\"translate(34 13) rotate(35) scale(0.75)\"><path d=\"M0 6V0M0 0L-5 -5.5M0 0L5 -5.5\" fill=\"none\" stroke=\"#FFD23F\" stroke-width=\"2.4\" stroke-linecap=\"round\" stroke-linejoin=\"round\"/></g><g transform=\"translate(17 36) rotate(205) scale(0.75)\"><path d=\"M0 6V0M0 0L-5 -5.5M0 0L5 -5.5\" fill=\"none\" stroke=\"#FFD23F\" stroke-width=\"2.4\" stroke-linecap=\"round\" stroke-linejoin=\"round\"/></g><g transform=\"translate(31 36) rotate(155) scale(0.75)\"><path d=\"M0 6V0M0 0L-5 -5.5M0 0L5 -5.5\" fill=\"none\" stroke=\"#FFD23F\" stroke-width=\"2.4\" stroke-linecap=\"round\" stroke-linejoin=\"round\"/></g></svg>",
+    "choice-complement": "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 48 48\" width=\"48\" height=\"48\"><defs><radialGradient id=\"ccm-h\"><stop offset=\"0\" stop-color=\"#FF7A3D\" stop-opacity=\"0.32\"/><stop offset=\"0.5\" stop-color=\"#FF7A3D\" stop-opacity=\"0.08\"/><stop offset=\"1\" stop-color=\"#FF7A3D\" stop-opacity=\"0\"/></radialGradient></defs><circle cx=\"24\" cy=\"24\" r=\"23\" fill=\"url(#ccm-h)\"/><rect x=\"8\" y=\"17\" width=\"32\" height=\"14\" rx=\"7\" fill=\"#FF3DCB\" opacity=\".7\"/><circle cx=\"16\" cy=\"24\" r=\"3.3\" fill=\"#04050A\" stroke=\"#FF7A3D\" stroke-width=\"1.8\"/><circle cx=\"24\" cy=\"22.5\" r=\"3.3\" fill=\"#04050A\" stroke=\"#FF7A3D\" stroke-width=\"1.8\"/><circle cx=\"32\" cy=\"25\" r=\"3.3\" fill=\"#04050A\" stroke=\"#FF7A3D\" stroke-width=\"1.8\"/></svg>",
+    "sector-blood": "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 48 48\" width=\"48\" height=\"48\"><path d=\"M4 14H44M4 34H44\" fill=\"none\" stroke=\"#C2334F\" stroke-width=\"2.4\" stroke-linecap=\"round\" stroke-linejoin=\"round\"/><ellipse cx=\"12\" cy=\"24\" rx=\"5\" ry=\"3.4\" fill=\"none\" stroke=\"#E0566F\" stroke-width=\"2\"/><ellipse cx=\"24\" cy=\"24\" rx=\"5\" ry=\"3.4\" fill=\"none\" stroke=\"#E0566F\" stroke-width=\"2\"/><ellipse cx=\"36\" cy=\"24\" rx=\"5\" ry=\"3.4\" fill=\"none\" stroke=\"#E0566F\" stroke-width=\"2\"/></svg>",
+    "sector-wound": "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 48 48\" width=\"48\" height=\"48\"><path d=\"M5 21L13 25L19 19L26 27L32 21L38 26L43 22L44 27L38 31L32 26L26 32L19 25L13 30L4 26Z\" fill=\"#FF3B4E\" fill-opacity=\".3\" stroke=\"#FF3B4E\" stroke-width=\"1.8\" stroke-linejoin=\"round\"/><rect x=\"20\" y=\"10\" width=\"9\" height=\"5\" rx=\"2.5\" fill=\"#FF3DCB\"/><rect x=\"28\" y=\"35\" width=\"9\" height=\"5\" rx=\"2.5\" fill=\"#FF3DCB\"/></svg>",
+    "sector-lymph": "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 48 48\" width=\"48\" height=\"48\"><path d=\"M4 14H44M4 34H44\" fill=\"none\" stroke=\"#2FB89A\" stroke-width=\"2.4\" stroke-linecap=\"round\" stroke-linejoin=\"round\"/><path d=\"M13 18l7 6-7 6M27 18l7 6-7 6\" fill=\"none\" stroke=\"#2FB89A\" stroke-width=\"2.2\" stroke-linecap=\"round\" stroke-linejoin=\"round\"/></svg>",
+    "scenario-papercut": "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 48 48\" width=\"48\" height=\"48\"><rect x=\"7\" y=\"9\" width=\"34\" height=\"30\" rx=\"2\" fill=\"#DDE6F5\" fill-opacity=\".08\" stroke=\"#DDE6F5\" stroke-width=\"1.8\"/><path d=\"M11 30L37 18\" fill=\"none\" stroke=\"#FF3B4E\" stroke-width=\"2.4\" stroke-linecap=\"round\" stroke-linejoin=\"round\"/><rect x=\"14\" y=\"31\" width=\"7\" height=\"4\" rx=\"2\" fill=\"#FF3DCB\"/><rect x=\"28\" y=\"26\" width=\"7\" height=\"4\" rx=\"2\" fill=\"#FF3DCB\"/><rect x=\"31\" y=\"13\" width=\"7\" height=\"4\" rx=\"2\" fill=\"#FF3DCB\"/></svg>",
+    "scenario-pollen": "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 48 48\" width=\"48\" height=\"48\"><g transform=\"translate(-8 -8) scale(1)\"><circle cx=\"32\" cy=\"32\" r=\"31\" fill=\"none\"/><path d=\"M54 32L49.28 34.74L52.92 38.8L47.59 39.94L49.8 44.93L44.37 44.37L44.93 49.8L39.94 47.59L38.8 52.92L34.74 49.28L32 54L29.26 49.28L25.2 52.92L24.06 47.59L19.07 49.8L19.63 44.37L14.2 44.93L16.41 39.94L11.08 38.8L14.72 34.74L10 32L14.72 29.26L11.08 25.2L16.41 24.06L14.2 19.07L19.63 19.63L19.07 14.2L24.06 16.41L25.2 11.08L29.26 14.72L32 10L34.74 14.72L38.8 11.08L39.94 16.41L44.93 14.2L44.37 19.63L49.8 19.07L47.59 24.06L52.92 25.2L49.28 29.26Z\" fill=\"#C9F25C\" fill-opacity=\".3\" stroke=\"#C9F25C\" stroke-width=\"1.3\" stroke-linejoin=\"round\"/><g fill=\"#F1FFC9\" opacity=\".7\"><circle cx=\"23.87\" cy=\"28.79\" r=\"1.1\"/><circle cx=\"19.79\" cy=\"34.68\" r=\"1.1\"/><circle cx=\"24.1\" cy=\"27.17\" r=\"1.1\"/><circle cx=\"26.43\" cy=\"31.58\" r=\"1.1\"/><circle cx=\"34.75\" cy=\"22.06\" r=\"1.1\"/><circle cx=\"30.69\" cy=\"35.77\" r=\"1.1\"/><circle cx=\"33.43\" cy=\"28.36\" r=\"1.1\"/><circle cx=\"42.45\" cy=\"34.82\" r=\"1.1\"/><circle cx=\"44.57\" cy=\"29.17\" r=\"1.1\"/><circle cx=\"24.14\" cy=\"25.02\" r=\"1.1\"/><circle cx=\"37.14\" cy=\"32.49\" r=\"1.1\"/><circle cx=\"40.8\" cy=\"35.45\" r=\"1.1\"/><circle cx=\"32.29\" cy=\"37.66\" r=\"1.1\"/><circle cx=\"29.8\" cy=\"32.51\" r=\"1.1\"/><circle cx=\"36.73\" cy=\"24.79\" r=\"1.1\"/><circle cx=\"26.04\" cy=\"24.77\" r=\"1.1\"/><circle cx=\"27.19\" cy=\"24.17\" r=\"1.1\"/><circle cx=\"30.45\" cy=\"40.65\" r=\"1.1\"/><circle cx=\"44.98\" cy=\"31.65\" r=\"1.1\"/><circle cx=\"28.88\" cy=\"20.5\" r=\"1.1\"/><circle cx=\"32.93\" cy=\"39.24\" r=\"1.1\"/><circle cx=\"38.32\" cy=\"34.98\" r=\"1.1\"/><circle cx=\"22.78\" cy=\"38.67\" r=\"1.1\"/><circle cx=\"22.95\" cy=\"39.83\" r=\"1.1\"/><circle cx=\"39.3\" cy=\"21.58\" r=\"1.1\"/><circle cx=\"32.08\" cy=\"32.29\" r=\"1.1\"/></g></g></svg>",
+    "shot": "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 64 16\" width=\"64\" height=\"16\"><defs><linearGradient id=\"shot-t\" x1=\"0\" y1=\"0\" x2=\"1\" y2=\"0\"><stop offset=\"0\" stop-color=\"#FFD23F\" stop-opacity=\"0\"/><stop offset=\".6\" stop-color=\"#FFD23F\" stop-opacity=\".45\"/><stop offset=\"1\" stop-color=\"#FFF3B8\" stop-opacity=\"1\"/></linearGradient><radialGradient id=\"shot-h\"><stop offset=\"0\" stop-color=\"#FFD23F\" stop-opacity=\"0.75\"/><stop offset=\"0.45\" stop-color=\"#FFD23F\" stop-opacity=\"0.25\"/><stop offset=\"1\" stop-color=\"#FFD23F\" stop-opacity=\"0\"/></radialGradient></defs><circle cx=\"54\" cy=\"8\" r=\"6\" fill=\"url(#shot-h)\"/><path d=\"M3 8L54 6.7V9.3Z\" fill=\"url(#shot-t)\"/><circle cx=\"54\" cy=\"8\" r=\"2.2\" fill=\"#FFF3B8\"/></svg>",
+    "shot-tuned": "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 64 16\" width=\"64\" height=\"16\"><defs><linearGradient id=\"shottuned-t\" x1=\"0\" y1=\"0\" x2=\"1\" y2=\"0\"><stop offset=\"0\" stop-color=\"#FFD23F\" stop-opacity=\"0\"/><stop offset=\".6\" stop-color=\"#FFD23F\" stop-opacity=\".45\"/><stop offset=\"1\" stop-color=\"#FFFFFF\" stop-opacity=\"1\"/></linearGradient><radialGradient id=\"shottuned-h\"><stop offset=\"0\" stop-color=\"#FFD23F\" stop-opacity=\"0.75\"/><stop offset=\"0.45\" stop-color=\"#FFD23F\" stop-opacity=\"0.25\"/><stop offset=\"1\" stop-color=\"#FFD23F\" stop-opacity=\"0\"/></radialGradient></defs><circle cx=\"54\" cy=\"8\" r=\"8\" fill=\"url(#shottuned-h)\"/><path d=\"M3 8L54 5.5V10.5Z\" fill=\"url(#shottuned-t)\"/><path d=\"M48 3.5L61 8L48 12.5\" fill=\"none\" stroke=\"#FFFFFF\" stroke-width=\"1.4\" stroke-linejoin=\"round\" opacity=\".9\"/><path d=\"M10 8H52\" stroke=\"#FFFFFF\" stroke-width=\"1\" opacity=\".55\"/><circle cx=\"54\" cy=\"8\" r=\"3.4\" fill=\"#FFFFFF\"/></svg>",
+    "hit-spark": "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 32 32\" width=\"32\" height=\"32\"><defs><radialGradient id=\"hsp-h\"><stop offset=\"0\" stop-color=\"#FFD23F\" stop-opacity=\"0.7\"/><stop offset=\"0.4\" stop-color=\"#FFD23F\" stop-opacity=\"0.2\"/><stop offset=\"1\" stop-color=\"#FFD23F\" stop-opacity=\"0\"/></radialGradient></defs><circle cx=\"16\" cy=\"16\" r=\"15\" fill=\"url(#hsp-h)\"/><path d=\"M19 16L30 16M18.12 18.12L21.66 21.66M16 19L16 30M13.88 18.12L10.34 21.66M13 16L2 16M13.88 13.88L10.34 10.34M16 13L16 2M18.12 13.88L21.66 10.34\" fill=\"none\" stroke=\"#FFFFFF\" stroke-width=\"1.6\" stroke-linecap=\"round\" stroke-linejoin=\"round\"/><circle cx=\"16\" cy=\"16\" r=\"3.2\" fill=\"#FFFFFF\"/></svg>",
+    "kill-shard": "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 16 16\" width=\"16\" height=\"16\"><defs><radialGradient id=\"ksh-h\"><stop offset=\"0\" stop-color=\"#FF3DCB\" stop-opacity=\"0.5\"/><stop offset=\"0.4\" stop-color=\"#FF3DCB\" stop-opacity=\"0.12\"/><stop offset=\"1\" stop-color=\"#FF3DCB\" stop-opacity=\"0\"/></radialGradient></defs><circle cx=\"8\" cy=\"8\" r=\"8\" fill=\"url(#ksh-h)\"/><path d=\"M4 10.5L9.5 3.5L12.5 11Z\" fill=\"#FF3DCB\" stroke=\"#FFC4EF\" stroke-width=\".8\" stroke-linejoin=\"round\"/></svg>",
+    "bacterium-hit": "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 64 64\" width=\"64\" height=\"64\"><defs><radialGradient id=\"bhh-h\"><stop offset=\"0\" stop-color=\"#FFFFFF\" stop-opacity=\"0.6\"/><stop offset=\"0.4\" stop-color=\"#FFFFFF\" stop-opacity=\"0.15\"/><stop offset=\"1\" stop-color=\"#FFFFFF\" stop-opacity=\"0\"/></radialGradient></defs><ellipse cx=\"32\" cy=\"32\" rx=\"24\" ry=\"17\" fill=\"url(#bhh-h)\"/><rect x=\"20\" y=\"26\" width=\"24\" height=\"12\" rx=\"6\" fill=\"#FFFFFF\" stroke=\"#FFC4EF\" stroke-width=\"1.5\"/></svg>",
+    "bacterium-armored": "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 64 64\" width=\"64\" height=\"64\"><defs><radialGradient id=\"arm-h\"><stop offset=\"0\" stop-color=\"#FF3DCB\" stop-opacity=\"0.55\"/><stop offset=\"0.4\" stop-color=\"#FF3DCB\" stop-opacity=\"0.15\"/><stop offset=\"1\" stop-color=\"#FF3DCB\" stop-opacity=\"0\"/></radialGradient><radialGradient id=\"arm-b\" cx=\"0.42\" cy=\"0.38\" r=\"0.7\"><stop offset=\"0\" stop-color=\"#FF9BE5\" stop-opacity=\"0.6\"/><stop offset=\"1\" stop-color=\"#FF3DCB\" stop-opacity=\"0.28\"/></radialGradient><radialGradient id=\"arm-r\"><stop offset=\".6\" stop-color=\"#FF3DCB\" stop-opacity=\"0\"/><stop offset=\"1\" stop-color=\"#FF3DCB\" stop-opacity=\".28\"/></radialGradient></defs><circle cx=\"32\" cy=\"32\" r=\"29\" fill=\"url(#arm-h)\"/><circle cx=\"32\" cy=\"32\" r=\"17\" fill=\"url(#arm-r)\" stroke=\"#C42596\" stroke-width=\"5\" stroke-dasharray=\"6.2 1.6\"/><circle cx=\"32\" cy=\"32\" r=\"17\" fill=\"none\" stroke=\"#FFC4EF\" stroke-width=\".9\" opacity=\".8\"/><rect x=\"23\" y=\"27.5\" width=\"18\" height=\"9\" rx=\"4.5\" fill=\"url(#arm-b)\" stroke=\"#FF7FDD\" stroke-width=\"1.5\"/><path d=\"M27.2 32q1.6 -2.4 3.2 0t3.2 0t3.2 0\" fill=\"none\" stroke=\"#FFC4EF\" stroke-width=\"1.3\" stroke-linecap=\"round\" opacity=\".85\"/></svg>",
+    "bacterium-armored-dividing": "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 64 64\" width=\"64\" height=\"64\"><defs><radialGradient id=\"armd-h\"><stop offset=\"0\" stop-color=\"#FF3DCB\" stop-opacity=\"0.55\"/><stop offset=\"0.4\" stop-color=\"#FF3DCB\" stop-opacity=\"0.15\"/><stop offset=\"1\" stop-color=\"#FF3DCB\" stop-opacity=\"0\"/></radialGradient><radialGradient id=\"armd-b\" cx=\"0.42\" cy=\"0.38\" r=\"0.7\"><stop offset=\"0\" stop-color=\"#FF9BE5\" stop-opacity=\"0.6\"/><stop offset=\"1\" stop-color=\"#FF3DCB\" stop-opacity=\"0.28\"/></radialGradient><radialGradient id=\"armd-r\"><stop offset=\".6\" stop-color=\"#FF3DCB\" stop-opacity=\"0\"/><stop offset=\"1\" stop-color=\"#FF3DCB\" stop-opacity=\".28\"/></radialGradient></defs><ellipse cx=\"32\" cy=\"32\" rx=\"31\" ry=\"23\" fill=\"url(#armd-h)\"/><ellipse cx=\"32\" cy=\"32\" rx=\"25\" ry=\"16\" fill=\"url(#armd-r)\" stroke=\"#C42596\" stroke-width=\"5\" stroke-dasharray=\"6.2 1.6\"/><ellipse cx=\"32\" cy=\"32\" rx=\"25\" ry=\"16\" fill=\"none\" stroke=\"#FFC4EF\" stroke-width=\".9\" opacity=\".8\"/><rect x=\"17\" y=\"27.5\" width=\"14\" height=\"9\" rx=\"4.5\" fill=\"url(#armd-b)\" stroke=\"#FF7FDD\" stroke-width=\"1.5\"/><rect x=\"33\" y=\"27.5\" width=\"14\" height=\"9\" rx=\"4.5\" fill=\"url(#armd-b)\" stroke=\"#FF7FDD\" stroke-width=\"1.5\"/><line x1=\"32\" y1=\"28\" x2=\"32\" y2=\"36\" stroke=\"#FFC4EF\" stroke-width=\"1.8\" stroke-linecap=\"round\"/></svg>",
+    "macrophage-offense": "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 64 64\" width=\"64\" height=\"64\"><defs><radialGradient id=\"macnse-h\"><stop offset=\"0\" stop-color=\"#3FE6FF\" stop-opacity=\"0.42\"/><stop offset=\"0.5\" stop-color=\"#3FE6FF\" stop-opacity=\"0.12\"/><stop offset=\"1\" stop-color=\"#3FE6FF\" stop-opacity=\"0\"/></radialGradient><radialGradient id=\"macnse-b\" cx=\"0.42\" cy=\"0.38\" r=\"0.7\"><stop offset=\"0\" stop-color=\"#9FF4FF\" stop-opacity=\"0.32\"/><stop offset=\"1\" stop-color=\"#3FE6FF\" stop-opacity=\"0.16\"/></radialGradient><radialGradient id=\"macnse-c\"><stop offset=\"0\" stop-color=\"#FF7A3D\" stop-opacity=\"0.85\"/><stop offset=\"0.55\" stop-color=\"#FF7A3D\" stop-opacity=\"0.35\"/><stop offset=\"1\" stop-color=\"#FF7A3D\" stop-opacity=\"0\"/></radialGradient></defs><circle cx=\"32\" cy=\"32\" r=\"32\" fill=\"url(#macnse-h)\"/><path d=\"M54.11 32C54.29 32.98 54.58 33.94 54.94 35.02C55.3 36.1 56.03 37.33 56.25 38.5C56.48 39.67 56.69 41.04 56.28 42.06C55.87 43.07 54.83 43.95 53.8 44.59C52.78 45.23 51.27 45.52 50.11 45.89C48.95 46.27 47.83 46.51 46.84 46.84C45.85 47.16 45.03 47.54 44.16 47.85C43.29 48.16 42.48 48.46 41.64 48.69C40.8 48.92 39.95 49.06 39.13 49.2C38.3 49.35 37.5 49.42 36.7 49.55C35.91 49.69 35.15 49.81 34.37 50.01C33.59 50.2 32.83 50.46 32 50.72C31.17 50.99 30.33 51.34 29.42 51.61C28.51 51.89 27.54 52.19 26.54 52.36C25.55 52.53 24.51 52.63 23.45 52.64C22.4 52.64 21.34 52.52 20.22 52.4C19.1 52.28 17.91 52.16 16.72 51.92C15.52 51.67 14.08 51.52 13.05 50.95C12.03 50.37 10.96 49.56 10.55 48.46C10.14 47.36 10.3 45.74 10.61 44.35C10.91 42.96 11.85 41.38 12.36 40.14C12.87 38.9 13.45 37.86 13.69 36.91C13.93 35.95 13.87 35.21 13.79 34.4C13.72 33.58 13.41 32.82 13.23 32C13.06 31.18 12.81 30.32 12.72 29.46C12.63 28.6 12.6 27.69 12.7 26.83C12.8 25.96 13.02 25.08 13.32 24.26C13.63 23.44 14.07 22.66 14.52 21.91C14.98 21.16 15.55 20.49 16.07 19.77C16.58 19.05 17.14 18.43 17.6 17.6C18.05 16.77 18.43 15.91 18.79 14.78C19.15 13.66 19.32 12.18 19.78 10.84C20.24 9.49 20.7 7.72 21.53 6.72C22.35 5.72 23.54 4.94 24.72 4.84C25.9 4.74 27.38 5.45 28.59 6.11C29.81 6.78 30.98 7.97 32 8.85C33.02 9.74 33.89 10.64 34.71 11.43C35.53 12.22 36.24 12.93 36.93 13.61C37.61 14.29 38.21 14.94 38.83 15.52C39.44 16.09 40 16.62 40.62 17.07C41.25 17.52 41.87 17.87 42.58 18.21C43.29 18.56 44.06 18.81 44.87 19.13C45.68 19.45 46.58 19.74 47.43 20.16C48.28 20.58 49.19 21.04 49.96 21.63C50.73 22.22 51.48 22.92 52.04 23.7C52.6 24.47 53.04 25.38 53.34 26.28C53.65 27.18 53.73 28.17 53.86 29.12C53.99 30.08 53.93 31.02 54.11 32Z\" fill=\"url(#macnse-b)\" stroke=\"#7FF0FF\" stroke-width=\"1.6\" stroke-linejoin=\"round\"/><circle cx=\"32\" cy=\"31\" r=\"13\" fill=\"url(#macnse-c)\"/><circle cx=\"20\" cy=\"40\" r=\"2.6\" fill=\"none\" stroke=\"#C8FAFF\" stroke-width=\".9\" opacity=\".6\"/><circle cx=\"43\" cy=\"39\" r=\"2.1\" fill=\"none\" stroke=\"#C8FAFF\" stroke-width=\".9\" opacity=\".6\"/><circle cx=\"37\" cy=\"18\" r=\"1.8\" fill=\"none\" stroke=\"#C8FAFF\" stroke-width=\".9\" opacity=\".6\"/><circle cx=\"21\" cy=\"22\" r=\"1.5\" fill=\"none\" stroke=\"#C8FAFF\" stroke-width=\".9\" opacity=\".6\"/><path d=\"M24.5 30.5C24 25.5 30 23.5 34 25.5C38 27.5 41 26 40.5 31C40 35.5 35.5 38.5 31.5 37C29.5 36.3 30.5 33.5 28.5 33.6C26.5 33.7 24.8 33.5 24.5 30.5Z\" fill=\"#FF7A3D\" opacity=\".9\"/></svg>",
+    "macrophage-support": "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 64 64\" width=\"64\" height=\"64\"><defs><radialGradient id=\"macort-h\"><stop offset=\"0\" stop-color=\"#3FE6FF\" stop-opacity=\"0.42\"/><stop offset=\"0.5\" stop-color=\"#3FE6FF\" stop-opacity=\"0.12\"/><stop offset=\"1\" stop-color=\"#3FE6FF\" stop-opacity=\"0\"/></radialGradient><radialGradient id=\"macort-b\" cx=\"0.42\" cy=\"0.38\" r=\"0.7\"><stop offset=\"0\" stop-color=\"#9FF4FF\" stop-opacity=\"0.32\"/><stop offset=\"1\" stop-color=\"#3FE6FF\" stop-opacity=\"0.16\"/></radialGradient><radialGradient id=\"macort-c\"><stop offset=\"0\" stop-color=\"#5CFFA1\" stop-opacity=\"0.85\"/><stop offset=\"0.55\" stop-color=\"#5CFFA1\" stop-opacity=\"0.35\"/><stop offset=\"1\" stop-color=\"#5CFFA1\" stop-opacity=\"0\"/></radialGradient></defs><circle cx=\"32\" cy=\"32\" r=\"32\" fill=\"url(#macort-h)\"/><path d=\"M54.11 32C54.29 32.98 54.58 33.94 54.94 35.02C55.3 36.1 56.03 37.33 56.25 38.5C56.48 39.67 56.69 41.04 56.28 42.06C55.87 43.07 54.83 43.95 53.8 44.59C52.78 45.23 51.27 45.52 50.11 45.89C48.95 46.27 47.83 46.51 46.84 46.84C45.85 47.16 45.03 47.54 44.16 47.85C43.29 48.16 42.48 48.46 41.64 48.69C40.8 48.92 39.95 49.06 39.13 49.2C38.3 49.35 37.5 49.42 36.7 49.55C35.91 49.69 35.15 49.81 34.37 50.01C33.59 50.2 32.83 50.46 32 50.72C31.17 50.99 30.33 51.34 29.42 51.61C28.51 51.89 27.54 52.19 26.54 52.36C25.55 52.53 24.51 52.63 23.45 52.64C22.4 52.64 21.34 52.52 20.22 52.4C19.1 52.28 17.91 52.16 16.72 51.92C15.52 51.67 14.08 51.52 13.05 50.95C12.03 50.37 10.96 49.56 10.55 48.46C10.14 47.36 10.3 45.74 10.61 44.35C10.91 42.96 11.85 41.38 12.36 40.14C12.87 38.9 13.45 37.86 13.69 36.91C13.93 35.95 13.87 35.21 13.79 34.4C13.72 33.58 13.41 32.82 13.23 32C13.06 31.18 12.81 30.32 12.72 29.46C12.63 28.6 12.6 27.69 12.7 26.83C12.8 25.96 13.02 25.08 13.32 24.26C13.63 23.44 14.07 22.66 14.52 21.91C14.98 21.16 15.55 20.49 16.07 19.77C16.58 19.05 17.14 18.43 17.6 17.6C18.05 16.77 18.43 15.91 18.79 14.78C19.15 13.66 19.32 12.18 19.78 10.84C20.24 9.49 20.7 7.72 21.53 6.72C22.35 5.72 23.54 4.94 24.72 4.84C25.9 4.74 27.38 5.45 28.59 6.11C29.81 6.78 30.98 7.97 32 8.85C33.02 9.74 33.89 10.64 34.71 11.43C35.53 12.22 36.24 12.93 36.93 13.61C37.61 14.29 38.21 14.94 38.83 15.52C39.44 16.09 40 16.62 40.62 17.07C41.25 17.52 41.87 17.87 42.58 18.21C43.29 18.56 44.06 18.81 44.87 19.13C45.68 19.45 46.58 19.74 47.43 20.16C48.28 20.58 49.19 21.04 49.96 21.63C50.73 22.22 51.48 22.92 52.04 23.7C52.6 24.47 53.04 25.38 53.34 26.28C53.65 27.18 53.73 28.17 53.86 29.12C53.99 30.08 53.93 31.02 54.11 32Z\" fill=\"url(#macort-b)\" stroke=\"#7FF0FF\" stroke-width=\"1.6\" stroke-linejoin=\"round\"/><circle cx=\"32\" cy=\"31\" r=\"13\" fill=\"url(#macort-c)\"/><circle cx=\"20\" cy=\"40\" r=\"2.6\" fill=\"none\" stroke=\"#C8FAFF\" stroke-width=\".9\" opacity=\".6\"/><circle cx=\"43\" cy=\"39\" r=\"2.1\" fill=\"none\" stroke=\"#C8FAFF\" stroke-width=\".9\" opacity=\".6\"/><circle cx=\"37\" cy=\"18\" r=\"1.8\" fill=\"none\" stroke=\"#C8FAFF\" stroke-width=\".9\" opacity=\".6\"/><circle cx=\"21\" cy=\"22\" r=\"1.5\" fill=\"none\" stroke=\"#C8FAFF\" stroke-width=\".9\" opacity=\".6\"/><path d=\"M24.5 30.5C24 25.5 30 23.5 34 25.5C38 27.5 41 26 40.5 31C40 35.5 35.5 38.5 31.5 37C29.5 36.3 30.5 33.5 28.5 33.6C26.5 33.7 24.8 33.5 24.5 30.5Z\" fill=\"#5CFFA1\" opacity=\".9\"/></svg>",
+    "support-ring": "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 128 128\" width=\"128\" height=\"128\"><defs><radialGradient id=\"sup-f\"><stop offset=\".55\" stop-color=\"#5CFFA1\" stop-opacity=\".02\"/><stop offset=\".9\" stop-color=\"#5CFFA1\" stop-opacity=\".16\"/><stop offset=\"1\" stop-color=\"#5CFFA1\" stop-opacity=\"0\"/></radialGradient></defs><circle cx=\"64\" cy=\"64\" r=\"62\" fill=\"url(#sup-f)\"/><circle cx=\"64\" cy=\"64\" r=\"60\" fill=\"none\" stroke=\"#5CFFA1\" stroke-width=\"1.6\" opacity=\".75\"/><circle cx=\"64\" cy=\"64\" r=\"56\" fill=\"none\" stroke=\"#5CFFA1\" stroke-width=\".8\" stroke-dasharray=\"2 6\" opacity=\".55\"/></svg>",
+    "speed-trail": "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 48 16\" width=\"48\" height=\"16\"><defs><linearGradient id=\"spd-t\" x1=\"0\" y1=\"0\" x2=\"1\" y2=\"0\"><stop offset=\"0\" stop-color=\"#3FE6FF\" stop-opacity=\"0\"/><stop offset=\"1\" stop-color=\"#3FE6FF\" stop-opacity=\".55\"/></linearGradient></defs><path d=\"M2 8L36 3V13Z\" fill=\"url(#spd-t)\"/><path d=\"M8 4.5L33 3.2M8 11.5L33 12.8\" stroke=\"#C8FAFF\" stroke-width=\".8\" opacity=\".45\"/></svg>",
+    "wound-flash": "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 128 128\" width=\"128\" height=\"128\"><defs><radialGradient id=\"wfl-g\" r=\".72\"><stop offset=\"0\" stop-color=\"#FF3B4E\" stop-opacity=\".55\"/><stop offset=\".6\" stop-color=\"#FF3B4E\" stop-opacity=\".2\"/><stop offset=\"1\" stop-color=\"#FF3B4E\" stop-opacity=\"0\"/></radialGradient></defs><rect width=\"128\" height=\"128\" fill=\"url(#wfl-g)\"/></svg>",
+    "toxin-shockwave": "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 256 256\" width=\"256\" height=\"256\"><defs><radialGradient id=\"tsw-g\"><stop offset=\".45\" stop-color=\"#B45CFF\" stop-opacity=\"0\"/><stop offset=\".88\" stop-color=\"#B45CFF\" stop-opacity=\".3\"/><stop offset=\"1\" stop-color=\"#B45CFF\" stop-opacity=\"0\"/></radialGradient></defs><circle cx=\"128\" cy=\"128\" r=\"126\" fill=\"url(#tsw-g)\"/><circle cx=\"128\" cy=\"128\" r=\"118\" fill=\"none\" stroke=\"#B45CFF\" stroke-width=\"7\" opacity=\".85\"/><circle cx=\"128\" cy=\"128\" r=\"114\" fill=\"none\" stroke=\"#F2E2FF\" stroke-width=\"1.6\" opacity=\".9\"/></svg>",
+    "marker-wave": "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 24 24\" width=\"24\" height=\"24\"><defs><radialGradient id=\"mkw-h\"><stop offset=\"0\" stop-color=\"#FF3DCB\" stop-opacity=\"0.5\"/><stop offset=\"0.45\" stop-color=\"#FF3DCB\" stop-opacity=\"0.12\"/><stop offset=\"1\" stop-color=\"#FF3DCB\" stop-opacity=\"0\"/></radialGradient></defs><circle cx=\"12\" cy=\"12\" r=\"11\" fill=\"url(#mkw-h)\"/><circle cx=\"12\" cy=\"12\" r=\"5.5\" fill=\"#FF3DCB\" stroke=\"#FFC4EF\" stroke-width=\"1\"/></svg>",
+    "marker-wave-armored": "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 24 24\" width=\"24\" height=\"24\"><defs><radialGradient id=\"mka-h\"><stop offset=\"0\" stop-color=\"#FF3DCB\" stop-opacity=\"0.5\"/><stop offset=\"0.45\" stop-color=\"#FF3DCB\" stop-opacity=\"0.12\"/><stop offset=\"1\" stop-color=\"#FF3DCB\" stop-opacity=\"0\"/></radialGradient></defs><circle cx=\"12\" cy=\"12\" r=\"11\" fill=\"url(#mka-h)\"/><circle cx=\"12\" cy=\"12\" r=\"6.5\" fill=\"none\" stroke=\"#C42596\" stroke-width=\"3\" stroke-dasharray=\"3.4 1\"/><circle cx=\"12\" cy=\"12\" r=\"3\" fill=\"#FF3DCB\"/></svg>",
+    "marker-wave-final": "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 24 24\" width=\"24\" height=\"24\"><defs><radialGradient id=\"mkf-h\"><stop offset=\"0\" stop-color=\"#FF3DCB\" stop-opacity=\"0.6\"/><stop offset=\"0.45\" stop-color=\"#FF3DCB\" stop-opacity=\"0.16\"/><stop offset=\"1\" stop-color=\"#FF3DCB\" stop-opacity=\"0\"/></radialGradient></defs><circle cx=\"12\" cy=\"12\" r=\"12\" fill=\"url(#mkf-h)\"/><circle cx=\"12\" cy=\"12\" r=\"8\" fill=\"none\" stroke=\"#FFC4EF\" stroke-width=\"1.4\"/><circle cx=\"12\" cy=\"12\" r=\"5.5\" fill=\"#FF3DCB\"/></svg>",
+    "marker-toxin": "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 24 24\" width=\"24\" height=\"24\"><defs><radialGradient id=\"mkt-h\"><stop offset=\"0\" stop-color=\"#B45CFF\" stop-opacity=\"0.5\"/><stop offset=\"0.45\" stop-color=\"#B45CFF\" stop-opacity=\"0.12\"/><stop offset=\"1\" stop-color=\"#B45CFF\" stop-opacity=\"0\"/></radialGradient></defs><circle cx=\"12\" cy=\"12\" r=\"11\" fill=\"url(#mkt-h)\"/><path d=\"M12 4.5L19.5 12L12 19.5L4.5 12Z\" fill=\"#B45CFF\" stroke=\"#F2E2FF\" stroke-width=\"1\" stroke-linejoin=\"round\"/></svg>",
+    "mode-offense": "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 48 48\" width=\"48\" height=\"48\"><defs><radialGradient id=\"mof-h\"><stop offset=\"0\" stop-color=\"#FF7A3D\" stop-opacity=\"0.28\"/><stop offset=\"0.5\" stop-color=\"#FF7A3D\" stop-opacity=\"0.08\"/><stop offset=\"1\" stop-color=\"#FF7A3D\" stop-opacity=\"0\"/></radialGradient></defs><circle cx=\"24\" cy=\"24\" r=\"22\" fill=\"url(#mof-h)\"/><path d=\"M37 15A15 15 0 1 0 37 33L27 24Z\" fill=\"#FF7A3D\" fill-opacity=\".22\" stroke=\"#FF7A3D\" stroke-width=\"2.4\" stroke-linejoin=\"round\"/><rect x=\"12\" y=\"21\" width=\"12\" height=\"6\" rx=\"3\" fill=\"#FF3DCB\"/></svg>",
+    "mode-support": "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 48 48\" width=\"48\" height=\"48\"><defs><radialGradient id=\"msp-h\"><stop offset=\"0\" stop-color=\"#5CFFA1\" stop-opacity=\"0.28\"/><stop offset=\"0.5\" stop-color=\"#5CFFA1\" stop-opacity=\"0.08\"/><stop offset=\"1\" stop-color=\"#5CFFA1\" stop-opacity=\"0\"/></radialGradient></defs><circle cx=\"24\" cy=\"24\" r=\"22\" fill=\"url(#msp-h)\"/><circle cx=\"24\" cy=\"24\" r=\"17\" fill=\"none\" stroke=\"#5CFFA1\" stroke-width=\"2.2\"/><path d=\"M15 18l6 6-6 6M24 18l6 6-6 6\" fill=\"none\" stroke=\"#3FE6FF\" stroke-width=\"2.4\" stroke-linecap=\"round\" stroke-linejoin=\"round\"/></svg>",
+    "sector-tissue": "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 48 48\" width=\"48\" height=\"48\"><ellipse cx=\"14\" cy=\"17\" rx=\"8\" ry=\"7\" fill=\"#0B1029\" stroke=\"#5468E0\" stroke-width=\"1.6\"/><circle cx=\"14\" cy=\"17\" r=\"2.6\" fill=\"#5468E0\"/><ellipse cx=\"31\" cy=\"15\" rx=\"8\" ry=\"7\" fill=\"#0B1029\" stroke=\"#5468E0\" stroke-width=\"1.6\"/><circle cx=\"31\" cy=\"15\" r=\"2.6\" fill=\"#5468E0\"/><ellipse cx=\"22\" cy=\"31\" rx=\"8\" ry=\"7\" fill=\"#0B1029\" stroke=\"#5468E0\" stroke-width=\"1.6\"/><circle cx=\"22\" cy=\"31\" r=\"2.6\" fill=\"#5468E0\"/><ellipse cx=\"38\" cy=\"31\" rx=\"8\" ry=\"7\" fill=\"#0B1029\" stroke=\"#5468E0\" stroke-width=\"1.6\"/><circle cx=\"38\" cy=\"31\" r=\"2.6\" fill=\"#5468E0\"/></svg>",
+    "pause": "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 48 48\" width=\"48\" height=\"48\"><rect x=\"14\" y=\"11\" width=\"7\" height=\"26\" rx=\"2.5\" fill=\"#DDE6F5\"/><rect x=\"27\" y=\"11\" width=\"7\" height=\"26\" rx=\"2.5\" fill=\"#DDE6F5\"/></svg>",
+    "star": "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 48 48\" width=\"48\" height=\"48\"><defs><radialGradient id=\"str-h\"><stop offset=\"0\" stop-color=\"#FFD23F\" stop-opacity=\"0.35\"/><stop offset=\"0.5\" stop-color=\"#FFD23F\" stop-opacity=\"0.1\"/><stop offset=\"1\" stop-color=\"#FFD23F\" stop-opacity=\"0\"/></radialGradient></defs><circle cx=\"24\" cy=\"24\" r=\"22\" fill=\"url(#str-h)\"/><path d=\"M24 5L29.4 17.6L43 18.6L32.6 27.4L35.8 40.8L24 33.6L12.2 40.8L15.4 27.4L5 18.6L18.6 17.6Z\" fill=\"#FFD23F\" stroke=\"#FFF3B8\" stroke-width=\"1.2\" stroke-linejoin=\"round\"/></svg>",
+    "star-empty": "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 48 48\" width=\"48\" height=\"48\"><path d=\"M24 5L29.4 17.6L43 18.6L32.6 27.4L35.8 40.8L24 33.6L12.2 40.8L15.4 27.4L5 18.6L18.6 17.6Z\" fill=\"none\" stroke=\"#6E7B96\" stroke-width=\"1.8\" stroke-linejoin=\"round\"/></svg>",
+  },
+  _img: {},
+  ready: {},  // name -> loaded <img>, filled in as loads finish (the draw helpers below read it)
+  // Resolves to an <img> you can drawImage(). Cached per name.
+  load(name) {
+    if (!this._img[name]) this._img[name] = new Promise((ok, err) => {
+      const i = new Image();
+      i.onload = () => { this.ready[name] = i; ok(i); }; i.onerror = err;
+      i.src = 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(this.svg[name]);
+    });
+    return this._img[name];
+  },
+  loadAll() {
+    return Promise.all(Object.keys(this.svg).map(n => this.load(n))).then(() => this);
+  },
+  // Pre-render a sprite to an offscreen canvas at a fixed pixel size (fast to blit hundreds of times).
+  async sprite(name, px) {
+    const img = await this.load(name), c = document.createElement('canvas');
+    c.width = c.height = Math.ceil(px * (window.devicePixelRatio || 1));
+    c.getContext('2d').drawImage(img, 0, 0, c.width, c.height);
+    return c;
+  },
+  // ---- v2 HUD helpers (call after loadAll) ----
+  // Lymph node infection timer: a ring that fills red clockwise from 12 o'clock.
+  // frac 0..1; beating = bacteria inside the node (adds a double-thump heartbeat); t = seconds, for the pulse.
+  drawTimer(ctx, x, y, r, frac, { beating = false, t = 0 } = {}) {
+    const red = this.palette.damage, k = beating ? 1 + 0.08 * this._beat(t) : 1, R = r * k;
+    ctx.save();
+    ctx.lineCap = 'round';
+    ctx.lineWidth = Math.max(3, r * 0.22);
+    ctx.strokeStyle = 'rgba(255,59,78,0.18)';
+    ctx.beginPath(); ctx.arc(x, y, R, 0, Math.PI * 2); ctx.stroke();
+    ctx.lineWidth = Math.max(1, r * 0.06); ctx.strokeStyle = 'rgba(255,59,78,0.45)';
+    for (let i = 0; i < 12; i++) {           // tick marks every 1/12
+      const a = i / 12 * Math.PI * 2 - Math.PI / 2, i0 = R - r * 0.42, i1 = R - r * 0.3;
+      ctx.beginPath(); ctx.moveTo(x + Math.cos(a) * i0, y + Math.sin(a) * i0); ctx.lineTo(x + Math.cos(a) * i1, y + Math.sin(a) * i1); ctx.stroke();
+    }
+    if (frac > 0) {
+      const a0 = -Math.PI / 2, a1 = a0 + Math.PI * 2 * Math.min(1, frac);
+      ctx.strokeStyle = red; ctx.lineWidth = Math.max(3, r * 0.22);
+      ctx.shadowColor = red; ctx.shadowBlur = r * (beating ? 0.9 : 0.5);
+      ctx.beginPath(); ctx.arc(x, y, R, a0, a1); ctx.stroke();
+      ctx.shadowBlur = 0; ctx.fillStyle = '#FFE1E5';
+      ctx.beginPath(); ctx.arc(x + Math.cos(a1) * R, y + Math.sin(a1) * R, Math.max(1.5, r * 0.09), 0, Math.PI * 2); ctx.fill();
+    }
+    ctx.restore();
+  },
+  _beat(t) {  // lub-dub at ~70 bpm, 0..1
+    const p = (t * 70 / 60) % 1, b = (c, w) => Math.exp(-(((p - c) / w) ** 2));
+    return Math.max(b(0.05, 0.05), 0.6 * b(0.25, 0.05));
+  },
+  // Level progress bar. frac 0..1; events = [{at: 0..1, kind: 'wave'|'wave-armored'|'wave-final'|'toxin'}].
+  // Events already passed dim out; the next one glows.
+  drawProgress(ctx, x, y, w, h, frac, events = []) {
+    ctx.save();
+    const r = h / 2, f = Math.max(0, Math.min(1, frac));
+    ctx.fillStyle = 'rgba(221,230,245,0.08)'; ctx.strokeStyle = 'rgba(221,230,245,0.3)'; ctx.lineWidth = 1;
+    this._pill(ctx, x, y, w, h, r); ctx.fill(); ctx.stroke();
+    if (f > 0) {
+      const g = ctx.createLinearGradient(x, 0, x + w * f, 0);
+      g.addColorStop(0, 'rgba(63,230,255,0.15)'); g.addColorStop(1, 'rgba(63,230,255,0.55)');
+      ctx.fillStyle = g; this._pill(ctx, x, y, Math.max(h, w * f), h, r); ctx.fill();
+      ctx.fillStyle = this.palette.cellHi; ctx.fillRect(x + w * f - 1, y - 2, 2, h + 4);
+    }
+    const next = events.filter(e => e.at > f).sort((a, b) => a.at - b.at)[0];
+    for (const e of events) {
+      const img = this.ready['marker-' + e.kind]; if (!img) continue;
+      const s = h * (e.kind === 'wave-final' ? 2.6 : 2.1) * (e === next ? 1.15 : 1);
+      ctx.globalAlpha = e.at <= f ? 0.25 : 1;
+      ctx.drawImage(img, x + w * e.at - s / 2, y + h / 2 - s / 2, s, s);
+    }
+    ctx.restore();
+  },
+  _pill(ctx, x, y, w, h, r) {
+    ctx.beginPath();
+    if (ctx.roundRect) ctx.roundRect(x, y, w, h, r); else ctx.rect(x, y, w, h);
+  },
+};
+// (node export removed) = ART;
+
+</script>
+<script>
+'use strict';
+// ---------------------------------------------------------------------------
+// Immune RTS fun-test prototype: simulation. No DOM in this part, so it also
+// runs headless under node (see src/headless.js).
+// ---------------------------------------------------------------------------
+
+// Every tunable number. The dev panel edits these live; the sim reads them each tick.
+const DEFAULTS = {
+  world:        { stanceDelay: 4, popCap: 420, maxPathogens: 900 },
+  bacteria:     { start: 15, inflow: 3.3, closeTime: 270, doublingTime: 16, capacity: 700, jitter: 0.35, crowdRadius: 12, crowdMax: 8, speed: 4, hostDmg: 0.0004, alarm: 0.08, loadCap: 500, edgeWeight: 1.5 },
+  toxin:        { quorum: 9, radius: 60, chance: 0.014, hostDmg: 0.8, killChance: 0.6, cooldown: 17, inflam: 0.3 },
+  pollen:       { start: 25, inflow: 1.2, life: 100, lifeJitter: 25, season: 250, loadWeight: 3, alarm: 0.04, engulf: 20, sample: 3 },
+  neutrophil:   { speed: 60, sense: 80, eatCooldown: 2.1, maxEats: 2, life: 42, cost: 1 },
+  trap:         { netRadius: 40, netLife: 20, killRate: 0.3, hostDmg: 0.005, inflam: 0.01, minTargets: 4, seekTime: 6 },
+  macrophage:   { speed: 24, sense: 80, eatCooldown: 7, life: 220, cost: 3, inflam: 0.013, alarmBoost: 0.15 },
+  repair:       { heal: 0.005, calm: 0.12, radius: 45 },
+  production:   { rate: 2.2, alertBoost: 0.12, mix: 0.7 },
+  alert:        { weight: [0.15, 1, 3, 6], inflam: [0, 0.0006, 0.014, 0.032], speed: [0.8, 1, 1.2, 1.4], eat: [0.85, 1, 1.2, 1.4] },
+  inflammation: { decay: 0.03, diffuse: 1.5, hostDmg: 0.5, calm: 0.035, calmHold: 5 },
+  alarm:        { decay: 0.5, diffuse: 3, recruit: 0.15 },
+  host:         { scarFrac: 0.3 },
+  fever:        { duration: 40, cooldown: 85, growth: 0.5, hostDmg: 0.25 },
+  adaptive:     { sampleNeeded: 90, delay: 14, doubling: 12, startLevel: 0.03, leak: 0.08, leakBase: 0.4, decay: 0.06, fade: 0.07,
+                  opsonize: 3, complementKill: 0.25, complementInflam: 0.08, complementAmbient: 0.008, allergyInflam: 0.18 },
+  debris:       { life: 56, inflam: 0.003 },
+};
+
+// One line per tunable, shown in the dev panel.
+const HINTS = {
+  'world.stanceDelay': 'Seconds for a stance change to spread through a population',
+  'world.popCap': 'Max friendly cells alive at once',
+  'world.maxPathogens': 'Hard cap on pathogen agents (performance)',
+  'bacteria.doublingTime': 'Seconds between divisions (before fever)',
+  'bacteria.inflow': 'Bacteria per second pouring in through the cut at the start',
+  'bacteria.closeTime': 'Seconds until the cut closes; inflow tapers to zero by then',
+  'bacteria.capacity': 'Tissue carrying capacity: growth slows to zero as the count nears this',
+  'bacteria.crowdMax': 'No division if this many neighbours within crowd radius',
+  'bacteria.hostDmg': 'Host Damage % per second, per bacterium',
+  'bacteria.loadCap': 'Weighted pathogen count that equals 100% load',
+  'bacteria.edgeWeight': 'Load weight of bacteria in Blood entry and Lymph exit',
+  'toxin.quorum': 'Neighbours needed before a bacterium can burst',
+  'toxin.chance': 'Burst chance per check (about every 1.5 s)',
+  'toxin.hostDmg': 'Host Damage % per burst',
+  'toxin.cooldown': 'Min seconds between bursts, map-wide',
+  'pollen.inflow': 'Grains per second during the season',
+  'pollen.season': 'Seconds of pollen inflow',
+  'pollen.loadWeight': 'Load weight of one grain',
+  'pollen.sample': 'Sample gained per grain a macrophage eats',
+  'pollen.engulf': 'Average seconds a macrophage needs to engulf one grain (neutrophils cannot)',
+  'neutrophil.maxEats': 'Bacteria eaten before a neutrophil dies',
+  'trap.killRate': 'Chance per second a pinned pathogen dies',
+  'trap.hostDmg': 'Host Damage % per second, per net',
+  'macrophage.inflam': 'Inflammation a Kill macrophage adds to its spot, per second',
+  'repair.heal': 'Host Damage % healed per second, per Repair macrophage on damaged tissue',
+  'repair.calm': 'Inflammation removed per second around a Repair macrophage',
+  'production.rate': 'Marrow output units per second (neutrophil 1, macrophage 3)',
+  'production.alertBoost': 'Extra output per alert step above Watch, summed over sectors',
+  'production.mix': 'Starting neutrophil share of the marrow slider',
+  'alert.weight': 'Recruitment pull: Quiet, Watch, Inflamed, Max',
+  'alert.inflam': 'Inflammation added per second per tile: Quiet, Watch, Inflamed, Max',
+  'alert.speed': 'Cell speed multiplier in the sector',
+  'alert.eat': 'Eat speed multiplier in the sector',
+  'inflammation.decay': 'Fraction lost per second (sets how long stand-down takes)',
+  'inflammation.hostDmg': 'Host Damage % per second at 100% inflammation everywhere',
+  'inflammation.calm': 'Mean inflammation below which the tissue counts as calm',
+  'inflammation.calmHold': 'Seconds calm before the match ends',
+  'alarm.recruit': 'How strongly damage alarms pull cells to a sector',
+  'host.scarFrac': 'Share of all damage that is permanent scarring',
+  'fever.growth': 'Bacterial growth multiplier during fever',
+  'fever.hostDmg': 'Host Damage % per second during fever',
+  'adaptive.sampleNeeded': 'Macrophage meals to fill the sample bar',
+  'adaptive.delay': 'Seconds from choice until antibodies start',
+  'adaptive.doubling': 'Seconds for antibody output to double',
+  'adaptive.leak': 'Antibody delivery rate into tissue',
+  'adaptive.leakBase': 'Delivery into uninflamed tissue (inflammation adds on top)',
+  'adaptive.opsonize': 'Eat speed bonus at full antibody coverage',
+  'adaptive.complementKill': 'Kill chance per second at full coverage',
+  'adaptive.complementInflam': 'Inflammation per complement kill',
+  'adaptive.allergyInflam': 'Pollen scenario: inflammation per antibody-coated grain',
+};
+
+const LEVELS = ['Quiet', 'Watch', 'Inflamed', 'Max'];
+const SECTOR_DEFS = [
+  { key: 'A', name: 'Blood entry', icon: 'sector-blood' },
+  { key: 'B', name: 'Wound', icon: 'sector-wound' },
+  { key: 'C', name: 'Lymph exit', icon: 'sector-lymph' },
+];
+const SCENARIOS = {
+  papercut: { name: 'Papercut', icon: 'scenario-papercut', goal: 'Staph got into a cut. Clear it, then stand down.', alerts: [1, 1, 1], pollen: false },
+  pollen:   { name: 'Pollen', icon: 'scenario-pollen', goal: 'Pollen is drifting into the tissue. Get the host through the season.', alerts: [1, 2, 1], pollen: true },
+};
+
+const clone = o => JSON.parse(JSON.stringify(o));
+let CONFIG = clone(DEFAULTS);
+function mergeConfig(saved) {
+  if (!saved || typeof saved !== 'object') return;
+  for (const g in saved) {
+    if (!CONFIG[g]) continue;
+    for (const k in saved[g]) {
+      const d = DEFAULTS[g][k], v = saved[g][k];
+      if (Array.isArray(d) ? (Array.isArray(v) && v.length === d.length) : typeof d === typeof v) CONFIG[g][k] = clone(v);
+    }
+  }
+}
+
+function mulberry32(a) {
+  return function () {
+    a |= 0; a = a + 0x6D2B79F5 | 0;
+    let t = Math.imul(a ^ a >>> 15, 1 | a);
+    t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t;
+    return ((t ^ t >>> 14) >>> 0) / 4294967296;
+  };
+}
+
+// World: 600 x 900 units, three stacked sectors of 300. Fields on a 20-unit grid.
+const W = 600, H = 900, SECTOR_H = 300, CELL = 20, GW = 30, GH = 45, N = GW * GH, ROWS_PER_SECTOR = 15;
+const HB = 30, HX = 20, HY = 30; // spatial hash buckets
+const secOf = y => (y < SECTOR_H ? 0 : y < 2 * SECTOR_H ? 1 : 2);
+const cellIdx = (x, y) => {
+  let gx = (x / CELL) | 0, gy = (y / CELL) | 0;
+  if (gx < 0) gx = 0; else if (gx >= GW) gx = GW - 1;
+  if (gy < 0) gy = 0; else if (gy >= GH) gy = GH - 1;
+  return gy * GW + gx;
+};
+
+class Game {
+  constructor(key, seed) {
+    this.key = key; this.sc = SCENARIOS[key]; this.seed = seed;
+    this.rng = mulberry32(seed);
+    this.t = 0;
+    this.inf = new Float32Array(N); this.alarm = new Float32Array(N); this.ab = new Float32Array(N);
+    this.vis = new Float32Array(N); this.tmp = new Float32Array(N);
+    this.sectors = SECTOR_DEFS.map((d, i) => ({ ...d, alert: this.sc.alerts[i], dmg: 0, inf: 0 }));
+    this.secAlarm = [0, 0, 0];
+    this.path = []; this.neut = []; this.mac = []; this.nets = []; this.debris = []; this.fx = [];
+    this.scar = 0; this.heal = 0; this.healed = 0; this.taken = 0;
+    this.bySource = { bacteria: 0, toxin: 0, inflammation: 0, nets: 0, fever: 0 };
+    this.stance = { neut: 'eat', mac: 'kill' };
+    this.mix = CONFIG.production.mix;
+    this.acc = { n: 0, m: 0, pollen: 0 };
+    this.fever = { active: false, left: 0, cd: 0, uses: 0 };
+    this.sample = 0;
+    this.ad = { state: 'none', choice: null, level: 0, t0: 0, prompted: false };
+    this.phase = this.sc.pollen ? 'season' : 'breach';
+    this.calmT = 0; this.result = null; this.meanInf = 0;
+    this.history = []; this.events = []; this.notices = []; this.inputs = 0;
+    this.peakLoad = 0; this.toxReady = 0; this.toxins = 0; this.histT = 0;
+    this.hb = Array.from({ length: HX * HY }, () => []);
+    const r = this.rng;
+    if (this.sc.pollen) {
+      for (let i = 0; i < CONFIG.pollen.start; i++) this.spawnPollen();
+    } else {
+      for (let i = 0; i < CONFIG.bacteria.start; i++) {
+        // Seeded along the cut
+        this.spawnBact(300 + (r() * 2 - 1) * 130, 450 + (r() + r() - 1) * 22);
+      }
+    }
+    this.record();
+  }
+
+  // ---- spawning ----
+  spawnBact(x, y) {
+    const B = CONFIG.bacteria, r = this.rng;
+    this.path.push({ kind: 'b', x, y, vx: 0, vy: 0, rot: r() * 6.28, div: B.doublingTime * (0.3 + r() * 0.9), pin: 0, tc: r() * 1.5, dead: false });
+  }
+  spawnPollen() {
+    const P = CONFIG.pollen, r = this.rng;
+    this.path.push({ kind: 'p', x: 40 + r() * 520, y: 450 + (r() + r() - 1) * 120, vx: 0, vy: 0, rot: r() * 6.28,
+      life: P.life + (r() * 2 - 1) * P.lifeJitter, pin: 0, dead: false });
+  }
+  spawnCell(type) {
+    const r = this.rng, C = CONFIG;
+    const base = type === 'n' ? C.neutrophil.life : C.macrophage.life;
+    const c = { type, x: 20 + r() * 560, y: 10, vx: 0, vy: 20, life: base * (0.85 + 0.3 * r()),
+      stance: type === 'n' ? this.stance.neut : this.stance.mac, pend: null, pendAt: 0,
+      tgt: null, tgtD: null, spot: null, rt: 0, cd: 0, eats: 0, seek: 0, lastEat: -99,
+      home: 0, wx: 0, wy: 0, homeT: 6 + r() * 6, dead: false, ph: r() * 6.28 };
+    this.setHome(c);
+    (type === 'n' ? this.neut : this.mac).push(c);
+  }
+  randPoint(s) { const r = this.rng; return { x: 40 + r() * 520, y: s * SECTOR_H + 40 + r() * (SECTOR_H - 80) }; }
+  chooseHome() {
+    const C = CONFIG, w = [0, 0, 0]; let tot = 0;
+    for (let s = 0; s < 3; s++) { w[s] = C.alert.weight[this.sectors[s].alert] * (1 + C.alarm.recruit * this.secAlarm[s]); tot += w[s]; }
+    let x = this.rng() * tot;
+    for (let s = 0; s < 3; s++) { x -= w[s]; if (x <= 0) return s; }
+    return 2;
+  }
+  setHome(c) { c.home = this.chooseHome(); const p = this.randPoint(c.home); c.wx = p.x; c.wy = p.y; }
+
+  // ---- spatial queries over pathogens ----
+  rebuildHash() {
+    for (const b of this.hb) b.length = 0;
+    for (const p of this.path) {
+      if (p.dead) continue;
+      let bx = (p.x / HB) | 0, by = (p.y / HB) | 0;
+      if (bx < 0) bx = 0; else if (bx >= HX) bx = HX - 1;
+      if (by < 0) by = 0; else if (by >= HY) by = HY - 1;
+      this.hb[by * HX + bx].push(p);
+    }
+  }
+  forNear(x, y, r, fn) {
+    const x0 = Math.max(0, ((x - r) / HB) | 0), x1 = Math.min(HX - 1, ((x + r) / HB) | 0);
+    const y0 = Math.max(0, ((y - r) / HB) | 0), y1 = Math.min(HY - 1, ((y + r) / HB) | 0), r2 = r * r;
+    for (let by = y0; by <= y1; by++) for (let bx = x0; bx <= x1; bx++) {
+      for (const p of this.hb[by * HX + bx]) {
+        if (p.dead) continue;
+        const dx = p.x - x, dy = p.y - y;
+        if (dx * dx + dy * dy <= r2) fn(p);
+      }
+    }
+  }
+  nearest(x, y, r, kind) {
+    let best = null, bd = r * r;
+    const x0 = Math.max(0, ((x - r) / HB) | 0), x1 = Math.min(HX - 1, ((x + r) / HB) | 0);
+    const y0 = Math.max(0, ((y - r) / HB) | 0), y1 = Math.min(HY - 1, ((y + r) / HB) | 0);
+    for (let by = y0; by <= y1; by++) for (let bx = x0; bx <= x1; bx++) {
+      for (const p of this.hb[by * HX + bx]) {
+        if (p.dead || (kind && p.kind !== kind)) continue;
+        const dx = p.x - x, dy = p.y - y, d = dx * dx + dy * dy;
+        if (d < bd) { bd = d; best = p; }
+      }
+    }
+    return best;
+  }
+  countNear(x, y, r) { let n = 0; this.forNear(x, y, r, () => n++); return n; }
+  nearestDebris(x, y, r) {
+    let best = null, bd = r * r;
+    for (const d of this.debris) {
+      if (d.dead) continue;
+      const dx = d.x - x, dy = d.y - y, q = dx * dx + dy * dy;
+      if (q < bd) { bd = q; best = d; }
+    }
+    return best;
+  }
+
+  // ---- meters ----
+  hostDamage() { return this.scar + this.heal; }
+  load() {
+    const B = CONFIG.bacteria, P = CONFIG.pollen; let w = 0;
+    for (const p of this.path) {
+      if (p.dead) continue;
+      w += p.kind === 'p' ? P.loadWeight : (secOf(p.y) === 1 ? 1 : B.edgeWeight);
+    }
+    return (w / B.loadCap) * 100;
+  }
+  addDmg(a, src, s) {
+    if (a <= 0) return;
+    const f = CONFIG.host.scarFrac;
+    this.scar += a * f; this.heal += a * (1 - f); this.taken += a;
+    this.bySource[src] += a;
+    if (s != null) this.sectors[s].dmg += a;
+  }
+  // Eat-speed multiplier for a target: opsonized targets are eaten faster.
+  opso(p) {
+    const ad = this.ad;
+    const o = ad.state === 'active' && ad.choice === 'opsonize' ? 1 + CONFIG.adaptive.opsonize * this.ab[cellIdx(p.x, p.y)] : 1;
+    return o;
+  }
+  counts() {
+    let b = 0, p = 0;
+    for (const q of this.path) if (!q.dead) { if (q.kind === 'b') b++; else p++; }
+    return { bacteria: b, pollen: p, neut: this.neut.length, mac: this.mac.length };
+  }
+
+  // ---- player inputs ----
+  event(type, label) { this.events.push({ t: this.t, type, label }); }
+  notice(text, kind) { this.notices.push({ text, kind: kind || 'info' }); }
+  setAlert(s, lvl) {
+    if (this.result || this.sectors[s].alert === lvl) return;
+    this.sectors[s].alert = lvl; this.inputs++;
+    this.event('alert', `${this.sectors[s].name}: ${LEVELS[lvl]}`);
+  }
+  setStance(type, st) {
+    if (this.result || this.stance[type] === st) return;
+    this.stance[type] = st; this.inputs++;
+    const list = type === 'neut' ? this.neut : this.mac, d = CONFIG.world.stanceDelay;
+    for (const c of list) { c.pend = st; c.pendAt = this.t + this.rng() * d; }
+    this.event('stance', `${type === 'neut' ? 'Neutrophils' : 'Macrophages'}: ${st[0].toUpperCase() + st.slice(1)}`);
+  }
+  switchProgress(type) {
+    const list = type === 'neut' ? this.neut : this.mac;
+    if (!list.length) return 1;
+    let p = 0; for (const c of list) if (c.pend) p++;
+    return 1 - p / list.length;
+  }
+  setMix(v) {
+    if (this.result) return;
+    this.mix = Math.max(0, Math.min(1, v)); this.inputs++;
+    this.event('mix', `Marrow: ${Math.round(this.mix * 100)}% neutrophils`);
+  }
+  startFever() {
+    const F = this.fever;
+    if (this.result || F.active || F.cd > 0) return false;
+    F.active = true; F.left = CONFIG.fever.duration; F.uses++; this.inputs++;
+    this.event('fever', 'Fever');
+    return true;
+  }
+  chooseAntibody(ch) {
+    const ad = this.ad;
+    if (ad.state !== 'ready') return;
+    this.inputs++;
+    if (ch === 'hold') { this.event('hold', 'Held off on antibodies'); return; }
+    ad.state = 'ramping'; ad.choice = ch; ad.t0 = this.t;
+    this.event('antibody', ch === 'opsonize' ? 'Opsonize' : 'Complement');
+  }
+
+  // ---- main tick ----
+  step(dt) {
+    if (this.result) return;
+    const C = CONFIG, r = this.rng;
+    this.t += dt;
+    const t = this.t;
+
+    // Fever
+    const F = this.fever;
+    if (F.active) {
+      F.left -= dt;
+      this.addDmg(C.fever.hostDmg * dt, 'fever', null);
+      if (F.left <= 0) { F.active = false; F.cd = C.fever.cooldown; this.notice('Fever broke'); this.event('feverEnd', 'Fever broke'); }
+    } else if (F.cd > 0) { F.cd = Math.max(0, F.cd - dt); }
+    const growth = F.active ? C.fever.growth : 1;
+
+    // Bone marrow: continuous flow, boosted by escalation
+    let boost = 0;
+    for (const s of this.sectors) boost += Math.max(0, s.alert - 1);
+    const rate = C.production.rate * (1 + C.production.alertBoost * boost);
+    this.acc.n += rate * this.mix * dt / C.neutrophil.cost;
+    this.acc.m += rate * (1 - this.mix) * dt / C.macrophage.cost;
+    while (this.acc.n >= 1) { this.acc.n -= 1; if (this.neut.length + this.mac.length < C.world.popCap) this.spawnCell('n'); }
+    while (this.acc.m >= 1) { this.acc.m -= 1; if (this.neut.length + this.mac.length < C.world.popCap) this.spawnCell('m'); }
+
+    // Papercut: bacteria keep pouring in through the cut while it closes
+    if (!this.sc.pollen) {
+      const B = C.bacteria, sIn = B.inflow * Math.max(0, 1 - t / B.closeTime);
+      if (sIn > 0) {
+        this.acc.bact = (this.acc.bact || 0) + sIn * dt;
+        while (this.acc.bact >= 1) { this.acc.bact -= 1; if (this.path.length < C.world.maxPathogens) this.spawnBact(300 + (r() * 2 - 1) * 130, 450 + (r() + r() - 1) * 14); }
+      }
+    }
+
+    // Pollen season inflow
+    if (this.sc.pollen && t < C.pollen.season) {
+      this.acc.pollen += C.pollen.inflow * dt;
+      while (this.acc.pollen >= 1) { this.acc.pollen -= 1; if (this.path.length < C.world.maxPathogens) this.spawnPollen(); }
+    }
+
+    this.rebuildHash();
+    this.updateNets(dt);
+    this.updatePathogens(dt, growth);
+    this.updateNeut(dt);
+    this.updateMac(dt);
+    this.updateDebris(dt);
+    this.updateFields(dt);
+    this.updateAdaptive(dt);
+
+    compact(this.path); compact(this.neut); compact(this.mac); compact(this.nets); compact(this.debris);
+    for (const f of this.fx) if (t - f.born > f.dur) f.dead = true;
+    compact(this.fx);
+
+    this.checkEnd(dt);
+    this.histT += dt;
+    if (this.histT >= 1) { this.histT -= 1; this.record(); }
+  }
+
+  record() {
+    this.history.push({ t: this.t, load: this.load(), host: this.hostDamage(), scar: this.scar, inf: this.meanInf, ab: this.ad.state === 'active' ? this.ad.level : 0 });
+  }
+
+  steer(c, tx, ty, sp, dt) {
+    const dx = tx - c.x, dy = ty - c.y, d = Math.hypot(dx, dy) || 1, k = Math.min(1, 6 * dt);
+    c.vx += (dx / d * sp - c.vx) * k; c.vy += (dy / d * sp - c.vy) * k;
+  }
+  move(c, dt) {
+    c.x += c.vx * dt; c.y += c.vy * dt;
+    if (c.x < 6) { c.x = 6; c.vx = Math.abs(c.vx); } else if (c.x > W - 6) { c.x = W - 6; c.vx = -Math.abs(c.vx); }
+    if (c.y < 6) { c.y = 6; c.vy = Math.abs(c.vy); } else if (c.y > H - 6) { c.y = H - 6; c.vy = -Math.abs(c.vy); }
+  }
+  // No target in reach: follow the alarm gradient inside the home sector, else patrol.
+  idle(c, sp, dt) {
+    if (secOf(c.y) !== c.home) { this.steer(c, c.wx, c.wy, sp, dt); return; }
+    const gx = Math.min(GW - 2, Math.max(1, (c.x / CELL) | 0)), gy = Math.min(GH - 2, Math.max(1, (c.y / CELL) | 0));
+    const a = this.alarm, i = gy * GW + gx;
+    const ax = a[i + 1] - a[i - 1], ay = a[i + GW] - a[i - GW], m = Math.hypot(ax, ay);
+    if (m > 0.004) this.steer(c, c.x + ax / m * 50, c.y + ay / m * 50, sp, dt);
+    else {
+      if (Math.hypot(c.wx - c.x, c.wy - c.y) < 15) { const p = this.randPoint(c.home); c.wx = p.x; c.wy = p.y; }
+      this.steer(c, c.wx, c.wy, sp * 0.6, dt);
+    }
+    c.homeT -= dt;
+    if (c.homeT <= 0) { c.homeT = 6 + this.rng() * 6; this.setHome(c); }
+  }
+
+  // Bacteria are swallowed on contact; a pollen grain takes a while to engulf (faster when antibody-coated).
+  engulfed(p, dt) {
+    return p.kind !== 'p' || this.rng() < dt * this.opso(p) / CONFIG.pollen.engulf;
+  }
+  kill(p, sample) {
+    p.dead = true;
+    if (sample && this.ad.state === 'none') this.sample = Math.min(CONFIG.adaptive.sampleNeeded, this.sample + (p.kind === 'p' ? CONFIG.pollen.sample : 1));
+    if (this.fx.length < 160) this.fx.push({ type: 'pop', x: p.x, y: p.y, born: this.t, dur: 0.35, kind: p.kind });
+  }
+  dieCell(c, leaveDebris) {
+    c.dead = true;
+    if (leaveDebris) this.debris.push({ x: c.x, y: c.y, life: CONFIG.debris.life, dead: false });
+  }
+
+  updateNets(dt) {
+    const T = CONFIG.trap, r = this.rng, t = this.t;
+    for (const n of this.nets) {
+      n.life -= dt;
+      if (n.life <= 0) { n.dead = true; continue; }
+      const s = secOf(n.y), ci = cellIdx(n.x, n.y);
+      this.addDmg(T.hostDmg * dt, 'nets', s);
+      this.inf[ci] += T.inflam * dt;
+      this.vis[ci] = Math.min(1, this.vis[ci] + 0.02 * dt);
+      this.forNear(n.x, n.y, T.netRadius, p => {
+        p.pin = t + 0.1;
+        if (r() < T.killRate * dt) this.kill(p, false);
+      });
+    }
+  }
+
+  updatePathogens(dt, growth) {
+    const C = CONFIG, B = C.bacteria, P = C.pollen, A = C.adaptive, r = this.rng, t = this.t, ad = this.ad;
+    const active = ad.state === 'active', comp = active && ad.choice === 'complement';
+    const dmg = [0, 0, 0];
+    const n = this.path.length;
+    let nb = 0;
+    for (let i = 0; i < n; i++) if (this.path[i].kind === 'b' && !this.path[i].dead) nb++;
+    const room = Math.max(0, 1 - nb / B.capacity);
+    for (let i = 0; i < n; i++) {
+      const p = this.path[i];
+      if (p.dead) continue;
+      const pinned = p.pin > t;
+      if (!pinned) {
+        const sp = p.kind === 'b' ? B.speed : 3;
+        if (r() < dt * 0.7) { const a = r() * 6.28; p.vx = Math.cos(a) * sp; p.vy = Math.sin(a) * sp; p.rot = a; }
+        p.x += p.vx * dt; p.y += p.vy * dt;
+        if (p.x < 8) p.x = 8; else if (p.x > W - 8) p.x = W - 8;
+        if (p.y < 30) p.y = 30; else if (p.y > H - 30) p.y = H - 30;
+      }
+      const ci = cellIdx(p.x, p.y);
+      if (p.kind === 'b') {
+        this.alarm[ci] += B.alarm * dt;
+        dmg[secOf(p.y)] += B.hostDmg * dt;
+        this.vis[ci] = Math.min(1, this.vis[ci] + 0.004 * dt);
+        if (!pinned) {
+          p.div -= dt * growth;
+          if (p.div <= 0) {
+            const crowded = r() > room || this.countNear(p.x, p.y, B.crowdRadius) >= B.crowdMax;
+            if (!crowded && this.path.length < C.world.maxPathogens) {
+              const a = r() * 6.28;
+              this.spawnBact(p.x + Math.cos(a) * 5, p.y + Math.sin(a) * 5);
+              this.path[this.path.length - 1].div = B.doublingTime * (1 + (r() * 2 - 1) * B.jitter);
+            }
+            p.div = B.doublingTime * (1 + (r() * 2 - 1) * B.jitter) * (crowded ? 0.5 : 1);
+          }
+        }
+        p.tc -= dt;
+        if (p.tc <= 0) {
+          p.tc = 1 + r();
+          if (t >= this.toxReady && r() < C.toxin.chance && this.countNear(p.x, p.y, C.toxin.radius * 0.5) >= C.toxin.quorum) this.toxinBurst(p.x, p.y);
+        }
+      } else {
+        p.life -= dt;
+        if (p.life <= 0) { p.dead = true; continue; }
+        this.alarm[ci] += P.alarm * dt;
+        if (active) this.inf[ci] += A.allergyInflam * this.ab[ci] * dt;
+      }
+      if (comp && r() < A.complementKill * this.ab[ci] * dt) {
+        this.kill(p, false);
+        this.inf[ci] += A.complementInflam;
+      }
+    }
+    for (let s = 0; s < 3; s++) this.addDmg(dmg[s], 'bacteria', s);
+  }
+
+  toxinBurst(x, y) {
+    const X = CONFIG.toxin, s = secOf(y), r = this.rng, R = X.radius;
+    this.toxReady = this.t + X.cooldown; this.toxins++;
+    this.addDmg(X.hostDmg, 'toxin', s);
+    const g0x = Math.max(0, ((x - R) / CELL) | 0), g1x = Math.min(GW - 1, ((x + R) / CELL) | 0);
+    const g0y = Math.max(0, ((y - R) / CELL) | 0), g1y = Math.min(GH - 1, ((y + R) / CELL) | 0);
+    for (let gy = g0y; gy <= g1y; gy++) for (let gx = g0x; gx <= g1x; gx++) {
+      const d = Math.hypot((gx + 0.5) * CELL - x, (gy + 0.5) * CELL - y);
+      if (d > R) continue;
+      const i = gy * GW + gx, f = 1 - d / R;
+      this.inf[i] += X.inflam * f; this.alarm[i] += 0.5 * f; this.vis[i] = Math.min(1, this.vis[i] + 0.3 * f);
+    }
+    for (const list of [this.neut, this.mac]) for (const c of list) {
+      if (c.dead) continue;
+      if (Math.hypot(c.x - x, c.y - y) < R && r() < X.killChance * (c.type === 'm' ? 0.4 : 1)) this.dieCell(c, true);
+    }
+    this.fx.push({ type: 'toxin', x, y, born: this.t, dur: 1.1, r: R });
+    this.notice(`Toxin burst in the ${this.sectors[s].name.toLowerCase()}`, 'bad');
+    this.event('toxin', 'Toxin burst');
+  }
+
+  updateNeut(dt) {
+    const C = CONFIG, NC = C.neutrophil, T = C.trap, t = this.t, r = this.rng;
+    for (const c of this.neut) {
+      if (c.dead) continue;
+      c.life -= dt;
+      if (c.life <= 0) { this.dieCell(c, true); continue; }
+      if (c.pend && t >= c.pendAt) { c.stance = c.pend; c.pend = null; c.tgt = null; c.seek = 0; }
+      const lvl = this.sectors[secOf(c.y)].alert, sp = NC.speed * C.alert.speed[lvl];
+      c.cd -= dt; c.rt -= dt;
+      if (c.stance === 'eat') {
+        if (!c.tgt || c.tgt.dead || c.rt <= 0) { c.tgt = this.nearest(c.x, c.y, NC.sense, 'b'); c.rt = 0.35 + r() * 0.2; }
+        const g = c.tgt;
+        if (g) {
+          this.steer(c, g.x, g.y, sp, dt);
+          if (Math.hypot(g.x - c.x, g.y - c.y) < 7 && c.cd <= 0 && this.engulfed(g, dt)) {
+            this.kill(g, false); c.eats++; c.tgt = null;
+            c.cd = NC.eatCooldown / (C.alert.eat[lvl] * this.opso(g));
+            if (c.eats >= NC.maxEats) { this.dieCell(c, true); continue; }
+          }
+        } else this.idle(c, sp, dt);
+      } else { // trap: find a crowd, cast a net, die
+        c.seek += dt;
+        if (!c.tgt || c.tgt.dead || c.rt <= 0) { c.tgt = this.nearest(c.x, c.y, NC.sense * 1.5, 'b'); c.rt = 0.5; }
+        const g = c.tgt;
+        if (g) {
+          this.steer(c, g.x, g.y, sp, dt);
+          if (Math.hypot(g.x - c.x, g.y - c.y) < 12) {
+            const k = this.countNear(c.x, c.y, T.netRadius);
+            if (k >= T.minTargets || c.seek > T.seekTime) {
+              c.dead = true;
+              this.nets.push({ x: c.x, y: c.y, life: T.netLife, max: T.netLife, rot: r() * 6.28, dead: false });
+              continue;
+            }
+          }
+        } else this.idle(c, sp, dt);
+      }
+      this.move(c, dt);
+    }
+  }
+
+  updateMac(dt) {
+    const C = CONFIG, M = C.macrophage, R = C.repair, t = this.t, r = this.rng;
+    const rr = Math.ceil(R.radius / CELL);
+    for (const c of this.mac) {
+      if (c.dead) continue;
+      c.life -= dt;
+      if (c.life <= 0) { this.dieCell(c, false); continue; }
+      if (c.pend && t >= c.pendAt) { c.stance = c.pend; c.pend = null; c.tgt = null; c.tgtD = null; c.spot = null; c.rt = 0; }
+      const lvl = this.sectors[secOf(c.y)].alert, sp = M.speed * C.alert.speed[lvl];
+      c.cd -= dt; c.rt -= dt;
+      const ci = cellIdx(c.x, c.y);
+      if (c.stance === 'kill') {
+        if (!c.tgt || c.tgt.dead || c.rt <= 0) {
+          c.tgt = this.nearest(c.x, c.y, M.sense);
+          c.tgtD = c.tgt ? null : this.nearestDebris(c.x, c.y, M.sense);
+          c.rt = 0.5 + r() * 0.3;
+        }
+        if (c.tgt) {
+          this.steer(c, c.tgt.x, c.tgt.y, sp, dt);
+          if (Math.hypot(c.tgt.x - c.x, c.tgt.y - c.y) < 10 && c.cd <= 0 && this.engulfed(c.tgt, dt)) {
+            const g = c.tgt;
+            this.kill(g, true); c.lastEat = t; c.tgt = null;
+            c.cd = M.eatCooldown / (C.alert.eat[lvl] * this.opso(g));
+          }
+        } else if (c.tgtD && !c.tgtD.dead) {
+          this.steer(c, c.tgtD.x, c.tgtD.y, sp, dt);
+          if (Math.hypot(c.tgtD.x - c.x, c.tgtD.y - c.y) < 10) { c.tgtD.dead = true; c.tgtD = null; }
+        } else this.idle(c, sp, dt);
+        this.inf[ci] += M.inflam * dt;
+        if (t - c.lastEat < 4) this.alarm[ci] += M.alarmBoost * dt;
+      } else { // repair: clean debris, go where tissue is hurt or inflamed, heal and calm
+        if (c.rt <= 0) {
+          c.rt = 1.2 + r() * 0.5;
+          c.tgtD = this.nearestDebris(c.x, c.y, M.sense);
+          c.spot = null;
+          if (!c.tgtD) {
+            let best = 0.03;
+            for (let k = 0; k < 8; k++) {
+              const a = r() * 6.28, d = r() * M.sense, x = c.x + Math.cos(a) * d, y = c.y + Math.sin(a) * d;
+              if (x < 0 || x > W || y < 0 || y > H) continue;
+              const i = cellIdx(x, y), sc = this.inf[i] + this.vis[i];
+              if (sc > best) { best = sc; c.spot = { x, y }; }
+            }
+          }
+          c.tgt = this.nearest(c.x, c.y, 14);
+        }
+        if (c.tgtD && !c.tgtD.dead) {
+          this.steer(c, c.tgtD.x, c.tgtD.y, sp, dt);
+          if (Math.hypot(c.tgtD.x - c.x, c.tgtD.y - c.y) < 10) { c.tgtD.dead = true; c.tgtD = null; }
+        } else if (c.spot) {
+          const d = Math.hypot(c.spot.x - c.x, c.spot.y - c.y);
+          if (d > 8) this.steer(c, c.spot.x, c.spot.y, sp * 0.8, dt); else { c.vx *= 0.9; c.vy *= 0.9; }
+        } else this.idle(c, sp * 0.7, dt);
+        if (c.tgt && !c.tgt.dead && Math.hypot(c.tgt.x - c.x, c.tgt.y - c.y) < 10 && c.cd <= 0 && this.engulfed(c.tgt, dt)) {
+          this.kill(c.tgt, false); c.tgt = null; c.cd = M.eatCooldown * 2;
+        }
+        if (this.inf[ci] + this.vis[ci] > 0.02 && this.heal > 0) {
+          const a = Math.min(this.heal, R.heal * dt);
+          this.heal -= a; this.healed += a;
+        }
+        const gx = (c.x / CELL) | 0, gy = (c.y / CELL) | 0;
+        for (let y = Math.max(0, gy - rr); y <= Math.min(GH - 1, gy + rr); y++)
+          for (let x = Math.max(0, gx - rr); x <= Math.min(GW - 1, gx + rr); x++) {
+            const i = y * GW + x;
+            this.inf[i] = Math.max(0, this.inf[i] - R.calm * dt);
+            this.vis[i] = Math.max(0, this.vis[i] - 0.03 * dt);
+          }
+      }
+      this.move(c, dt);
+    }
+  }
+
+  updateDebris(dt) {
+    const D = CONFIG.debris;
+    for (const d of this.debris) {
+      if (d.dead) continue;
+      d.life -= dt;
+      if (d.life <= 0) { d.dead = true; continue; }
+      this.inf[cellIdx(d.x, d.y)] += D.inflam * dt;
+    }
+  }
+
+  diffuse(f, k) {
+    const tmp = this.tmp;
+    for (let y = 0; y < GH; y++) for (let x = 0; x < GW; x++) {
+      const i = y * GW + x, v = f[i];
+      tmp[i] = ((x > 0 ? f[i - 1] : v) + (x < GW - 1 ? f[i + 1] : v) + (y > 0 ? f[i - GW] : v) + (y < GH - 1 ? f[i + GW] : v)) * 0.25;
+    }
+    for (let i = 0; i < N; i++) f[i] += k * (tmp[i] - f[i]);
+  }
+
+  updateFields(dt) {
+    const C = CONFIG, I = C.inflammation, AL = C.alarm, A = C.adaptive, ad = this.ad;
+    const inf = this.inf, al = this.alarm, ab = this.ab, vis = this.vis;
+    for (let s = 0; s < 3; s++) {
+      const e = C.alert.inflam[this.sectors[s].alert] * dt;
+      if (e > 0) for (let i = s * ROWS_PER_SECTOR * GW, end = (s + 1) * ROWS_PER_SECTOR * GW; i < end; i++) inf[i] += e;
+    }
+    const L = ad.state === 'active' ? ad.level : 0, comp = ad.state === 'active' && ad.choice === 'complement';
+    this.diffuse(inf, Math.min(0.24, I.diffuse * dt));
+    this.diffuse(al, Math.min(0.24, AL.diffuse * dt));
+    if (ad.state === 'active') this.diffuse(ab, Math.min(0.24, 2 * dt));
+    const di = 1 - I.decay * dt, da = 1 - AL.decay * dt, dab = 1 - A.decay * dt;
+    const sums = [0, 0, 0], asums = [0, 0, 0];
+    for (let i = 0; i < N; i++) {
+      const s = ((i / GW) / ROWS_PER_SECTOR) | 0;
+      if (L > 0) ab[i] += L * A.leak * (A.leakBase + inf[i]) * dt;
+      if (comp) inf[i] += A.complementAmbient * ab[i] * dt;
+      let v = inf[i] * di; inf[i] = v > 1 ? 1 : v;
+      v = al[i] * da; al[i] = v > 2 ? 2 : v;
+      v = ab[i] * dab; ab[i] = v > 1 ? 1 : v;
+      v = vis[i] + inf[i] * 0.003 * dt; vis[i] = v > 1 ? 1 : v;
+      sums[s] += inf[i]; asums[s] += al[i];
+    }
+    const per = N / 3;
+    let tot = 0;
+    for (let s = 0; s < 3; s++) {
+      this.sectors[s].inf = sums[s] / per;
+      this.secAlarm[s] = asums[s];
+      this.addDmg(I.hostDmg * (sums[s] / N) * dt, 'inflammation', s);
+      tot += sums[s];
+    }
+    this.meanInf = tot / N;
+  }
+
+  updateAdaptive(dt) {
+    const A = CONFIG.adaptive, ad = this.ad;
+    if (ad.state === 'none' && this.sample >= A.sampleNeeded) {
+      ad.state = 'ready';
+      this.event('sample', 'Sample ready');
+      this.notice('A sample reached the lymph node', 'good');
+    } else if (ad.state === 'ramping' && this.t - ad.t0 >= A.delay) {
+      ad.state = 'active'; ad.level = A.startLevel;
+      this.event('abArrive', 'Antibodies arriving');
+      this.notice('Antibodies are arriving', 'good');
+    } else if (ad.state === 'active') {
+      const any = this.path.length > 0;
+      ad.level = any ? Math.min(1, ad.level * Math.pow(2, dt / A.doubling)) : ad.level * (1 - A.fade * dt);
+    }
+  }
+
+  checkEnd(dt) {
+    const I = CONFIG.inflammation;
+    const load = this.load(), host = this.hostDamage();
+    if (load > this.peakLoad) this.peakLoad = load;
+    if (host >= 100) return this.finish(false, 'host');
+    if (load >= 100) return this.finish(false, 'pathogen');
+    if (this.phase !== 'standdown') {
+      const clear = this.path.length === 0 && (this.sc.pollen || this.t >= CONFIG.bacteria.closeTime);
+      if (this.sc.pollen && this.t >= CONFIG.pollen.season && this.path.length === 0) return this.finish(true, 'season');
+      if (clear && !this.sc.pollen) {
+        this.phase = 'standdown';
+        this.event('standdown', this.sc.pollen ? 'Season over' : 'Infection cleared');
+        this.notice(this.sc.pollen ? 'Pollen season is over' : 'Infection cleared', 'good');
+      }
+    } else {
+      this.calmT = this.meanInf < I.calm ? this.calmT + dt : 0;
+      if (this.calmT >= I.calmHold) this.finish(true, this.sc.pollen ? 'season' : 'cleared');
+    }
+  }
+
+  finish(win, reason) {
+    this.record();
+    const host = this.hostDamage(), scarPct = this.scar;
+    let stars = 0, goals = [];
+    if (this.sc.pollen) {
+      goals = [['Get through the season', win], ['Host Damage 15% or less', win && host <= 15], ['Host Damage 5% or less', win && host <= 5]];
+    } else {
+      goals = [['Clear the infection and stand down', win], ['Host Damage 50% or less', win && host <= 50], ['Scarring 15% or less', win && scarPct <= 15]];
+    }
+    for (const g of goals) if (g[1]) stars++;
+    this.result = { win, reason, t: this.t, host, scar: scarPct, peakLoad: this.peakLoad, stars, goals,
+      inputs: this.inputs, feverUses: this.fever.uses, choice: this.ad.choice, healed: this.healed };
+    this.event('end', win ? 'Won' : 'Lost');
+  }
+}
+
+function compact(a) {
+  let j = 0;
+  for (let i = 0; i < a.length; i++) if (!a[i].dead) a[j++] = a[i];
+  a.length = j;
+}
+
+// (node export removed) = { Game, DEFAULTS, SCENARIOS, LEVELS, getConfig: () => CONFIG, mergeConfig, clone };
+
+</script>
+<script>
+'use strict';
+// ---------------------------------------------------------------------------
+// Immune RTS fun-test prototype: rendering, input, HUD, dev tools.
+// ---------------------------------------------------------------------------
+(function () {
+  const $ = s => document.querySelector(s);
+  const STEP = 1 / 60;
+  const SPEEDS = [0.25, 0.5, 1, 1.5, 2, 3, 4];
+  const PAL = ART.palette;
+  const ALERT_COL = [ART.alert.quiet, ART.alert.watch, ART.alert.inflamed, ART.alert.max];
+  const ALERT_ART = ['alert-quiet', 'alert-watch', 'alert-inflamed', 'alert-max'];
+  const LEVEL_HINTS = [
+    'Few cells come here, and the alert adds no inflammation.',
+    'The default. A normal share of cells and very light inflammation.',
+    'Pulls about 3× the cells and they move faster. Inflames this sector.',
+    'Pulls about 6× the cells, fastest of all. Heavy inflammation that burns the host quickly.',
+  ];
+  const STANCE_HINTS = {
+    eat: 'Swallow a couple of bacteria, then die.',
+    trap: 'Die casting nets that pin bacteria. Nets hurt tissue.',
+    kill: 'Eat bacteria, gather samples. Inflames.',
+    repair: 'Heal tissue and calm it. No samples.',
+  };
+  const store = {
+    get(k) { try { return JSON.parse(localStorage.getItem(k)); } catch (e) { return null; } },
+    set(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch (e) { /* storage blocked */ } },
+  };
+
+  mergeConfig(store.get('immuneRts.tuning'));
+  let seed = store.get('immuneRts.seed') || 1;
+  let game = null, scenarioKey = 'papercut';
+  let paused = false, speedIdx = 2, acc = 0, last = 0;
+  let modal = null; // 'start' | 'choice' | 'end' | null
+  let selSector = null, endShown = false;
+  const overlay = { alarm: false, stats: false };
+
+  // ---- canvas and sprites ----
+  const cv = $('#cv'), ctx = cv.getContext('2d'), stage = $('#stage');
+  let dpr = 1, scale = 1, ox = 0, oy = 0, cssW = 0, cssH = 0;
+  const img = {};
+  const spr = {};
+  let bg = null, bgDmg = null;
+  // Fixed random offsets, drift speeds and phases for the antibody particles
+  const AB_PER_TILE = 5, abSeed = new Float32Array(N * AB_PER_TILE * 4);
+  for (let i = 0; i < abSeed.length; i += 4) { abSeed[i] = Math.random(); abSeed[i + 1] = Math.random(); abSeed[i + 2] = 0.3 + Math.random() * 0.9; abSeed[i + 3] = Math.random() * 6.28; }
+  const fieldCv = document.createElement('canvas'); fieldCv.width = GW; fieldCv.height = GH;
+  const fctx = fieldCv.getContext('2d'), fimg = fctx.createImageData(GW, GH);
+  // World size of each sprite's 64-unit box, chosen so the body radius reads at phone size.
+  const SPRITE_WORLD = {
+    neutrophil: 64 * 7.5 / 13, 'neutrophil-trap': 64 * 7.5 / 13,
+    'macrophage-kill': 64 * 13 / 22, 'macrophage-repair': 64 * 13 / 22,
+    bacterium: 64 * 5 / 9, 'bacterium-dividing': 64 * 6.2 / 12, 'bacterium-opsonized': 64 * 5 / 9, 'bacterium-complement': 64 * 5 / 9,
+    pollen: 64 * 8 / 18, antibody: 7,
+  };
+
+  function makeSprite(name, worldSize) {
+    const px = Math.max(4, Math.ceil(worldSize * scale * dpr));
+    const c = document.createElement('canvas'); c.width = c.height = px;
+    c.getContext('2d').drawImage(img[name], 0, 0, px, px);
+    spr[name] = { c, w: worldSize };
+  }
+  function glowDot(name, color, worldR) {
+    const px = Math.max(4, Math.ceil(worldR * 4 * scale * dpr)), c = document.createElement('canvas');
+    c.width = c.height = px;
+    const g = c.getContext('2d'), gr = g.createRadialGradient(px / 2, px / 2, 0, px / 2, px / 2, px / 2);
+    gr.addColorStop(0, color); gr.addColorStop(0.25, color); gr.addColorStop(1, 'rgba(0,0,0,0)');
+    g.fillStyle = gr; g.fillRect(0, 0, px, px);
+    spr[name] = { c, w: worldR * 4 };
+  }
+  function tileWorld(name, tileW) {
+    const k = scale * dpr, c = document.createElement('canvas');
+    c.width = Math.ceil(W * k); c.height = Math.ceil(H * k);
+    const g = c.getContext('2d'), im = img[name], th = tileW * im.naturalHeight / im.naturalWidth;
+    for (let y = 0; y < H; y += th) for (let x = 0; x < W; x += tileW) g.drawImage(im, x * k, y * k, tileW * k + 1, th * k + 1);
+    return c;
+  }
+  function buildGraphics() {
+    if (!img.tissue) return;
+    for (const n in SPRITE_WORLD) makeSprite(n, SPRITE_WORLD[n]);
+    makeSprite('net', 64 * CONFIG.trap.netRadius / 28);
+    makeSprite('toxin-burst', 64 * CONFIG.toxin.radius / 30);
+    glowDot('pop', PAL.germHi, 2.5);
+    glowDot('popPollen', PAL.pollenHi, 2.5);
+    glowDot('debris', 'rgba(110,123,150,0.55)', 2);
+    bg = tileWorld('tissue', 128);
+    bgDmg = tileWorld('tissue-damaged', 128);
+  }
+  function resize() {
+    const r = stage.getBoundingClientRect();
+    cssW = r.width; cssH = r.height;
+    dpr = Math.min(3, window.devicePixelRatio || 1);
+    cv.width = Math.round(cssW * dpr); cv.height = Math.round(cssH * dpr);
+    scale = Math.min(cssW / W, cssH / H);
+    ox = (cssW - W * scale) / 2; oy = (cssH - H * scale) / 2;
+    buildGraphics();
+  }
+
+  function draw(name, x, y, rot, alpha, sizeMul) {
+    const s = spr[name]; if (!s) return;
+    const w = s.w * (sizeMul || 1);
+    ctx.globalAlpha = alpha == null ? 1 : alpha;
+    if (rot) {
+      ctx.save(); ctx.translate(x, y); ctx.rotate(rot);
+      ctx.drawImage(s.c, -w / 2, -w / 2, w, w);
+      ctx.restore();
+    } else ctx.drawImage(s.c, x - w / 2, y - w / 2, w, w);
+  }
+
+  function render(now) {
+    ctx.setTransform(1, 0, 0, 1, 0, 0);
+    ctx.globalCompositeOperation = 'source-over'; ctx.globalAlpha = 1;
+    ctx.fillStyle = PAL.void; ctx.fillRect(0, 0, cv.width, cv.height);
+    const g = game;
+    if (!g || !bg) return;
+    const k = scale * dpr, t = g.t, ad = g.ad;
+    ctx.setTransform(k, 0, 0, k, ox * dpr, oy * dpr);
+    ctx.save();
+    ctx.beginPath(); ctx.rect(0, 0, W, H); ctx.clip();
+
+    // Tissue, cross-faded toward damaged by each sector's share of Host Damage
+    ctx.globalAlpha = 0.5; ctx.drawImage(bg, 0, 0, W, H);
+    for (let s = 0; s < 3; s++) {
+      const a = Math.min(0.9, g.sectors[s].dmg / 25);
+      if (a > 0.01) { ctx.globalAlpha = a; ctx.drawImage(bgDmg, 0, s * SECTOR_H * k, W * k, SECTOR_H * k, 0, s * SECTOR_H, W, SECTOR_H); }
+    }
+    ctx.globalAlpha = 1;
+
+    // Vessels and the cut
+    const vb = img['vessel-blood'], vl = img['vessel-lymph'], tw = 96, th = 48;
+    const flow = (now / 1000 * 14) % tw;
+    for (let x = -tw + flow; x < W; x += tw) ctx.drawImage(vb, x, -10, tw, th);
+    for (let x = -flow; x < W + tw; x += tw) ctx.drawImage(vl, x, H - th + 10, tw, th);
+    if (!g.sc.pollen) {
+      const open = Math.max(0.25, 1 - t / CONFIG.bacteria.closeTime);
+      ctx.globalAlpha = 0.35 + 0.65 * open;
+      for (let i = 0; i < 3; i++) ctx.drawImage(img.wound, 135 + i * 110, 450 - 27, 110, 55);
+      ctx.globalAlpha = 1;
+    }
+
+    // Fields: inflammation haze, damage tint, optional alarm (dev)
+    const d = fimg.data;
+    for (let i = 0; i < N; i++) {
+      const inf = g.inf[i], vis = g.vis[i], al = overlay.alarm ? Math.min(1, g.alarm[i]) : 0;
+      const ab = g.ab[i] * 0.22;
+      d[i * 4] = Math.min(255, 255 * inf * 0.95 + 120 * vis * 0.4 + 180 * al + 255 * ab);
+      d[i * 4 + 1] = Math.min(255, 122 * inf * 0.95 + 20 * vis * 0.4 + 92 * al + 210 * ab);
+      d[i * 4 + 2] = Math.min(255, 61 * inf * 0.95 + 30 * vis * 0.4 + 255 * al + 63 * ab);
+      d[i * 4 + 3] = 255;
+    }
+    fctx.putImageData(fimg, 0, 0);
+    ctx.globalCompositeOperation = 'lighter';
+    ctx.imageSmoothingEnabled = true;
+    ctx.globalAlpha = 0.6; ctx.drawImage(fieldCv, 0, 0, W, H);
+
+    // Antibodies: a drifting dust of tiny particles, count per tile = local density.
+    // Most are gold specks; every few is a tiny Y glyph so the shape still reads.
+    if (ad.state === 'active' || ad.level > 0) {
+      const ts = now / 1000;
+      ctx.fillStyle = PAL.antibody;
+      for (let i = 0; i < N; i++) {
+        const n = g.ab[i] * AB_PER_TILE;
+        if (n < 0.5) continue;
+        const bx = (i % GW) * CELL, by = ((i / GW) | 0) * CELL;
+        for (let j = 0; j < n; j++) {
+          const q = (i * AB_PER_TILE + j) * 4;
+          const x = bx + abSeed[q] * CELL + Math.sin(ts * abSeed[q + 2] + abSeed[q + 3]) * 7;
+          const y = by + abSeed[q + 1] * CELL + Math.cos(ts * abSeed[q + 2] * 0.8 + abSeed[q + 3] * 1.3) * 7;
+          if (j % 5 === 4) draw('antibody', x, y, ts * 0.6 + abSeed[q + 3], 0.9);
+          else { ctx.globalAlpha = 0.55 + 0.45 * Math.sin(ts * 3 + abSeed[q + 3]) ** 2; ctx.fillRect(x - 0.8, y - 0.8, 1.6, 1.6); }
+        }
+      }
+    }
+
+    // Debris and nets
+    for (const db of g.debris) draw('debris', db.x, db.y, 0, Math.min(1, db.life / 10));
+    for (const n of g.nets) draw('net', n.x, n.y, n.rot, Math.min(1, n.life / 4) * 0.9);
+
+    // Pathogens
+    const opso = ad.state === 'active' && ad.choice === 'opsonize', comp = ad.state === 'active' && ad.choice === 'complement';
+    for (const p of g.path) {
+      if (p.kind === 'p') { draw('pollen', p.x, p.y, p.rot + t * 0.2, Math.min(1, p.life / 6)); continue; }
+      let name = 'bacterium';
+      const a = (opso || comp) ? g.ab[cellIdx(p.x, p.y)] : 0;
+      if (p.div < 1.2 && p.pin <= t) name = 'bacterium-dividing';
+      else if (a > 0.2) name = opso ? 'bacterium-opsonized' : 'bacterium-complement';
+      draw(name, p.x, p.y, p.rot, p.pin > t ? 0.5 : 0.8);
+    }
+
+    // Friendly cells
+    for (const c of g.neut) draw(c.stance === 'trap' ? 'neutrophil-trap' : 'neutrophil', c.x, c.y, c.ph + t * 0.5, Math.min(1, c.life / 3));
+    for (const c of g.mac) draw(c.stance === 'repair' ? 'macrophage-repair' : 'macrophage-kill', c.x, c.y, c.ph + t * 0.15, Math.min(1, c.life / 4));
+
+    // Effects
+    for (const f of g.fx) {
+      const age = (t - f.born) / f.dur;
+      if (f.type === 'pop') draw(f.kind === 'p' ? 'popPollen' : 'pop', f.x, f.y, 0, 0.5 * (1 - age), 1 + age);
+      else if (f.type === 'toxin') draw('toxin-burst', f.x, f.y, 0, 1 - age, 0.4 + 0.6 * Math.min(1, age * 1.6));
+    }
+    ctx.globalCompositeOperation = 'source-over'; ctx.globalAlpha = 1;
+
+    // Fever: warm vignette
+    if (g.fever.active) {
+      const gr = ctx.createRadialGradient(W / 2, H / 2, H * 0.3, W / 2, H / 2, H * 0.75);
+      gr.addColorStop(0, 'rgba(255,122,61,0)'); gr.addColorStop(1, `rgba(255,122,61,${0.18 + 0.06 * Math.sin(now / 300)})`);
+      ctx.fillStyle = gr; ctx.fillRect(0, 0, W, H);
+    }
+    ctx.restore();
+
+    // Sector boundaries and labels, in screen space
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    ctx.strokeStyle = 'rgba(221,230,245,0.18)'; ctx.lineWidth = 1; ctx.setLineDash([4, 5]);
+    for (let s = 1; s < 3; s++) { const y = oy + s * SECTOR_H * scale; ctx.beginPath(); ctx.moveTo(ox, y); ctx.lineTo(ox + W * scale, y); ctx.stroke(); }
+    ctx.setLineDash([]);
+    if (selSector != null) {
+      ctx.strokeStyle = ALERT_COL[g.sectors[selSector].alert]; ctx.lineWidth = 2;
+      ctx.strokeRect(ox + 1, oy + selSector * SECTOR_H * scale + 1, W * scale - 2, SECTOR_H * scale - 2);
+    }
+    const cnt = [0, 0, 0];
+    for (const p of g.path) cnt[secOf(p.y)]++;
+    ctx.font = '600 12px "Instrument Sans", "Helvetica Neue", Arial, sans-serif';
+    ctx.textBaseline = 'middle';
+    for (let s = 0; s < 3; s++) {
+      const sec = g.sectors[s], x = ox + 6, y = oy + s * SECTOR_H * scale + (s === 0 ? 26 : 8);
+      const label = `${sec.key} · ${sec.name}`, lvl = LEVELS[sec.alert];
+      const w1 = ctx.measureText(label).width, w2 = ctx.measureText(lvl).width;
+      const boxW = 18 + 4 + w1 + 10 + 16 + 4 + w2 + 10;
+      ctx.fillStyle = 'rgba(4,5,10,0.72)'; roundRect(x, y, boxW, 22, 11); ctx.fill();
+      ctx.drawImage(img[sec.icon], x + 4, y + 2, 18, 18);
+      ctx.fillStyle = PAL.ui; ctx.fillText(label, x + 24, y + 11.5);
+      ctx.drawImage(img[ALERT_ART[sec.alert]], x + 24 + w1 + 8, y + 3, 16, 16);
+      ctx.fillStyle = ALERT_COL[sec.alert]; ctx.fillText(lvl, x + 24 + w1 + 26, y + 11.5);
+      // Right side: pathogens here and this sector's share of Host Damage
+      const rx = ox + W * scale - 6;
+      const txt = `${cnt[s]}`, dm = `${sec.dmg.toFixed(0)}% dmg`;
+      const wt = ctx.measureText(txt).width, wd = ctx.measureText(dm).width;
+      const bw = 10 + 8 + wt + 10 + wd + 8;
+      ctx.fillStyle = 'rgba(4,5,10,0.72)'; roundRect(rx - bw, y, bw, 22, 11); ctx.fill();
+      ctx.fillStyle = g.sc.pollen ? PAL.pollen : PAL.germ;
+      ctx.beginPath(); ctx.arc(rx - bw + 10, y + 11, 3.5, 0, 6.29); ctx.fill();
+      ctx.fillStyle = PAL.ui; ctx.fillText(txt, rx - bw + 18, y + 11.5);
+      ctx.fillStyle = sec.dmg > 10 ? PAL.damage : PAL.uiDim; ctx.fillText(dm, rx - wd - 8, y + 11.5);
+      if (overlay.stats) {
+        let nn = 0, mm = 0;
+        for (const c of g.neut) if (secOf(c.y) === s) nn++;
+        for (const c of g.mac) if (secOf(c.y) === s) mm++;
+        ctx.fillStyle = PAL.uiDim;
+        ctx.fillText(`neut ${nn} · mac ${mm} · infl ${(sec.inf * 100).toFixed(0)}% · alarm ${g.secAlarm[s].toFixed(1)}`, x + 4, y + 34);
+      }
+    }
+    if (paused && !modal) {
+      ctx.fillStyle = 'rgba(4,5,10,0.55)'; ctx.fillRect(ox, oy, W * scale, H * scale);
+      ctx.fillStyle = PAL.ui; ctx.font = '600 20px "Instrument Sans", Arial, sans-serif'; ctx.textAlign = 'center';
+      ctx.fillText('Paused', ox + W * scale / 2, oy + H * scale / 2); ctx.textAlign = 'left';
+    }
+  }
+  function roundRect(x, y, w, h, r) {
+    ctx.beginPath(); ctx.moveTo(x + r, y); ctx.arcTo(x + w, y, x + w, y + h, r); ctx.arcTo(x + w, y + h, x, y + h, r);
+    ctx.arcTo(x, y + h, x, y, r); ctx.arcTo(x, y, x + w, y, r); ctx.closePath();
+  }
+
+  // ---- HUD ----
+  const fmt = s => { s = Math.max(0, Math.floor(s)); return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`; };
+  function hud() {
+    const g = game; if (!g) return;
+    const load = g.load(), host = g.hostDamage();
+    $('#vLoad').textContent = `${load.toFixed(0)}%`;
+    $('#fLoad').style.width = `${Math.min(100, load)}%`;
+    $('#mLoad').classList.toggle('pollen', g.sc.pollen);
+    $('#mLoad').classList.toggle('warn', load > 75);
+    $('#vHost').textContent = `${host.toFixed(0)}%`;
+    $('#fHost').style.width = `${Math.min(100, host)}%`;
+    $('#fScar').style.width = `${Math.min(100, g.scar)}%`;
+    $('#mHost').classList.toggle('warn', host > 75);
+    $('#clock').textContent = fmt(g.t);
+
+    const ad = g.ad, A = CONFIG.adaptive, sb = $('#sampleBtn');
+    let sl = '', sf = 0;
+    if (ad.state === 'none') { sl = `Lymph node: sample ${Math.floor(g.sample / A.sampleNeeded * 100)}%`; sf = g.sample / A.sampleNeeded; }
+    else if (ad.state === 'ready') { sl = 'Sample ready: choose antibodies'; sf = 1; }
+    else if (ad.state === 'ramping') { sl = `${cap(ad.choice)} antibodies in ${Math.ceil(A.delay - (g.t - ad.t0))}s`; sf = 1; }
+    else { sl = `${cap(ad.choice)} antibodies: output ${Math.round(ad.level * 100)}%`; sf = ad.level; }
+    $('#sampleLabel').textContent = sl;
+    $('#fSample').style.width = `${Math.min(100, sf * 100)}%`;
+    sb.classList.toggle('ready', ad.state === 'ready');
+
+    $('#nCount').textContent = g.neut.length;
+    $('#mCount').textContent = g.mac.length;
+    for (const type of ['neut', 'mac']) {
+      const st = g.stance[type];
+      document.querySelectorAll(`.seg[data-type="${type}"] button`).forEach(b => b.setAttribute('aria-pressed', String(b.dataset.st === st)));
+      const p = g.switchProgress(type), h = $(type === 'neut' ? '#nHint' : '#mHint');
+      if (p < 1) { h.textContent = `Switching to ${cap(st)}: ${Math.round(p * 100)}%`; h.classList.add('switching'); }
+      else { h.textContent = STANCE_HINTS[st]; h.classList.remove('switching'); }
+    }
+    let boost = 0;
+    for (const s of g.sectors) boost += Math.max(0, s.alert - 1);
+    $('#rate').textContent = boost ? `+${Math.round(CONFIG.production.alertBoost * boost * 100)}%` : '';
+    const mix = Math.round(g.mix * 100);
+    if (document.activeElement !== $('#mix')) $('#mix').value = mix;
+    $('#mixN').textContent = `${mix}% neut.`; $('#mixM').textContent = `${100 - mix}% macro.`;
+    const F = g.fever, fb = $('#feverBtn');
+    fb.classList.toggle('active', F.active);
+    fb.disabled = !F.active && F.cd > 0;
+    $('#feverState').textContent = F.active ? `On ${Math.ceil(F.left)}s` : F.cd > 0 ? `Cooldown ${Math.ceil(F.cd)}s` : 'Ready';
+
+    $('#banner').innerHTML = hintText(g);
+    if (selSector != null) sheetStats();
+    $('#speedTag').hidden = SPEEDS[speedIdx] === 1;
+    $('#speedTag').textContent = `${SPEEDS[speedIdx]}×`;
+    $('#pauseBtn').textContent = paused ? '▶' : 'II';
+    $('#pauseBtn').setAttribute('aria-label', paused ? 'Resume' : 'Pause');
+  }
+  const cap = s => s ? s[0].toUpperCase() + s.slice(1) : '';
+  function hintText(g) {
+    const ad = g.ad, I = CONFIG.inflammation;
+    if (g.result) return '';
+    if (g.sc.pollen) {
+      if (g.t < CONFIG.pollen.season) return `Pollen season: <b>${fmt(CONFIG.pollen.season - g.t)}</b> left. Get the host through it.`;
+      return 'Season over. The last grains are clearing.';
+    }
+    if (g.phase === 'standdown') {
+      return `Infection cleared. <b>Stand down</b>: lower alerts, switch macrophages to Repair. Inflammation ${(g.meanInf * 100).toFixed(1)}%, ends below ${(I.calm * 100).toFixed(1)}%.`;
+    }
+    const close = CONFIG.bacteria.closeTime - g.t;
+    const cut = close > 0 ? `Cut closes in <b>${fmt(close)}</b>.` : 'The cut has closed. Clear the rest.';
+    if (g.t < 20 && g.inputs === 0) return `Bacteria are pouring in through the cut. <b>Tap a sector</b> to set its alert.`;
+    if (ad.state === 'ready') return `${cut} The lymph node has a sample: <b>tap it</b> to make antibodies.`;
+    return cut;
+  }
+
+  // ---- sector sheet ----
+  function buildLevels() {
+    const box = $('#levels'); box.innerHTML = '';
+    LEVELS.forEach((name, i) => {
+      const b = document.createElement('button');
+      b.type = 'button'; b.dataset.lvl = i; b.style.setProperty('--lv', ALERT_COL[i]);
+      b.innerHTML = `<img src="${artUrl(ALERT_ART[i])}" alt="">${name}`;
+      b.addEventListener('click', () => { if (game && selSector != null) { game.setAlert(selSector, i); sheetUpdate(); } });
+      box.appendChild(b);
+    });
+  }
+  function openSheet(s) {
+    selSector = s; $('#sheet').hidden = false; sheetUpdate();
+  }
+  function closeSheet() { selSector = null; $('#sheet').hidden = true; }
+  function sheetUpdate() {
+    if (selSector == null || !game) return;
+    const sec = game.sectors[selSector];
+    $('#sheetTitle').textContent = `${sec.key} · ${sec.name}`;
+    $('#sheetIcon').src = artUrl(sec.icon);
+    document.querySelectorAll('#levels button').forEach(b => b.setAttribute('aria-pressed', String(+b.dataset.lvl === sec.alert)));
+    $('#sheetHint').textContent = LEVEL_HINTS[sec.alert];
+    sheetStats();
+  }
+  function sheetStats() {
+    const s = selSector, g = game; let p = 0, c = 0;
+    for (const q of g.path) if (secOf(q.y) === s) p++;
+    for (const q of g.neut) if (secOf(q.y) === s) c++;
+    for (const q of g.mac) if (secOf(q.y) === s) c++;
+    $('#sheetStats').textContent = `${p} ${g.sc.pollen ? 'grains' : 'bacteria'} · ${c} cells · inflamed ${(g.sectors[s].inf * 100).toFixed(0)}%`;
+  }
+
+  // ---- modals ----
+  function artUrl(n) { return 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(ART.svg[n]); }
+  function openModal(kind, html) {
+    modal = kind; $('#mbox').innerHTML = html; $('#modal').hidden = false;
+    const f = $('#mbox').querySelector('button'); if (f) f.focus({ preventScroll: true });
+  }
+  function closeModal() { modal = null; $('#modal').hidden = true; }
+
+
+  // ---- guide: what each unit is for, and what every control does ----
+  let guideTab = 'goal', guideFrom = null;
+  function guideHtml(tab) {
+    const C = CONFIG, A = C.adaptive, F = C.fever, img = n => `<img src="${artUrl(n)}" alt="">`;
+    const unit = (icon, name, tag, why, items) => `<div class="unit">${img(icon)}<h4>${name}<small>${tag}</small></h4><p class="why">${why}</p><ul>${items.map(i => `<li>${i}</li>`).join('')}</ul></div>`;
+    const S = {
+      goal: `
+        <p>You run the immune response but never steer a cell. You change settings, the cells act on them, and you read what happens. Every setting is a tradeoff, and your own response counts toward Host Damage, so overreacting can lose as surely as underreacting.</p>
+        ${unit('meter-pathogen', 'Pathogen Load', 'lose at 100%', 'How much infection is in the tissue.', [
+          'Bacteria in <b>Blood entry</b> or <b>Lymph exit</b> count 1.5× because they are escaping into the body.',
+          'In Pollen it fills with harmless grains. Read it with that in mind.'])}
+        ${unit('meter-host', 'Host Damage', 'lose at 100%', 'Everything that hurts the host: bacteria, toxin bursts, and also your inflammation, nets and fever.', [
+          `The dark part of the bar is <b>scarring</b>, the permanent ${Math.round(C.host.scarFrac * 100)}% share. Repair macrophages can heal only the bright part.`,
+          'The end screen shows where the damage came from.'])}
+        <div class="sub">How a Papercut match goes</div>
+        <ol class="phases">
+          <li><b>Breach.</b> Bacteria pour in through the cut and double. Raise the wound's alert so innate cells hold the line.</li>
+          <li><b>Sample.</b> Kill-stance macrophages carry samples to the lymph node. When the bar fills you choose antibodies.</li>
+          <li><b>Ramp-up.</b> Antibodies start slowly, then double every ${A.doubling} s. This is where the match turns.</li>
+          <li><b>Stand down.</b> Once the cut has closed and the bacteria are gone, lower alerts and switch macrophages to Repair. The match ends when inflammation settles.</li>
+        </ol>
+        <p>In <b>Pollen</b> the invader is harmless. The match ends when the season does, and the stars reward holding back.</p>`,
+      cells: `
+        <p>Innate cells are fast and generic. They hold the line but usually can't finish the job alone, and every one of them costs the host something.</p>
+        ${unit('neutrophil', 'Neutrophil', 'the swarm', 'Fast, cheap and short-lived. Numbers over quality: your answer to fast-growing bacteria.', [
+          `<b>Eat</b> (default): each swallows ${C.neutrophil.maxEats} bacteria, then dies and leaves debris that inflames tissue until a macrophage cleans it.`,
+          '<b>Trap</b> (one-way for each cell): the cell dies casting a net that pins and slowly kills every bacterium inside. Strong on dense clumps, but nets hurt the tissue under them.',
+          'Too small to eat pollen grains.'])}
+        ${unit('macrophage-kill', 'Macrophage', 'tank and cleanup', `Slow, costs ${C.macrophage.cost}× a neutrophil and lives about ${Math.round(C.macrophage.life / 60)} minutes. Its stance switch is the stand-down decision.`, [
+          '<b>Kill</b> (default): eats bacteria steadily and is the only way to collect samples for the lymph node. Amplifies damage alarms and inflames the tissue around it.',
+          '<b>Repair</b>: stops sampling, cleans debris, heals Host Damage where tissue is hurt, and calms inflammation nearby. It still eats bacteria it bumps into.',
+          'The orange core means Kill, the green core means Repair.'])}
+        ${unit('antibody', 'Antibodies', 'slow and precise', 'The payoff of the match. Not units but a gold dust that spreads through tissue. Innate cells hold; antibodies win.', [
+          `Available only after a full sample. They take ${A.delay} s to start, then output doubles every ${A.doubling} s.`,
+          '<b>Opsonize</b>: tags invaders so your cells eat them several times faster. No extra inflammation.',
+          '<b>Complement</b>: kills invaders directly, but every kill inflames the tissue.',
+          'They seep in faster where tissue is inflamed, so some inflammation helps them reach the fight.'])}`,
+      enemies: `
+        ${unit('bacterium', 'Bacteria', 'Papercut', 'Exponential growth is the clock. Small numbers get big fast, so a late response costs far more than an early one.', [
+          `Each one doubles about every ${C.bacteria.doublingTime} s, slower when crowded. Fever halves that rate.`,
+          `More pour in through the cut until it closes at ${fmt(C.bacteria.closeTime)}. The banner counts down.`,
+          `<b>Toxin bursts</b>: a clump of ${C.toxin.quorum} or more can burst, damaging the host and killing nearby cells. Break clumps up early.`,
+          'Bacteria about to divide switch to a two-part shape, so you can see growth happening.'])}
+        ${unit('pollen', 'Pollen', 'Pollen', 'The restraint test. It looks like an invasion but does no harm on its own.', [
+          'It doesn\'t multiply and deals no damage. Grains dissolve on their own over time.',
+          'Neutrophils can\'t eat it and macrophages engulf it slowly, so Pathogen Load stays high.',
+          'Escalating, fever or antibodies only hurt the host. Antibodies against pollen even inflame the tissue, like an allergy.'])}`,
+      controls: `
+        ${unit('alert-inflamed', 'Sector alert', 'tap a sector', 'The main dial and the main source of self-inflicted damage. It sets where cells go and how inflamed each area gets.', [
+          '<b>Quiet</b>: few cells come and no inflammation from the alert.',
+          '<b>Watch</b> (default): a normal share of cells and very light inflammation.',
+          '<b>Inflamed</b>: about 3× the cells, which move and eat faster. Inflames the sector.',
+          '<b>Max</b>: about 6× the cells, fastest of all. Heavy inflammation that burns the host quickly.',
+          `Each step above Watch, in any sector, also speeds up the bone marrow by ${Math.round(C.production.alertBoost * 100)}%.`,
+          'Inflammation lingers after you lower an alert, so plan the stand-down early.'])}
+        ${unit('stance-eat', 'Stance cards', 'Neutrophils, Macrophages', 'Body-wide orders for each cell type. Every switch is a commitment, not a toggle.', [
+          `A new stance spreads through the population over about ${C.world.stanceDelay} s. The card shows progress.`,
+          'New cells arrive in whatever stance is set.'])}
+        ${unit('marrow', 'Bone marrow', 'slider', 'A continuous flow of new cells, not a build queue. You choose the mix.', [
+          `Left means more neutrophils, right more macrophages. A macrophage costs ${C.macrophage.cost} neutrophils' worth of output.`,
+          'New cells enter from the blood vessel at the top and head for the sectors that call them.'])}
+        ${unit('fever', 'Fever', 'body-wide ability', 'A big, costly lever with a cooldown.', [
+          `Lasts ${F.duration} s and halves bacterial growth everywhere. Hurts the host the whole time it runs.`,
+          `Then it needs ${F.cooldown} s to recover. It does nothing against pollen.`])}
+        ${unit('lymph-node', 'Lymph node', 'button under the meters', 'Shows the sample filling up, then the antibody status.', [
+          'When it is full the game pauses for your antibody choice. "Not now" lets you decide later by tapping the button.'])}
+        <p><b>II</b> pauses, and so does the space bar on a keyboard. <b>Dev</b> holds the speed slider, the seed, cheats and live tuning for every number.</p>`,
+    };
+    const tabs = [['goal', 'Goal'], ['cells', 'Your cells'], ['enemies', 'Enemies'], ['controls', 'Controls']];
+    return `
+      <div class="eyebrow">Guide</div>
+      <h2>How the immune response works</h2>
+      <div class="tabs" role="group" aria-label="Guide sections">${tabs.map(([k, l]) => `<button type="button" data-tab="${k}" aria-pressed="${k === tab}">${l}</button>`).join('')}</div>
+      <div class="gsec">${S[tab]}</div>
+      <button type="button" class="btn primary" id="guideClose">${guideFrom === 'start' ? 'Back' : 'Back to the match'}</button>`;
+  }
+  function showGuide(from, tab) {
+    if (from !== undefined) guideFrom = from;
+    if (tab) guideTab = tab;
+    openModal('guide', guideHtml(guideTab));
+    $('#mbox').scrollTop = 0;
+    $('#mbox').querySelectorAll('[data-tab]').forEach(b => b.addEventListener('click', () => showGuide(undefined, b.dataset.tab)));
+    $('#guideClose').addEventListener('click', () => { if (guideFrom === 'start') showStart(); else closeModal(); });
+  }
+  function showStart() {
+    const sc = k => `<button type="button" class="opt" data-sc="${k}"><img src="${artUrl(SCENARIOS[k].icon)}" alt=""><b>${SCENARIOS[k].name}</b><span>${SCENARIOS[k].goal}</span></button>`;
+    openModal('start', `
+      <div class="eyebrow">Fun-test prototype · seed ${seed}</div>
+      <h2>Immune <span class="glow">RTS</span></h2>
+      <p>You run the immune response. You never steer a cell: you set the strategy and the cells carry it out.</p>
+      <ul class="howto">
+        <li>Tap a sector to set its alert. Higher alerts pull in more cells but inflame the tissue.</li>
+        <li>The cards below set what neutrophils and macrophages do, what the bone marrow makes, and fever.</li>
+        <li>Macrophages carry samples to the lymph node. When it fills, you choose the antibodies.</li>
+        <li>You lose if Pathogen Load or Host Damage reaches 100%. Your own response counts toward Host Damage.</li>
+      </ul>
+      <button type="button" class="linkbtn" id="openGuide">Read the guide: each unit's role and every control</button>
+      <div class="opts">${sc('papercut')}${sc('pollen')}</div>`);
+    $('#openGuide').addEventListener('click', () => showGuide('start', 'goal'));
+    $('#mbox').querySelectorAll('[data-sc]').forEach(b => b.addEventListener('click', () => newGame(b.dataset.sc, seed)));
+  }
+
+  function showChoice() {
+    const g = game, what = g.sc.pollen ? 'it' : 'the bacteria';
+    paused = true;
+    openModal('choice', `
+      <div class="eyebrow">Lymph node</div>
+      <h2>Make antibodies?</h2>
+      <p>Macrophages delivered a sample. B cells can make antibodies against ${g.sc.pollen ? 'what they found' : 'these bacteria'}. They take ${CONFIG.adaptive.delay} seconds to start, then output doubles every ${CONFIG.adaptive.doubling} seconds.</p>
+      <div class="opts">
+        <button type="button" class="opt" data-ch="opsonize"><img src="${artUrl('choice-opsonize')}" alt=""><b>Opsonize</b><span>Tags ${what} so your cells eat much faster. No extra inflammation.</span></button>
+        <button type="button" class="opt" data-ch="complement"><img src="${artUrl('choice-complement')}" alt=""><b>Complement</b><span>Punches holes in ${what} directly. Kills on its own, but inflames tissue.</span></button>
+      </div>
+      <button type="button" class="ghost" data-ch="hold">Not now (decide later from the lymph node button)</button>`);
+    $('#mbox').querySelectorAll('[data-ch]').forEach(b => b.addEventListener('click', () => {
+      game.chooseAntibody(b.dataset.ch); closeModal(); paused = false;
+    }));
+  }
+
+  function showEnd() {
+    const g = game, r = g.result;
+    endShown = true;
+    const title = r.win ? (g.sc.pollen ? 'Season survived' : 'Infection cleared')
+      : r.reason === 'host' ? 'The host took too much damage' : 'The infection overwhelmed the host';
+    const why = r.win ? '' : r.reason === 'host'
+      ? 'Host Damage reached 100%. See below for how much came from your own response.'
+      : 'Pathogen Load reached 100%. Bacteria in Blood entry and Lymph exit count 1.5× because they are escaping.';
+    const stars = [0, 1, 2].map(i => `<span class="${i < r.stars ? '' : 'off'}">★</span>`).join('');
+    const src = g.bySource, tot = Math.max(10, g.taken);
+    const SRC = [['bacteria', 'Bacteria'], ['toxin', 'Toxin bursts'], ['inflammation', 'Inflammation'], ['nets', 'Neutrophil nets'], ['fever', 'Fever']];
+    const bar = (label, v, max) => `<div class="row"><span>${label}</span><span class="bar"><i style="width:${Math.min(100, v / max * 100)}%"></i></span><span>${v < 1 ? v.toFixed(1) : v.toFixed(0)}%</span></div>`;
+    const inputsEvery = r.inputs ? `one every ${Math.round(r.t / r.inputs)} s` : 'none';
+    openModal('end', `
+      <div class="eyebrow">${g.sc.name} · seed ${g.seed} · ${fmt(r.t)}</div>
+      <h2>${title}</h2>
+      ${why ? `<p>${why}</p>` : ''}
+      <div class="stars" aria-label="${r.stars} of 3 stars">${stars}</div>
+      <ul class="goals">${r.goals.map(([l, ok]) => `<li class="${ok ? 'hit' : ''}">${l}</li>`).join('')}</ul>
+      <div class="stats">
+        <div><b>${r.host.toFixed(0)}%</b><span>Host Damage</span></div>
+        <div><b>${r.scar.toFixed(0)}%</b><span>Scarring</span></div>
+        <div><b>${r.peakLoad.toFixed(0)}%</b><span>Peak load</span></div>
+        <div><b>${r.healed.toFixed(0)}%</b><span>Healed by Repair</span></div>
+        <div><b>${r.inputs}</b><span>Settings changed (${inputsEvery})</span></div>
+        <div><b>${r.choice ? cap(r.choice) : 'None'}</b><span>Antibodies</span></div>
+      </div>
+      <div class="sub">Meters over time</div>
+      <canvas id="graph"></canvas>
+      <div class="legend"><span style="--c:${g.sc.pollen ? PAL.pollen : PAL.germ}">Pathogen Load</span><span style="--c:${PAL.damage}">Host Damage</span><span style="--c:${PAL.antibody}">Antibody output</span><span style="--c:${PAL.cell}">Your changes</span></div>
+      <div class="sub">Where the damage came from</div>
+      <div class="bars">${SRC.filter(([k]) => src[k] > 0.05).map(([k, l]) => bar(l, src[k], tot)).join('')}</div>
+      <div class="sub">Damage by sector</div>
+      <div class="bars">${g.sectors.map(s => bar(s.name, s.dmg, tot)).join('')}</div>
+      <div class="btnrow">
+        <button type="button" class="btn primary" id="again">Play again</button>
+        <button type="button" class="btn" id="newSeed">New seed</button>
+        <button type="button" class="btn" id="menu">Scenarios</button>
+      </div>`);
+    drawGraph($('#graph'), g);
+    $('#again').addEventListener('click', () => newGame(scenarioKey, seed));
+    $('#newSeed').addEventListener('click', () => { setSeed(1 + Math.floor(Math.random() * 99999)); newGame(scenarioKey, seed); });
+    $('#menu').addEventListener('click', showStart);
+  }
+
+  function drawGraph(c, g) {
+    const r = c.getBoundingClientRect(), k = Math.min(3, window.devicePixelRatio || 1);
+    c.width = Math.round(r.width * k); c.height = Math.round(r.height * k);
+    const x = c.getContext('2d'); x.scale(k, k);
+    const w = r.width, h = r.height, L = 30, R = 8, T = 16, B = 20, pw = w - L - R, ph = h - T - B;
+    const hist = g.history, tEnd = Math.max(60, g.t);
+    const X = t => L + t / tEnd * pw, Y = v => T + ph - Math.min(100, v) / 100 * ph;
+    x.font = '10px "IBM Plex Mono", monospace'; x.textBaseline = 'middle';
+    // grid
+    for (const v of [0, 25, 50, 75, 100]) {
+      x.strokeStyle = v === 0 ? 'rgba(221,230,245,0.25)' : 'rgba(221,230,245,0.08)';
+      x.beginPath(); x.moveTo(L, Y(v)); x.lineTo(w - R, Y(v)); x.stroke();
+      x.fillStyle = PAL.uiDim; x.textAlign = 'right'; x.fillText(`${v}`, L - 5, Y(v));
+    }
+    x.textAlign = 'center';
+    const stepT = tEnd > 600 ? 120 : 60;
+    for (let t = 0; t <= tEnd; t += stepT) x.fillText(fmt(t), X(t), h - 8);
+    // fever spans
+    let fs = null;
+    for (const e of g.events) {
+      if (e.type === 'fever') fs = e.t;
+      if (e.type === 'feverEnd' && fs != null) { x.fillStyle = 'rgba(255,122,61,0.13)'; x.fillRect(X(fs), T, X(e.t) - X(fs), ph); fs = null; }
+    }
+    if (fs != null) { x.fillStyle = 'rgba(255,122,61,0.13)'; x.fillRect(X(fs), T, X(g.t) - X(fs), ph); }
+    // markers
+    const mark = (t, col, label) => {
+      x.strokeStyle = col; x.setLineDash([3, 3]); x.beginPath(); x.moveTo(X(t), T); x.lineTo(X(t), T + ph); x.stroke(); x.setLineDash([]);
+      x.fillStyle = col; x.textAlign = X(t) > w - 70 ? 'right' : 'left'; x.fillText(label, X(t) + (x.textAlign === 'left' ? 3 : -3), T - 7);
+    };
+    for (const e of g.events) {
+      if (e.type === 'antibody') mark(e.t, PAL.antibody, e.label);
+      if (e.type === 'standdown') mark(e.t, PAL.cell, 'Stand down');
+      if (e.type === 'alert' || e.type === 'stance' || e.type === 'mix') { x.fillStyle = PAL.cell; x.fillRect(X(e.t) - 0.5, T + ph - 5, 1.5, 5); }
+    }
+    const line = (key, col, wdt) => {
+      x.strokeStyle = col; x.lineWidth = wdt; x.beginPath();
+      hist.forEach((p, i) => { const v = key === 'ab' ? p.ab * 100 : key === 'inf' ? p.inf * 100 : p[key]; i ? x.lineTo(X(p.t), Y(v)) : x.moveTo(X(p.t), Y(v)); });
+      x.stroke(); x.lineWidth = 1;
+    };
+    line('ab', 'rgba(255,210,63,0.7)', 1);
+    line('load', g.sc.pollen ? PAL.pollen : PAL.germ, 2);
+    line('host', PAL.damage, 2);
+  }
+
+  // ---- game lifecycle ----
+  function newGame(key, s) {
+    scenarioKey = key; setSeed(s);
+    game = new Game(key, seed);
+    endShown = false; paused = false; acc = 0;
+    closeModal(); closeSheet();
+    $('#toasts').innerHTML = '';
+    hud();
+  }
+  function setSeed(s) { seed = Math.max(1, Math.floor(+s || 1)); store.set('immuneRts.seed', seed); $('#seed').value = seed; }
+  function toast(text, kind) {
+    const el = document.createElement('div'); el.className = `toast ${kind || ''}`; el.textContent = text;
+    $('#toasts').appendChild(el);
+    while ($('#toasts').children.length > 3) $('#toasts').firstChild.remove();
+    setTimeout(() => el.remove(), 2900);
+  }
+
+  let hudT = 0;
+  function frame(now) {
+    const dt = Math.min(0.1, (now - (last || now)) / 1000); last = now;
+    if (game && !paused && !modal && !game.result) {
+      acc += dt * SPEEDS[speedIdx];
+      let n = 0;
+      while (acc >= STEP && n < 16) { game.step(STEP); acc -= STEP; n++; }
+      if (n === 16) acc = 0;
+    }
+    if (game) {
+      for (const m of game.notices.splice(0)) toast(m.text, m.kind);
+      if (game.ad.state === 'ready' && !game.ad.prompted && !modal) { game.ad.prompted = true; showChoice(); }
+      if (game.result && !endShown) { hud(); showEnd(); }
+    }
+    render(now);
+    hudT -= dt;
+    if (hudT <= 0) { hudT = 0.1; hud(); }
+    requestAnimationFrame(frame);
+  }
+
+  // ---- input wiring ----
+  cv.addEventListener('pointerdown', e => {
+    if (!game || modal) return;
+    const r = cv.getBoundingClientRect(), y = (e.clientY - r.top - oy) / scale, x = (e.clientX - r.left - ox) / scale;
+    if (x < 0 || x > W || y < 0 || y > H) { closeSheet(); return; }
+    const s = secOf(y);
+    if (selSector === s) closeSheet(); else openSheet(s);
+  });
+  $('#sheetClose').addEventListener('click', closeSheet);
+  document.querySelectorAll('.seg button').forEach(b => b.addEventListener('click', () => {
+    if (game) game.setStance(b.parentElement.dataset.type, b.dataset.st); hud();
+  }));
+  $('#mix').addEventListener('input', e => { $('#mixN').textContent = `${e.target.value}% neut.`; $('#mixM').textContent = `${100 - e.target.value}% macro.`; });
+  $('#mix').addEventListener('change', e => { if (game) game.setMix(e.target.value / 100); });
+  $('#feverBtn').addEventListener('click', () => { if (game && game.startFever()) toast('Fever is up: bacteria grow at half speed', 'bad'); hud(); });
+  $('#sampleBtn').addEventListener('click', () => { if (game && game.ad.state === 'ready' && !modal) showChoice(); });
+  $('#pauseBtn').addEventListener('click', () => { paused = !paused; hud(); });
+  $('#devBtn').addEventListener('click', () => { $('#dev').hidden = !$('#dev').hidden; });
+  $('#helpBtn').addEventListener('click', () => { if (!modal) showGuide('game', 'cells'); });
+  $('#devClose').addEventListener('click', () => { $('#dev').hidden = true; });
+  document.addEventListener('keydown', e => {
+    if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return;
+    if (e.key === ' ' && !modal) { paused = !paused; e.preventDefault(); hud(); }
+    if (e.key === 'Escape') { if (selSector != null) closeSheet(); else $('#dev').hidden = true; }
+  });
+
+  // ---- dev tools ----
+  $('#speed').addEventListener('input', e => { speedIdx = +e.target.value; $('#speedVal').textContent = `${SPEEDS[speedIdx]}×`; hud(); });
+  $('#devPause').addEventListener('click', () => { paused = !paused; hud(); });
+  $('#devStep').addEventListener('click', () => { if (game && !game.result) { for (let i = 0; i < 60; i++) game.step(STEP); hud(); } });
+  $('#devRestart').addEventListener('click', () => newGame(scenarioKey, $('#seed').value));
+  $('#devNewSeed').addEventListener('click', () => newGame(scenarioKey, 1 + Math.floor(Math.random() * 99999)));
+  $('#devMenu').addEventListener('click', () => { $('#dev').hidden = true; showStart(); });
+  $('#cheatBact').addEventListener('click', () => { if (game) for (let i = 0; i < 50; i++) game.spawnBact(300 + (Math.random() * 2 - 1) * 200, 450 + (Math.random() * 2 - 1) * 60); });
+  $('#cheatSample').addEventListener('click', () => { if (game && game.ad.state === 'none') game.sample = CONFIG.adaptive.sampleNeeded; });
+  $('#cheatClear').addEventListener('click', () => { if (game) for (const p of game.path) p.dead = true; });
+  $('#ovAlarm').addEventListener('change', e => { overlay.alarm = e.target.checked; });
+  $('#ovStats').addEventListener('change', e => { overlay.stats = e.target.checked; });
+
+  const human = k => k.replace(/([A-Z])/g, ' $1').toLowerCase();
+  function stepFor(v) { const a = Math.abs(v); return a === 0 ? 0.001 : Math.pow(10, Math.floor(Math.log10(a)) - 1); }
+  function buildTuning() {
+    const host = $('#tuning'); host.innerHTML = '';
+    for (const grp in DEFAULTS) {
+      const det = document.createElement('details');
+      det.innerHTML = `<summary>${human(grp)}</summary>`;
+      for (const key in DEFAULTS[grp]) {
+        const def = DEFAULTS[grp][key], id = `t-${grp}-${key}`;
+        const f = document.createElement('div'); f.className = 'field';
+        const hint = HINTS[`${grp}.${key}`];
+        if (Array.isArray(def)) {
+          f.innerHTML = `<label class="row"><span>${human(key)}</span><span class="arr">${def.map((_, i) => `<input type="number" id="${id}-${i}" step="${stepFor(def[i] || def[def.length - 1])}" aria-label="${human(key)} ${LEVELS[i] || i}">`).join('')}</span></label>`;
+        } else {
+          f.innerHTML = `<label class="row" for="${id}"><span>${human(key)}</span><input type="number" id="${id}" step="${stepFor(def)}"></label>`;
+        }
+        if (hint) f.insertAdjacentHTML('beforeend', `<small>${hint}</small>`);
+        det.appendChild(f);
+        f.querySelectorAll('input').forEach((inp, i) => {
+          const isArr = Array.isArray(def);
+          inp.value = isArr ? CONFIG[grp][key][i] : CONFIG[grp][key];
+          const mark = () => inp.classList.toggle('changed', +inp.value !== (isArr ? def[i] : def));
+          mark();
+          inp.addEventListener('input', () => {
+            const v = parseFloat(inp.value); if (!isFinite(v)) return;
+            if (isArr) CONFIG[grp][key][i] = v; else CONFIG[grp][key] = v;
+            mark(); saveTuning();
+            if (grp === 'trap' || grp === 'toxin') buildGraphics();
+          });
+        });
+      }
+      host.appendChild(det);
+    }
+  }
+  function tuningDiff() {
+    const out = {};
+    for (const g in DEFAULTS) for (const k in DEFAULTS[g]) {
+      if (JSON.stringify(DEFAULTS[g][k]) !== JSON.stringify(CONFIG[g][k])) (out[g] = out[g] || {})[k] = CONFIG[g][k];
+    }
+    return out;
+  }
+  function saveTuning() { store.set('immuneRts.tuning', tuningDiff()); }
+  $('#tuneReset').addEventListener('click', () => {
+    for (const g in DEFAULTS) for (const k in DEFAULTS[g]) CONFIG[g][k] = clone(DEFAULTS[g][k]);
+    saveTuning(); buildTuning(); buildGraphics();
+  });
+  $('#tuneCopy').addEventListener('click', () => {
+    const txt = JSON.stringify(tuningDiff(), null, 1), ta = $('#devJson');
+    ta.value = txt; ta.hidden = false;
+    const fallback = () => { ta.focus(); ta.select(); };
+    try { navigator.clipboard.writeText(txt).then(() => toast('Tuning copied'), fallback); } catch (e) { fallback(); }
+  });
+
+  // ---- boot ----
+  document.querySelectorAll('img[data-art]').forEach(i => { i.src = artUrl(i.dataset.art); });
+  buildLevels();
+  buildTuning();
+  $('#seed').value = seed;
+  const names = Object.keys(ART.svg);
+  Promise.all(names.map(n => ART.load(n).then(im => { img[n] = im; }))).then(() => {
+    resize();
+    new ResizeObserver(resize).observe(stage);
+  });
+  showStart();
+  requestAnimationFrame(frame);
+})();
+
+</script>

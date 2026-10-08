@@ -1,0 +1,222 @@
+<title>Immune RTS Tuner</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Instrument+Sans:wdth,wght@75..100,400..700&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+/* Layout: results first (what the bots did), then the level's knobs, then saved difficulties.
+   On wide screens the knobs sit left and the results stay in view on the right.
+   Deliberately single-theme, matching the game: glowing cells on black. */
+:root {
+  color-scheme: dark;
+  --void: #05060C;
+  --panel: #0B0F1C;
+  --panel2: #111730;
+  --line: #1F2744;
+  --ink: #DDE6F5;
+  --dim: #7F8BA6;
+  --faint: #47506B;
+  --cell: #3FE6FF;
+  --germ: #FF3DCB;
+  --gold: #FFD23F;
+  --kill: #FF7A3D;
+  --repair: #5CFFA1;
+  --damage: #FF3B4E;
+  --toxin: #B45CFF;
+  --display: "Instrument Sans", "Helvetica Neue", Arial, sans-serif;
+  --mono: "IBM Plex Mono", ui-monospace, Menlo, monospace;
+}
+html { background: var(--void); }
+body { background: var(--void); color: var(--ink); font: 15px/1.45 var(--display); margin: 0; }
+button, input, textarea, select { font: inherit; color: inherit; }
+button { cursor: pointer; touch-action: manipulation; }
+[hidden] { display: none !important; }
+:focus-visible { outline: 2px solid var(--gold); outline-offset: 2px; }
+@media (prefers-reduced-motion: reduce) { * { transition: none !important; animation: none !important; } }
+
+#app { max-width: 1180px; margin: 0 auto; padding-inline: 16px; padding-block: 18px 0; box-sizing: border-box; }
+.top { display: grid; gap: 6px; padding-bottom: 14px; }
+.top h1 { margin: 0; font-weight: 700; font-stretch: 78%; font-size: clamp(26px, 6vw, 38px); letter-spacing: .01em; line-height: 1.05; text-wrap: balance; }
+.top h1 b { color: var(--cell); font-weight: 700; }
+.top p { margin: 0; color: var(--dim); max-width: 64ch; }
+.fair { display: inline-flex; gap: 8px; align-items: baseline; font-size: 13px; color: var(--dim); }
+.fair::before { content: ""; width: 8px; height: 8px; border-radius: 50%; background: var(--repair); box-shadow: 0 0 8px var(--repair); flex: none; transform: translateY(-1px); }
+
+.cols { display: grid; gap: 18px; grid-template-columns: minmax(0, 1fr); }
+@media (min-width: 980px) {
+  .cols { grid-template-columns: minmax(0, 5fr) minmax(0, 6fr); align-items: start; }
+  .cols > .results { position: sticky; top: calc(env(safe-area-inset-top, 0px) + 12px); max-height: calc(100vh - 110px); overflow: auto; order: 2; }
+  .cols > .knobs { order: 1; }
+}
+
+.panel { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 14px; min-width: 0; }
+h2 { margin: 0; font-size: 13px; font-weight: 600; letter-spacing: .08em; text-transform: uppercase; color: var(--dim); }
+h3 { margin: 0; font-size: 17px; font-weight: 650; text-wrap: balance; }
+.muted { color: var(--dim); }
+.small { font-size: 13px; }
+.mono, .num { font-family: var(--mono); font-variant-numeric: tabular-nums; }
+.stack { display: grid; gap: 12px; }
+
+/* Tabs */
+.tabs { display: flex; gap: 4px; background: var(--panel2); padding: 4px; border-radius: 9px; }
+.tabs button { flex: 1; border: 0; background: none; padding: 8px 10px; border-radius: 6px; color: var(--dim); font-weight: 600; font-size: 14px; }
+.tabs button[aria-selected="true"] { background: var(--line); color: var(--ink); }
+
+.stale { border: 1px dashed var(--gold); color: var(--gold); border-radius: 8px; padding: 8px 10px; font-size: 13px; }
+
+/* Skill ladder */
+.ladder { display: grid; gap: 10px; }
+.skill { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 2px 12px; align-items: center; }
+.skill .name { display: flex; gap: 8px; align-items: center; font-weight: 600; min-width: 0; }
+.skill .name i { width: 10px; height: 10px; border-radius: 50%; flex: none; }
+.skill .pct { font: 500 18px var(--mono); font-variant-numeric: tabular-nums; text-align: right; }
+.skill .bar { grid-column: 1 / -1; position: relative; height: 8px; background: var(--panel2); border-radius: 4px; }
+.skill .bar span { position: absolute; inset: 0 auto 0 0; border-radius: 4px; }
+.skill .bar em { position: absolute; top: -4px; bottom: -4px; width: 2px; background: var(--ink); opacity: .55; }
+.skill .about { grid-column: 1 / -1; font-size: 12.5px; color: var(--dim); }
+.dots { grid-column: 1 / -1; display: flex; flex-wrap: wrap; gap: 3px; }
+.dots b { width: 9px; height: 9px; border-radius: 2px; background: var(--panel2); border: 1px solid var(--line); box-sizing: border-box; }
+.dots b.w1 { background: #6b5a1e; border-color: #6b5a1e; } .dots b.w2 { background: #b3922a; border-color: #b3922a; } .dots b.w3 { background: var(--gold); border-color: var(--gold); }
+.legend { display: flex; flex-wrap: wrap; gap: 4px 14px; font-size: 12px; color: var(--dim); }
+.legend span { display: inline-flex; align-items: center; gap: 5px; }
+.legend b { width: 9px; height: 9px; border-radius: 2px; display: inline-block; }
+.legend .line { width: 14px; height: 2px; border-radius: 1px; }
+
+.chart { width: 100%; height: auto; display: block; }
+.chart text { fill: var(--dim); font: 10px var(--mono); }
+.chart .grid { stroke: var(--line); stroke-width: 1; }
+
+/* Strategies */
+.headline { display: flex; flex-wrap: wrap; align-items: baseline; gap: 6px 14px; }
+.headline .big { font: 600 40px/1 var(--mono); font-variant-numeric: tabular-nums; color: var(--gold); }
+.pill { display: inline-block; font-size: 12px; font-weight: 650; letter-spacing: .04em; padding: 3px 9px; border-radius: 99px; border: 1px solid currentColor; }
+.pill.wide { color: var(--repair); } .pill.some { color: var(--cell); } .pill.narrow { color: var(--kill); } .pill.none { color: var(--damage); }
+.recipe { margin: 0; padding-left: 18px; display: grid; gap: 4px; }
+.recipe li::marker { color: var(--gold); }
+.inputs { display: grid; gap: 14px; grid-template-columns: repeat(auto-fill, minmax(min(100%, 250px), 1fr)); }
+.inp { display: grid; gap: 4px; min-width: 0; }
+.inp .hd { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 2px 8px; align-items: baseline; }
+.inp .hd span { font-size: 13px; font-weight: 600; min-width: 0; }
+.inp .hd .tag { margin-left: auto; }
+.tag { font-size: 11px; font-weight: 650; letter-spacing: .05em; text-transform: uppercase; white-space: nowrap; }
+.tag.t2 { color: var(--gold); } .tag.t1 { color: var(--cell); } .tag.t0 { color: var(--faint); }
+.inp .band { font: 12px var(--mono); color: var(--dim); }
+.inp .band b { color: var(--ink); font-weight: 500; }
+
+/* Knobs */
+.knobs details { border-top: 1px solid var(--line); }
+.knobs details:first-of-type { border-top: 0; }
+.knobs summary { cursor: pointer; padding: 11px 0; font-weight: 650; display: flex; justify-content: space-between; gap: 8px; list-style: none; }
+.knobs summary::-webkit-details-marker { display: none; }
+.knobs summary::after { content: "+"; color: var(--dim); font: 16px var(--mono); }
+.knobs details[open] > summary::after { content: "−"; }
+.knobs summary .cnt { margin-left: auto; color: var(--gold); font: 12px var(--mono); }
+.knobs .sect { display: grid; gap: 10px; padding-bottom: 14px; }
+.kh { display: flex; gap: 10px; align-items: baseline; justify-content: space-between; flex-wrap: wrap; padding-top: 6px; }
+.kh p { margin: 0; }
+.field { display: grid; grid-template-columns: minmax(0, 1fr) 92px; gap: 2px 10px; align-items: center; }
+.field label { font-size: 14px; }
+.field small { grid-column: 1 / -1; color: var(--dim); font-size: 12px; }
+.field.changed label { color: var(--gold); }
+input[type=number], input[type=text], textarea, select { background: var(--void); border: 1px solid var(--line); border-radius: 6px; padding: 7px 8px; width: 100%; box-sizing: border-box; font-family: var(--mono); font-size: 14px; font-variant-numeric: tabular-nums; }
+.field.changed input { border-color: var(--gold); }
+textarea { min-height: 88px; resize: vertical; font-size: 12px; }
+
+.waves { width: 100%; border-collapse: collapse; font-size: 13px; }
+.waves th { text-align: left; font-weight: 600; color: var(--dim); font-size: 11.5px; letter-spacing: .04em; text-transform: uppercase; padding: 0 4px 4px; }
+.waves td { padding: 3px 4px; vertical-align: middle; }
+.waves input[type=number] { padding: 6px; }
+.waves .x { border: 0; background: none; color: var(--dim); font-size: 18px; padding: 2px 6px; }
+.waves .clock { font: 11px var(--mono); color: var(--dim); }
+.wrap-x { overflow-x: auto; }
+.row { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.btn { border: 1px solid var(--line); background: var(--panel2); border-radius: 7px; padding: 8px 12px; font-weight: 600; font-size: 14px; }
+.btn:hover { border-color: var(--dim); }
+.btn.go { background: var(--cell); color: #021015; border-color: var(--cell); }
+.btn.gold { background: var(--gold); color: #1a1300; border-color: var(--gold); }
+.btn.quiet { background: none; }
+.btn:disabled { opacity: .45; cursor: default; }
+.toxlist { display: flex; flex-wrap: wrap; gap: 8px; }
+.toxlist label { display: flex; align-items: center; gap: 4px; }
+.toxlist input { width: 74px; }
+
+/* Saved */
+.saved { display: grid; gap: 8px; }
+.slot { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 4px 10px; align-items: center; padding: 10px; border: 1px solid var(--line); border-radius: 8px; }
+.slot .sum { grid-column: 1 / -1; font: 12px var(--mono); color: var(--dim); }
+
+/* Run bar: stays at the bottom on a phone */
+.runbar { position: sticky; bottom: 0; z-index: 5; margin-top: 18px; background: color-mix(in srgb, var(--void) 88%, transparent); backdrop-filter: blur(8px); border-top: 1px solid var(--line); padding: 10px 0 calc(10px + env(safe-area-inset-bottom, 0px)); }
+.runbar .inner { display: flex; flex-wrap: wrap; gap: 8px 12px; align-items: center; }
+.runbar label { display: flex; gap: 6px; align-items: center; font-size: 13px; color: var(--dim); }
+.runbar select { width: auto; padding: 6px; }
+.prog { flex: 1 1 160px; display: grid; gap: 3px; min-width: 0; }
+.prog .track { height: 6px; background: var(--panel2); border-radius: 3px; overflow: hidden; }
+.prog .track span { display: block; height: 100%; width: 0; background: var(--cell); transition: width .2s; }
+.prog small { font: 12px var(--mono); color: var(--dim); }
+.toast { position: fixed; left: 50%; bottom: calc(80px + env(safe-area-inset-bottom, 0px)); transform: translateX(-50%); background: var(--panel2); border: 1px solid var(--line); padding: 8px 14px; border-radius: 8px; font-size: 14px; z-index: 9; }
+footer { color: var(--faint); font-size: 12px; padding-block: 18px 8px; }
+</style>
+
+<div id="app">
+  <header class="top">
+    <h1>Immune RTS <b>Tuner</b></h1>
+    <p>Change the level's pressure, then let bots play it. The skill ladder shows who wins. Winning strategies tries many different ways to play and shows which ranges of choices win.</p>
+    <span class="fair">Every knob is part of the level's script or a fixed rule. Nothing reacts to how the player is doing.</span>
+  </header>
+
+  <div class="cols">
+    <section class="results panel stack" aria-label="Results">
+      <div class="tabs" role="tablist">
+        <button role="tab" id="tabLadder" aria-selected="true" type="button">Skill ladder</button>
+        <button role="tab" id="tabStrat" aria-selected="false" type="button">Winning strategies</button>
+      </div>
+      <div id="paneLadder" class="stack"></div>
+      <div id="paneStrat" class="stack" hidden></div>
+    </section>
+
+    <section class="knobs panel" aria-label="Difficulty settings">
+      <div class="kh">
+        <h2>Difficulty</h2>
+        <div class="row"><span id="changeCount" class="small muted"></span><button class="btn quiet" id="resetAll" type="button">Reset to live game</button></div>
+      </div>
+      <div id="knobs"></div>
+    </section>
+  </div>
+
+  <section class="panel stack" style="margin-top:18px" aria-label="Saved difficulties and export">
+    <h2>Saved difficulties</h2>
+    <p class="small muted" style="margin:0">Saved on this device only. Save one per difficulty (Easy, Normal, Hard) to compare how wide the winning range is on each.</p>
+    <div class="row"><input type="text" id="slotName" placeholder="Name, like Hard" style="flex:1 1 160px"><button class="btn" id="slotSave" type="button">Save current</button></div>
+    <div class="saved" id="saved"></div>
+    <h2 style="margin-top:8px">Use these numbers</h2>
+    <div class="row">
+      <button class="btn gold" id="play" type="button">Play these settings</button>
+      <button class="btn" id="copy" type="button">Copy settings</button>
+    </div>
+    <p class="small muted" style="margin:0">Play opens a copy of the game with these settings. The live game link is not changed. To make them the real game's numbers, paste the copied settings into the build thread.</p>
+    <label class="small muted" for="paste">Load settings someone copied</label>
+    <textarea id="paste" placeholder='{"tune": {...}, "waves": [...], "toxins": [...]}'></textarea>
+    <div class="row"><button class="btn" id="load" type="button">Load pasted settings</button></div>
+  </section>
+
+  <div class="runbar">
+    <div class="inner">
+      <button class="btn go" id="runLadder" type="button">Run skill ladder</button>
+      <label for="ladderN">games each <select id="ladderN"><option>4</option><option selected>8</option><option>16</option></select></label>
+      <button class="btn go" id="runStrat" type="button">Find winning strategies</button>
+      <label for="stratN">strategies <select id="stratN"><option>60</option><option selected>120</option><option>240</option><option>480</option></select></label>
+      <div class="prog" id="prog" hidden><div class="track"><span id="progBar"></span></div><small id="progTxt"></small></div>
+      <button class="btn quiet" id="stop" type="button" hidden>Stop</button>
+    </div>
+  </div>
+  <footer>Bots play the same simulation as the game, at full detail, using only the buttons a player has.</footer>
+</div>
+<div class="toast" id="toast" hidden></div>
+
+<script>
+/*SIM*/
+/*BOTS*/
+const BASELINE = /*BASELINE*/;
+const WORKER_SRC = /*WORKERSRC*/;
+/*TUNER*/
+</script>

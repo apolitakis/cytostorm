@@ -1,0 +1,504 @@
+<title>Mechanics Workshop</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Instrument+Sans:wdth,wght@75..100,400..700&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+/* v3 layout: progress bar on top, the three-zone map in the middle, per-zone production cards and controls at the bottom.
+   Deliberately single-theme: the art is fluorescence microscopy, glowing cells on black. */
+:root {
+  color-scheme: dark;
+  --void: #04050A;
+  --panel: #0A0D18;
+  --panel2: #10152A;
+  --line: #1E2540;
+  --ink: #DDE6F5;
+  --dim: #7A86A0;
+  --cell: #3FE6FF;
+  --germ: #FF3DCB;
+  --gold: #FFD23F;
+  --kill: #FF7A3D;
+  --repair: #5CFFA1;
+  --damage: #FF3B4E;
+  --toxin: #B45CFF;
+  --slime: #96C828;
+  --display: "Instrument Sans", "Helvetica Neue", Arial, sans-serif;
+  --mono: "IBM Plex Mono", ui-monospace, Menlo, monospace;
+}
+[hidden] { display: none !important; }
+html, body { height: 100%; background: var(--void); color: var(--ink); }
+body { margin: 0; font: 14px/1.4 var(--display); overflow: hidden; -webkit-user-select: none; user-select: none; -webkit-tap-highlight-color: transparent; }
+button, input { font: inherit; color: inherit; }
+button { touch-action: manipulation; cursor: pointer; }
+button:focus-visible, input:focus-visible, summary:focus-visible { outline: 2px solid var(--gold); outline-offset: 2px; }
+img.ico { width: 18px; height: 18px; flex: none; }
+
+#app { height: 100%; max-width: 1100px; margin: 0 auto; display: flex; flex-direction: column; padding-inline: 16px; box-sizing: border-box; }
+
+/* HUD */
+#hud { display: grid; gap: 4px; padding-block: 8px 2px; min-width: 0; }
+.hudrow { display: flex; align-items: center; gap: 8px; min-width: 0; }
+#prog { position: absolute; z-index: 1; left: 0; top: 0; width: 22px; height: 100px; display: block; pointer-events: none; }
+#clock { margin-right: auto; }
+#clock { flex: none; font: 500 13px var(--mono); font-variant-numeric: tabular-nums; color: var(--dim); min-width: 2.8em; text-align: right; }
+.hbtn { flex: none; display: grid; place-items: center; background: var(--panel); border: 1px solid var(--line); border-radius: 8px; padding: 4px 8px; font: 500 12px var(--mono); min-width: 34px; height: 30px; box-sizing: border-box; }
+.hbtn img { width: 16px; height: 16px; }
+#muteBtn { color: var(--ink, #E6E9F2); } #muteBtn .x { display: none; } #muteBtn.off { color: #6B7180; } #muteBtn.off .x { display: inline; } #muteBtn.off .wave { display: none; }
+#ffBtn { min-width: 40px; font-variant-numeric: tabular-nums; }
+#ffBtn.fast { border-color: var(--gold); color: var(--gold); }
+/* Fatigue meter: fills as the body overworks; ticks at each tier */
+.fatigue { display: flex; align-items: baseline; gap: 8px; font-size: 11.5px; color: var(--dim); min-width: 0; white-space: nowrap; }
+#fTier { flex: none; font: 600 12px var(--display); color: #FF8FB1; }
+#cellCount { font: 500 11px var(--mono); font-variant-numeric: tabular-nums; }
+#cellCount { margin-left: auto; }
+/* The fatigue heart sits left of the body output slider */
+#heart { grid-row: 1 / span 3; width: 54px; height: 50px; align-self: center; }
+.fatigue[data-tier="1"] #fTier { color: #FF9A4D; }
+.fatigue[data-tier="2"] #fTier { color: var(--kill); }
+.fatigue[data-tier="3"] #fTier { color: #C77DFF; }
+.fatigue[data-tier="4"] #fTier { color: var(--damage); animation: pulse .35s ease-in-out infinite alternate; }
+/* Organs: five mini organs with 4 pips each, by the fatigue label; tap for Organ status */
+.fatigue { align-items: center; }
+.bodybtn { flex: none; display: flex; gap: 3px; padding: 1px 4px 2px; background: var(--panel2); border: 1px solid var(--line); border-radius: 7px; cursor: pointer; }
+#cellCount { margin-left: auto; } #cellCount.cut { color: var(--damage); }
+.bodybtn.over { border-color: var(--damage); box-shadow: 0 0 6px var(--damage); }
+.bodybtn .org { display: grid; justify-items: center; gap: 1px; }
+.bodybtn img { width: 19px; height: 14px; }
+.bodybtn .s1 img { animation: pulse .3s ease-in-out infinite alternate; }
+.bodybtn .hit img { filter: brightness(1.8); }
+.pips { display: flex; gap: 1px; }
+.pips i { width: 3px; height: 3px; border-radius: 1px; background: var(--line); }
+.pips i.on { background: #7BE0A0; }
+.pips i.part { background: #F2B33D; }
+.s2 .pips i.on, .s3 .pips i.on { background: #F2B33D; }
+.s1 .pips i.on, .s0 .pips i.on { background: #FF5A5A; }
+.pips.big { display: inline-flex; gap: 2px; vertical-align: middle; margin-left: 4px; }
+.pips.big i { width: 9px; height: 6px; }
+.bodyview { display: grid; gap: 8px; }
+.ocard { display: grid; grid-template-columns: 52px 1fr; gap: 2px 10px; align-items: start; background: var(--panel2); border: 1px solid var(--line); border-radius: 10px; padding: 8px 10px; }
+.ocard > img { grid-row: span 2; width: 52px; height: 39px; }
+.ocard > ul, .ocard > div:not(.ometer) { grid-column: 2; }
+.ocard b { font-size: 14px; }
+.ocard .ost { font: 600 12px var(--mono); margin-left: 6px; }
+.ocard.healthy .ost, .ocard.healthy .pips i.on { color: #7BE0A0; background-color: #7BE0A0; }
+.ocard.strained .ost, .ocard.damaged .ost { color: #F2B33D; } .ocard.strained .pips i.on, .ocard.damaged .pips i.on { background: #F2B33D; }
+.ocard.failing .ost { color: #FF5A5A; } .ocard.failing .pips i.on { background: #FF5A5A; }
+.ocard.failed .ost { color: var(--dim); }
+.ocard.healthy .ost { background: none; }
+.ocard ul, .ocard ol { margin: 0; padding: 0; list-style: none; display: grid; gap: 2px; font-size: 12.5px; line-height: 1.3; }
+.ocard ul li { padding-left: 13px; position: relative; }
+.ocard ul li::before { content: ''; position: absolute; left: 1px; top: .45em; width: 6px; height: 6px; border-radius: 50%; background: var(--dim); }
+.ocard ul li.bad::before { background: var(--damage); } .ocard ul li.good::before { background: #7BE0A0; }
+.ocard ul li.dim { color: var(--dim); }
+.ocard .ometer { grid-column: 2; display: grid; gap: 3px; margin: 4px 0 2px; }
+.ometer .mlab { font: 600 10.5px var(--mono); color: var(--dim); text-transform: uppercase; letter-spacing: .06em; }
+.ometer .msegs { display: grid; grid-template-columns: repeat(5, 1fr); gap: 3px; }
+.ometer i { display: grid; justify-items: center; gap: 1px; padding: 4px 2px 3px; border-radius: 6px; background: rgba(140,150,170,.08); color: rgba(160,168,185,.38); font-style: normal; }
+.ometer i b { font: 600 12px var(--mono); color: inherit; }
+.ometer i small { font-size: 9.5px; }
+.ometer i.on { color: #0B0E18; transform: scale(1.06); }
+.ometer i.on b { font-size: 14px; }
+.ometer i.s4 { background: #7BE0A0; } .ometer i.s3 { background: #C6E07B; } .ometer i.s2 { background: #F2B33D; } .ometer i.s1 { background: #FF5A5A; } .ometer i.s0 { background: #8A8F9C; }
+.ocard .onow { grid-column: 2; margin: 2px 0 4px; font-size: 14px; font-weight: 600; }
+.ocard .onow.bad { color: #FFB0A8; } .ocard .onow.good { color: #A8EBC0; }
+#banner { min-height: 2.7em; font-size: 12.5px; line-height: 1.35; color: var(--dim); text-wrap: pretty; }
+#banner b { color: var(--ink); font-weight: 600; }
+#banner.alarm b { color: var(--toxin); }
+#banner.bad b { color: var(--damage); }
+
+/* Stage */
+#stage { position: relative; flex: 1; min-height: 0; }
+/* spectator zoom: a chip to get back out (double-tap or Esc also works) */
+.zoomout { position: absolute; top: 8px; left: 50%; transform: translateX(-50%); z-index: 3; padding: 6px 12px; border-radius: 999px; background: rgba(10,13,24,.85); border: 1px solid var(--line); color: var(--dim); font: 500 12px var(--display); cursor: pointer; white-space: nowrap; }
+.zoomout b { color: var(--ink); font-weight: 600; }
+/* per-zone power buttons on the map (bottom-right of each sector): green = making cells, grey dashed = off */
+.zpwr { position: absolute; z-index: 2; width: 30px; height: 30px; margin: -15px 0 0 -15px; display: grid; place-items: center; padding: 0; border-radius: 50%; background: rgba(10,13,24,.82); border: 1.5px solid #7BE0A0; box-shadow: 0 0 8px rgba(123,224,160,.45); cursor: pointer; touch-action: manipulation; }
+.zpwr svg { width: 16px; height: 16px; fill: none; stroke: #7BE0A0; stroke-width: 2.6; stroke-linecap: round; }
+.zpwr.off { border: 1.5px dashed #5A6070; box-shadow: none; }
+.zpwr.off svg { stroke: #6B7180; }
+.zpwr.no { animation: pwrNo .3s ease-in-out 2; }
+@keyframes pwrNo { 0%, 100% { transform: none; } 25% { transform: translateX(-3px); } 75% { transform: translateX(3px); } }
+#cv { position: absolute; inset: 0; width: 100%; height: 100%; display: block; touch-action: manipulation; }
+#toasts { position: absolute; z-index: 6; left: 0; right: 0; bottom: 48px; display: grid; justify-items: center; gap: 4px; pointer-events: none; }
+.toast { background: rgba(10, 13, 24, .9); border: 1px solid var(--line); border-radius: 999px; padding: 4px 12px; font-size: 12.5px; animation: toast 2.2s ease forwards; }
+.toast.bad { border-color: var(--damage); }
+.toast.good { border-color: var(--gold); }
+.toast.toxin { border-color: var(--toxin); }
+@keyframes toast { 0% { opacity: 0; transform: translateY(6px); } 10%, 80% { opacity: 1; transform: none; } 100% { opacity: 0; } }
+
+/* Bottom controls: marrow switch, pause */
+#bar { display: flex; align-items: stretch; gap: 8px; padding-block: 6px 10px; min-width: 0; }
+.mlabel { display: grid; gap: 2px; font-size: 12px; color: var(--dim); white-space: nowrap; }
+.mlabel b { color: var(--ink); font: 600 12.5px var(--display); }
+.mlabel span.cut { color: #C77DFF; }
+.mlabel span { font: 500 11px var(--mono); font-variant-numeric: tabular-nums; }
+/* Production cards: one per zone, a stacked bar of the mix */
+.zones { flex: 1.4 1 0; min-width: 0; display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; }
+.zcard { min-width: 0; display: grid; gap: 4px; align-content: center; text-align: left; background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 6px 8px; }
+.zcard.open { border-color: var(--cell); }
+.zt { display: flex; align-items: baseline; gap: 6px; min-width: 0; }
+.zt b { font: 600 12.5px var(--display); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.mode { margin-left: auto; font: normal 500 10.5px var(--mono); }
+.mode.offense { color: var(--kill); }
+.mode.support { color: var(--repair); }
+.mix { display: flex; height: 8px; border-radius: 4px; overflow: hidden; gap: 2px; background: var(--panel2); }
+.mix i { display: block; flex: 1 1 0; min-width: 0; box-shadow: 0 0 6px currentColor; }
+.zcard .boost { font: 600 10.5px var(--mono); font-style: normal; color: var(--gold); }
+.zcard.off { border-style: dashed; }
+.zcard.copied { animation: copied .7s ease-out; }
+@keyframes pulse { from { opacity: 1; } to { opacity: .45; } }
+@keyframes copied { 0% { box-shadow: 0 0 0 2px var(--gold), 0 0 16px rgba(255,210,63,.7); } 100% { box-shadow: none; } }
+.lrow { align-items: flex-start; }
+.loadouts { margin-left: auto; display: grid; grid-template-columns: repeat(3, minmax(0, 76px)); gap: 6px; }
+.lslot { display: grid; gap: 3px; }
+.lapply { display: grid; gap: 4px; justify-items: start; background: var(--panel2); border: 1px solid var(--line); border-radius: 8px; padding: 5px 7px; font: 600 12px var(--mono); touch-action: manipulation; -webkit-touch-callout: none; }
+.lapply[aria-pressed="true"] { border-color: var(--cell); color: var(--cell); }
+.lbar { display: flex; width: 100%; height: 5px; border-radius: 3px; overflow: hidden; background: var(--line); }
+.lbar i { display: block; min-width: 2px; }
+.lbar em { font: 400 9.5px var(--display); color: var(--dim); font-style: normal; line-height: 5px; display: none; }
+.lsave { background: none; border: 0; color: var(--dim); font: 500 11px var(--display); padding: 1px 0; text-decoration: underline; text-underline-offset: 2px; }
+.copyall { margin-left: auto; background: var(--panel2); border: 1px solid var(--line); border-radius: 8px; padding: 5px 10px; font-size: 12.5px; font-weight: 600; white-space: nowrap; }
+.zcard.off .zt b, .zcard.off .zsub { color: var(--dim); }
+.zcard.off .mix i { filter: grayscale(1) brightness(.6); }
+.urow.dim { opacity: .45; }
+.prow { border-top: 0; padding-top: 0; color: var(--ink); font-weight: 600; }
+.seg2 button[data-on="1"][aria-pressed="true"] { border-color: var(--cell); color: var(--cell); }
+.seg2 button[data-on="0"][aria-pressed="true"] { border-color: var(--dim); color: var(--ink); background: var(--panel); }
+.zsub { font: 500 10.5px var(--mono); color: var(--dim); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+/* The open production sheet sits over the bottom of the map */
+#sheet { position: absolute; left: 0; right: 0; bottom: 0; max-height: 100%; overflow: auto; z-index: 5; background: rgba(10, 13, 24, .96); border: 1px solid var(--line); border-radius: 14px; padding: 10px 12px 12px; display: grid; gap: 8px; box-sizing: border-box; max-width: 560px; margin: 0 auto; box-shadow: 0 -6px 30px rgba(0,0,0,.6); }
+.shd { display: flex; gap: 8px; align-items: center; }
+.ztabs { flex: 1; display: grid; grid-template-columns: repeat(3, 1fr); gap: 4px; }
+.ztabs button { background: var(--panel2); border: 1px solid var(--line); border-radius: 8px; padding: 5px 2px; font-size: 12.5px; font-weight: 600; }
+.ztabs button[aria-pressed="true"] { border-color: var(--cell); color: var(--cell); }
+.shint { margin: 0; font-size: 12px; color: var(--dim); text-wrap: pretty; }
+.shint b { color: var(--ink); }
+.urow { display: grid; grid-template-columns: 30px 1fr auto auto; grid-template-areas: "i t p a" "i r r r"; gap: 2px 8px; align-items: center; }
+.urow img { grid-area: i; width: 30px; height: 30px; }
+.urow .ut { grid-area: t; min-width: 0; display: grid; }
+.urow .ut b { font-size: 13px; }
+.urow .ut small { font-size: 11px; color: var(--dim); line-height: 1.25; }
+.urow .pct { grid-area: p; font: 500 13px var(--mono); font-variant-numeric: tabular-nums; min-width: 3em; text-align: right; }
+.urow .qset { grid-area: a; display: flex; gap: 4px; }
+.urow .qset button[aria-pressed="true"] { border-color: var(--cell); color: var(--cell); }
+.urow .qset button { background: var(--panel2); border: 1px solid var(--line); border-radius: 8px; padding: 4px 7px; font: 600 11.5px var(--mono); white-space: nowrap; }
+.urow input { grid-area: r; width: 100%; margin: 2px 0; -webkit-appearance: none; appearance: none; height: 22px; background: none; }
+.urow input::-webkit-slider-runnable-track { height: 6px; border-radius: 3px; background: linear-gradient(90deg, var(--c) var(--p, 0%), var(--panel2) var(--p, 0%)); }
+.urow input::-moz-range-track { height: 6px; border-radius: 3px; background: linear-gradient(90deg, var(--c) var(--p, 0%), var(--panel2) var(--p, 0%)); }
+.urow input::-webkit-slider-thumb { -webkit-appearance: none; width: 22px; height: 22px; margin-top: -8px; border-radius: 50%; background: var(--c); border: 2px solid var(--void); box-shadow: 0 0 8px var(--c); }
+.urow input::-moz-range-thumb { width: 18px; height: 18px; border-radius: 50%; background: var(--c); border: 2px solid var(--void); }
+.mrow { display: flex; align-items: center; gap: 8px; font-size: 12.5px; color: var(--dim); border-top: 1px solid var(--line); padding-top: 8px; }
+.seg2 { margin-left: auto; display: grid; grid-template-columns: 1fr 1fr; gap: 4px; }
+.seg2 button { background: var(--panel2); border: 1px solid var(--line); border-radius: 8px; padding: 5px 10px; font-size: 12.5px; font-weight: 600; }
+.seg2 button[data-mode="offense"][aria-pressed="true"] { border-color: var(--kill); color: var(--kill); }
+.seg2 button[data-mode="support"][aria-pressed="true"] { border-color: var(--repair); color: var(--repair); }
+/* Cytokine storm: hold to preview the cost, release to fire */
+#stormBtn { flex: none; display: grid; justify-items: center; align-content: center; gap: 2px; min-width: 58px; background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 4px 6px; font: 600 11.5px var(--display); color: var(--dim); touch-action: none; }
+#stormBtn img { width: 28px; height: 28px; }
+#spawnRates input[type="range"] { width: 100%; }
+#stormBtn { --charge: 0; position: relative; overflow: hidden; }
+#stormBtn::before { content: ''; position: absolute; inset: auto 0 0 0; height: calc(var(--charge) * 100%); background: linear-gradient(to top, rgba(255,210,63,.45), rgba(255,210,63,.12)); pointer-events: none; }
+#stormBtn > * { position: relative; }
+#stormBtn.held { border-color: var(--gold); color: var(--gold); }
+#stormBtn.lethal::before { background: linear-gradient(to top, rgba(255,59,78,.5), rgba(255,59,78,.14)); }
+#stormBtn.charged { animation: stormReady .5s ease-in-out infinite alternate; }
+@keyframes stormReady { from { box-shadow: 0 0 4px rgba(255,210,63,.4); } to { box-shadow: 0 0 18px rgba(255,210,63,.9); } }
+#stormBtn.charged.lethal { animation-name: stormReadyLethal; }
+@keyframes stormReadyLethal { from { box-shadow: 0 0 4px rgba(255,59,78,.4); } to { box-shadow: 0 0 20px rgba(255,59,78,1); } }
+@media (prefers-reduced-motion: reduce) { #stormBtn.charged { animation: none; box-shadow: 0 0 14px rgba(255,210,63,.8); } }
+#stormBtn.lethal { border-color: var(--damage); color: var(--damage); box-shadow: 0 0 12px rgba(255,59,78,.5); }
+/* Risky: the storm would cost organ bars but not kill you */
+#stormBtn.risky { border-color: #FF8A3D; color: #FF8A3D; box-shadow: 0 0 12px rgba(255,138,61,.5); }
+#stormBtn.risky::before { background: linear-gradient(to top, rgba(255,138,61,.5), rgba(255,138,61,.14)); }
+#stormBtn.charged.risky { animation-name: stormReadyRisky; }
+@keyframes stormReadyRisky { from { box-shadow: 0 0 4px rgba(255,138,61,.4); } to { box-shadow: 0 0 18px rgba(255,138,61,.95); } }
+#stormBtn.burning { border-color: var(--kill); color: var(--kill); }
+#pauseBtn { height: auto; min-width: 44px; border-radius: 12px; }
+.output { flex: 1 1 240px; min-width: 0; display: grid; grid-template-columns: 54px minmax(0, 1fr); column-gap: 10px; row-gap: 2px; align-content: center; background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 6px 10px; }
+.output .mlabel { display: flex; align-items: center; gap: 6px; }
+.output .mlabel span { margin-left: auto; }
+#output { width: 100%; margin: 4px 0 2px; -webkit-appearance: none; appearance: none; height: 18px; background: none; }
+#output::-webkit-slider-runnable-track { height: 6px; border-radius: 3px; background: var(--track, var(--panel2)); }
+#output::-moz-range-track { height: 6px; border-radius: 3px; background: var(--track, var(--panel2)); }
+#output::-webkit-slider-thumb { -webkit-appearance: none; width: 20px; height: 20px; margin-top: -7px; border-radius: 50%; background: var(--ink); border: 2px solid var(--void); box-shadow: 0 0 8px rgba(255, 210, 63, .6); }
+#output::-moz-range-thumb { width: 18px; height: 18px; border-radius: 50%; background: var(--ink); border: 2px solid var(--void); }
+
+/* Modals */
+#modal { position: fixed; inset: 0; background: rgba(4, 5, 10, .8); display: grid; place-items: center; padding: 16px; z-index: 20; }
+.mbox { width: 100%; max-width: 460px; max-height: calc(100% - 8px); overflow: auto; background: var(--panel); border: 1px solid var(--line); border-radius: 16px; padding: 18px; display: grid; gap: 12px; box-sizing: border-box; }
+.mbox h2 { margin: 0; font-size: 24px; font-weight: 650; font-stretch: 80%; line-height: 1.05; text-wrap: balance; }
+.mbox h2 .glow { color: var(--cell); }
+.mbox h2 .bad { color: var(--damage); }
+.mbox p { margin: 0; color: var(--dim); }
+.eyebrow { font: 500 11px/1 var(--mono); letter-spacing: .14em; text-transform: uppercase; color: var(--dim); }
+.howto { margin: 0; padding-left: 18px; display: grid; gap: 5px; color: var(--ink); font-size: 13.5px; }
+.howto li::marker { color: var(--cell); }
+.btnrow { display: flex; gap: 8px; flex-wrap: wrap; }
+.btn { flex: 1; background: var(--panel2); border: 1px solid var(--line); border-radius: 10px; padding: 9px 12px; font-weight: 600; white-space: nowrap; }
+.btn.primary { border-color: var(--cell); color: var(--cell); }
+.linkbtn { background: none; border: 0; color: var(--cell); text-decoration: underline; padding: 2px; justify-self: start; font-size: 13.5px; }
+.stars { display: flex; gap: 6px; }
+.stars img { width: 34px; height: 34px; }
+.goals { list-style: none; margin: 0; padding: 0; display: grid; gap: 3px; font-size: 13px; }
+.goals li { display: flex; gap: 8px; color: var(--dim); }
+.goals li::before { content: "\2606"; }
+.goals li.hit { color: var(--ink); }
+.goals li.hit::before { content: "\2605"; color: var(--gold); }
+.stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+.stats div { display: grid; gap: 1px; }
+.stats b { font: 500 16px var(--mono); font-variant-numeric: tabular-nums; }
+.stats span { font-size: 11px; color: var(--dim); }
+#graph { width: 100%; height: 130px; display: block; }
+.legend { display: flex; flex-wrap: wrap; gap: 4px 14px; font-size: 11.5px; color: var(--dim); margin-top: -6px; }
+.legend span::before { content: ""; display: inline-block; width: 10px; height: 3px; margin-right: 5px; vertical-align: middle; background: var(--c); }
+/* Pause card and feedback */
+.pausecard { position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); z-index: 4; width: min(320px, calc(100% - 32px)); box-sizing: border-box; display: grid; gap: 12px; justify-items: center; background: var(--panel); border: 1px solid var(--line); border-radius: 14px; padding: 16px; }
+.pausecard b { font-size: 20px; font-weight: 650; }
+.pausecard .btnrow { width: 100%; }
+.chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.chip { background: var(--panel2); border: 1px solid var(--line); border-radius: 999px; padding: 6px 12px; font-size: 13px; font-weight: 600; }
+.chip[aria-pressed="true"] { border-color: var(--gold); color: var(--gold); }
+.fbl { font-size: 13px; color: var(--dim); }
+.mbox textarea { width: 100%; box-sizing: border-box; background: var(--panel2); color: var(--ink); border: 1px solid var(--line); border-radius: 10px; padding: 8px 10px; font: 14px/1.4 var(--display); resize: vertical; -webkit-user-select: text; user-select: text; }
+#fbOut { font: 11px var(--mono); }
+.mbox p.small { font-size: 12.5px; }
+/* Level list */
+.levels { display: grid; gap: 4px; }
+.lvl { display: grid; grid-template-columns: 1.6em 1fr auto auto; gap: 8px; align-items: center; text-align: left; background: var(--panel2); border: 1px solid var(--line); border-radius: 9px; padding: 5px 8px; }
+.lvl[aria-pressed="true"] { border-color: var(--cell); }
+.lvl .n { font: 500 12px var(--mono); color: var(--dim); }
+.lvl .nm { font-weight: 600; font-size: 13px; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.lvl .new { display: flex; gap: 2px; }
+.lvl .new img { width: 20px; height: 20px; }
+.lvl .rough { font: normal 500 10.5px var(--mono); color: var(--gold); margin-left: 4px; }
+.lvl .st { font-size: 12px; color: var(--gold); letter-spacing: 1px; }
+.lvl .st span { color: var(--line); }
+.emblem { width: 72px; height: 72px; justify-self: center; }
+/* Guide */
+.tabs { display: grid; grid-template-columns: repeat(5, 1fr); gap: 4px; position: sticky; top: -18px; background: var(--panel); padding-block: 6px; z-index: 1; }
+.tabs button { background: var(--panel2); border: 1px solid var(--line); border-radius: 8px; padding: 6px 2px; font-size: 12.5px; }
+.tabs button[aria-pressed="true"] { border-color: var(--cell); color: var(--cell); }
+#tutHost { height: min(640px, calc(100vh - 72px)); height: min(640px, calc(100dvh - 72px)); }
+.clips { display: grid; grid-template-columns: repeat(auto-fill, minmax(128px, 1fr)); gap: 8px; }
+.clips h4 { grid-column: 1 / -1; margin: 6px 0 0; font: 500 11px/1 var(--mono); letter-spacing: .14em; text-transform: uppercase; color: var(--dim); }
+.clip { display: grid; gap: 6px; padding: 6px; background: var(--panel2); border: 1px solid var(--line); border-radius: 10px; text-align: left; font: 600 13px/1.2 var(--display); color: var(--ink); cursor: pointer; }
+.clip canvas { width: 100%; aspect-ratio: 4 / 3; display: block; border-radius: 6px; background: #04050A; }
+.clip.seen span::after { content: ' ✓'; color: var(--dim); font-weight: 400; }
+.gsec { display: grid; gap: 14px; }
+.unit { display: grid; grid-template-columns: 44px 1fr; gap: 2px 12px; align-items: start; }
+.unit > img { grid-row: span 3; width: 44px; height: 44px; }
+.unit h4 { margin: 0; font-size: 16px; font-weight: 650; font-stretch: 85%; }
+.unit .why { margin: 0; color: var(--ink); font-size: 13.5px; }
+.unit ul { margin: 2px 0 0; padding-left: 16px; display: grid; gap: 3px; color: var(--dim); font-size: 13px; }
+.unit ul b { color: var(--ink); font-weight: 600; }
+
+/* Dev panel */
+#dev { position: fixed; top: 0; right: 0; bottom: 0; width: min(360px, 100%); background: rgba(10, 13, 24, .97); border-left: 1px solid var(--line); z-index: 30; overflow: auto; padding: 14px 16px 40px; box-sizing: border-box; display: grid; gap: 12px; align-content: start; font-size: 13px; }
+#dev h3 { margin: 0; font-size: 16px; font-weight: 650; font-stretch: 85%; display: flex; align-items: center; }
+#dev h3 button { margin-left: auto; }
+#dev .grp { display: grid; gap: 6px; padding-bottom: 10px; border-bottom: 1px solid var(--line); }
+#dev label.row { display: grid; grid-template-columns: 1fr auto; gap: 8px; align-items: center; }
+#dev input[type="number"] { width: 5.5em; background: var(--panel2); border: 1px solid var(--line); border-radius: 6px; padding: 3px 6px; font: 12px var(--mono); }
+#dev input[type="number"].changed { border-color: var(--gold); color: var(--gold); }
+#dev details summary { cursor: pointer; font: 500 12px var(--mono); text-transform: uppercase; letter-spacing: .08em; color: var(--dim); padding: 4px 0; }
+#dev details[open] summary { color: var(--ink); }
+#dev details .field { display: grid; gap: 2px; padding: 4px 0; }
+#dev details .field small { color: var(--dim); font-size: 11px; line-height: 1.3; }
+#dev .devbtns { display: flex; gap: 6px; flex-wrap: wrap; }
+#dev select { background: var(--panel2); border: 1px solid var(--line); border-radius: 8px; color: var(--ink); font: 12px var(--display); padding: 4px; }
+#dev .devbtns button { background: var(--panel2); border: 1px solid var(--line); border-radius: 8px; padding: 5px 9px; font-size: 12px; }
+#devJson { width: 100%; min-height: 80px; background: var(--panel2); color: var(--ink); border: 1px solid var(--line); border-radius: 8px; font: 11px var(--mono); box-sizing: border-box; }
+#speed { width: 100%; accent-color: var(--gold); }
+
+/* workshop: toxin bar, panel controls, start-screen combos */
+#app { transition: margin .15s; }
+.toxrow #toxVal { flex: none; min-width: 5.4em; text-align: right; font: 600 11.5px var(--display); color: var(--slime); }
+.toxbar { flex: 1; min-width: 40px; height: 6px; border-radius: 3px; background: var(--panel2); position: relative; overflow: hidden; }
+.toxbar i { position: absolute; left: 0; top: 0; bottom: 0; width: 0; background: var(--slime); box-shadow: 0 0 6px var(--slime); }
+.toxbar b { position: absolute; top: 0; bottom: 0; width: 1px; background: rgba(221,230,245,.4); }
+.toxrow.max .toxbar i { animation: pulse .6s ease-in-out infinite alternate; }
+.toxrow.max #toxVal { color: var(--damage); }
+@keyframes pulse { to { opacity: .45; } }
+#devBtn.on { border-color: var(--gold); color: var(--gold); }
+#dev .ghead { display: flex; gap: 6px; align-items: center; }
+#dev .ghead > span { font: 500 12px var(--mono); text-transform: uppercase; letter-spacing: .08em; color: var(--dim); margin-right: auto; }
+#dev .ghead button, #dev .chips button, #dev .srow button { background: var(--panel2); border: 1px solid var(--line); border-radius: 8px; padding: 4px 9px; font-size: 12px; }
+#dev .chips { display: flex; flex-wrap: wrap; gap: 5px; }
+#dev .chips button[aria-pressed="true"] { border-color: var(--cell); color: var(--cell); }
+#dev small.note, #dev label small { color: var(--dim); font-size: 11px; line-height: 1.3; }
+#dev label small { display: block; }
+#dev .srow { display: grid; grid-template-columns: 26px 1fr auto auto; grid-template-areas: "i t v b" "i r r r"; gap: 0 8px; align-items: center; padding: 3px 0; }
+#dev .srow img { grid-area: i; width: 26px; height: 26px; }
+#dev .srow .st2 { grid-area: t; min-width: 0; display: grid; }
+#dev .srow .st2 small { color: var(--dim); font-size: 11px; line-height: 1.25; }
+#dev .srow output { grid-area: v; font: 500 11.5px var(--mono); color: var(--dim); text-align: right; display: grid; }
+#dev .srow output.on { color: var(--gold); }
+#dev .srow output::after { content: attr(data-n); color: var(--germ); font-size: 10.5px; }
+#dev .srow button { grid-area: b; min-width: 34px; }
+#dev .srow input { grid-area: r; width: 100%; accent-color: var(--gold); margin: 2px 0; }
+#dev .grp > input[type="range"] { width: 100%; accent-color: var(--gold); margin: 0 0 4px; }
+#dev output.changed { color: var(--gold); }
+#dev label.row output { font: 500 12px var(--mono); }
+#dev input[type="checkbox"] { width: 18px; height: 18px; accent-color: var(--cell); }
+#dev .readout { display: grid; grid-template-columns: auto 1fr; gap: 2px 10px; font-size: 12px; }
+#dev .readout span { color: var(--dim); }
+#dev .readout b { font: 500 12px var(--mono); font-variant-numeric: tabular-nums; }
+#wsJson { width: 100%; min-height: 70px; background: var(--panel2); color: var(--ink); border: 1px solid var(--line); border-radius: 8px; font: 11px var(--mono); box-sizing: border-box; -webkit-user-select: text; user-select: text; }
+.combos { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 6px; }
+.combo { display: grid; gap: 2px; align-content: start; text-align: left; background: var(--panel2); border: 1px solid var(--line); border-radius: 10px; padding: 8px 10px; }
+.combo .ci { display: flex; gap: 3px; min-height: 18px; }
+.combo .ci img { width: 18px; height: 18px; }
+.combo b { font-size: 13.5px; }
+.combo small { color: var(--dim); font-size: 11.5px; line-height: 1.3; }
+.mbox { max-width: 560px; }
+/* Wide screens: the Workshop panel docks beside the game */
+@media (min-width: 1100px) { body.ws-open #app { margin-right: 380px; } #dev { width: 380px; } }
+/* Phones: the panel is a bottom sheet so the map stays in view */
+@media (max-width: 700px) { #dev { top: auto; left: 0; width: 100%; height: 58%; border-left: 0; border-top: 1px solid var(--line); border-radius: 16px 16px 0 0; } body.ws-open #app { height: 50%; } body.ws-open #legend, body.ws-open #bar, body.ws-open #banner { display: none; } #dev { height: 50%; } }
+/* v3's heart meter spans the left column; the toxin row sits under the fatigue line */
+.output #toxRow { grid-column: 2; }
+#heart { grid-row: 1 / span 4; }
+
+/* v3's own debug spawn sliders duplicate the Workshop's antigen rates, so the Sandbox hides them */
+#dev .grp:has(#spawnRates) { display: none; }
+
+/* organ health buttons */
+.devbtns .mini { align-self: center; font-size: 11px; color: var(--dim); margin-left: 4px; }
+
+/* Toxin strip under the main game's organ button (no separate toxin bar) */
+.bodybtn { flex-wrap: wrap; row-gap: 2px; }
+.bodybtn .btox { display: block; flex-basis: 100%; height: 3px; border-radius: 2px; background: var(--line); overflow: hidden; }
+.bodybtn .btox b { display: block; height: 100%; width: 0; background: var(--slime); }
+.bodybtn .btox b.over { background: #C4E03A; box-shadow: 0 0 4px var(--slime); }
+.ocard.tox .ost { color: var(--slime); }
+.orgbtns { flex-wrap: wrap; }
+.ocard.tox { grid-template-columns: 1fr; }
+
+/* Narrower screens: production cards take a full row, controls below */
+@media (max-width: 900px) {
+  #bar { flex-wrap: wrap; }
+  .zones { flex-basis: 100%; }
+}
+@media (max-width: 480px) {
+  .zcard { padding: 5px 6px; }
+  .zt b { font-size: 12px; }
+  .mode { font-size: 0; } /* stance as a dot: the map chips spell it out, the zone name gets the room */
+  .mode::before { content: ''; display: inline-block; width: 8px; height: 8px; border-radius: 50%; background: currentColor; }
+  .bodybtn { gap: 2px; padding: 1px 3px 2px; }
+  .bodybtn img { width: 16px; height: 12px; }
+  .fatigue { gap: 6px; }
+  .output { grid-template-columns: 44px minmax(0, 1fr); column-gap: 8px; }
+  #heart { grid-row: 1 / span 2; width: 44px; height: 44px; }
+  .output .fatigue { grid-column: 1 / -1; } /* full width, so the cell count never clips */
+  #pauseBtn { min-width: 40px; }
+  #stormBtn { min-width: 52px; }
+}
+/* Short landscape phones: tighten the chrome so the map keeps its height */
+@media (max-height: 480px) {
+  #hud { padding-block: 4px 0; }
+  #banner { min-height: 1.35em; font-size: 12px; }
+  #bar { padding-block: 4px 6px; }
+  .zcard { gap: 2px; padding: 4px 6px; }
+}
+/* Wide screens: the map is always vertical, so it takes a tall column on the left and the controls stack on the right */
+@media (min-width: 700px) and (min-aspect-ratio: 1/1) {
+  #app { display: grid; grid-template-columns: minmax(0, 1fr) 340px; grid-template-rows: auto auto 1fr auto; column-gap: 18px; max-width: calc(100vh * 0.52 + 430px); }
+  #stage { grid-column: 1; grid-row: 1 / span 4; margin-block: 10px; }
+  #hud { grid-column: 2; grid-row: 1; }
+  #bar { grid-column: 2; grid-row: 4; flex-wrap: wrap; align-content: end; }
+  .zones { flex-basis: 100%; grid-template-columns: 1fr; }
+  .output { flex-basis: 100%; }
+  #stormBtn { flex: 1; min-height: 52px; }
+  #sheet { left: 0; right: 0; }
+}
+@media (prefers-reduced-motion: reduce) { .toast { animation-duration: .01s; animation-delay: 2s; } }
+</style>
+
+<div id="app">
+  <header id="hud">
+    <div class="hudrow">
+      <span id="clock">0:00</span>
+      <button id="ffBtn" class="hbtn" type="button" aria-label="Game speed 1×, tap to fast-forward">1×</button>
+      <button id="muteBtn" class="hbtn" type="button" aria-label="Sound on, tap to mute" title="Sound on (M)"><svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><path d="M4 9h4l5-4v14l-5-4H4z" fill="currentColor"/><path class="wave" d="M16 8.5a5 5 0 0 1 0 7M18.5 6a8.5 8.5 0 0 1 0 12" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/><path class="x" d="M16 9l6 6M22 9l-6 6" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg></button>
+      <button id="helpBtn" class="hbtn" type="button" aria-label="Guide">?</button>
+      <button id="wsReset" class="hbtn" type="button" aria-label="Reset: restart this setup from zero">Reset</button><button id="devBtn" class="hbtn" type="button">Workshop</button>
+    </div>
+    <div id="banner" aria-live="polite"></div>
+  </header>
+
+  <main id="stage">
+    <canvas id="prog" aria-label="Level progress, top to bottom: waves and toxin bursts still to come"></canvas>
+    <canvas id="cv" aria-label="The map: Wound, Tissue and Lymph node. Tap a zone to flip its stance between Offense and Support; double-tap to zoom in on it."></canvas>
+    <div id="pwrs" aria-label="Cell production per zone"><button type="button" class="zpwr" data-pz="0" hidden><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v8"/><path d="M6.3 6.6a8 8 0 1 0 11.4 0"/></svg></button><button type="button" class="zpwr" data-pz="1" hidden><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v8"/><path d="M6.3 6.6a8 8 0 1 0 11.4 0"/></svg></button><button type="button" class="zpwr" data-pz="2" hidden><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v8"/><path d="M6.3 6.6a8 8 0 1 0 11.4 0"/></svg></button></div>
+    <button id="zoomOut" class="zoomout" type="button" hidden>Watching <b>Tissue</b> · zoom out</button>
+    <div id="toasts"></div>
+    <div id="sheet" hidden></div>
+    <div id="pauseCard" class="pausecard" hidden><b>Paused</b><div class="btnrow"><button class="btn primary" id="resumeBtn" type="button">Resume</button><button class="btn" id="fbPause" type="button">Send feedback</button></div></div>
+  </main>
+
+  <footer id="bar">
+    <div id="zones" class="zones"></div>
+    <div class="output">
+      <canvas id="heart" role="img" aria-label="Fatigue: the heart fills and beats faster as your body tires"></canvas>
+      <div class="mlabel"><img class="ico" data-art="body-output" alt=""><b>Body output</b><span id="outVal">1.0×</span></div>
+      <input type="range" id="output" min="0" max="100" step="5" value="50" aria-label="Body output: how fast your body makes cells">
+      <div class="fatigue" id="fatigue" data-tier="0"><span id="fTier">Fine</span><button id="bodyBtn" class="bodybtn" type="button" aria-label="Organ status"></button><span id="cellCount">0 cells</span></div>
+      <div class="fatigue toxrow" id="toxRow"><span>Toxin</span><div class="toxbar"><i id="toxFill"></i><b id="toxMark"></b></div><span id="toxVal">0</span></div>
+    </div>
+    <button id="stormBtn" type="button" aria-label="Cytokine storm: hold 5 seconds to charge, release to fire"><img id="stormIcon" alt=""><span id="stormLbl">Storm</span></button>
+    <button id="pauseBtn" class="hbtn" type="button" aria-label="Pause"><img data-art="pause" alt=""></button>
+  </footer>
+</div>
+
+<div id="modal" hidden><div class="mbox" id="mbox" role="dialog" aria-modal="true"></div></div>
+
+<aside id="dev" hidden aria-label="Workshop">
+  <h3>Workshop <button type="button" class="hbtn" id="devClose">Close</button></h3>
+  <div id="wsPanel"></div>
+  <div class="grp">
+    <label class="row" for="speed"><span>Speed <b id="speedVal">1×</b></span></label>
+    <input type="range" id="speed" min="0" max="6" step="1" value="2">
+    <div class="devbtns"><button type="button" id="devPause">Pause</button><button type="button" id="devStep">Step 1 s</button><button type="button" id="devSkip">Skip 15 s</button></div>
+  </div>
+  <div class="grp">
+    <label class="row" for="seed"><span>Random seed</span><input type="number" id="seed" value="1" min="1" step="1"></label>
+    <div class="devbtns"><button type="button" id="devRestart">Restart with seed</button><button type="button" id="devNewSeed">New seed</button></div>
+  </div>
+  <div class="grp">
+    <span>Cheats and overlays</span>
+    <div class="devbtns"><select id="cheatKind" aria-label="Antigen to spawn"></select><button type="button" id="cheatSpawn">Spawn</button><button type="button" id="cheatClear">Kill all antigens</button><button type="button" id="cheatCalm">Fatigue to 0</button></div>
+    <label class="row" for="ovRange"><span>Show neutrophil range</span><input type="checkbox" id="ovRange"></label>
+  </div>
+  <div class="grp">
+    <span>Extra antigens <small style="color:var(--dim)">(per second of game time, poured into the Wound on top of the level)</small></span>
+    <div id="spawnRates"></div>
+    <div class="devbtns"><button type="button" id="spawnReset">All to 0</button></div>
+  </div>
+  <div class="grp">
+    <span>Every number <small style="color:var(--dim)">(live; gold = changed from default; saved in this browser)</small></span>
+    <div id="tuning"></div>
+    <div class="devbtns"><button type="button" id="tuneCopy">Copy changes as JSON</button><button type="button" id="tuneReset">Reset all</button></div>
+    <textarea id="devJson" hidden readonly aria-label="Tuning JSON"></textarea>
+  </div>
+</aside>
+
+<script>
+/*ART*/
+</script>
+<script>
+/*TUT*/
+</script>
+<script>
+/*AUDIO*/
+</script>
+<script>
+/*SIM*/
+</script>
+<script>
+/*LAYER*/
+</script>
+<script>
+/*COMBOS*/
+</script>
+<script>
+/*UI*/
+</script>

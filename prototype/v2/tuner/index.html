@@ -1,0 +1,1331 @@
+<title>Immune RTS Tuner</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Instrument+Sans:wdth,wght@75..100,400..700&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+/* Layout: results first (what the bots did), then the level's knobs, then saved difficulties.
+   On wide screens the knobs sit left and the results stay in view on the right.
+   Deliberately single-theme, matching the game: glowing cells on black. */
+:root {
+  color-scheme: dark;
+  --void: #05060C;
+  --panel: #0B0F1C;
+  --panel2: #111730;
+  --line: #1F2744;
+  --ink: #DDE6F5;
+  --dim: #7F8BA6;
+  --faint: #47506B;
+  --cell: #3FE6FF;
+  --germ: #FF3DCB;
+  --gold: #FFD23F;
+  --kill: #FF7A3D;
+  --repair: #5CFFA1;
+  --damage: #FF3B4E;
+  --toxin: #B45CFF;
+  --display: "Instrument Sans", "Helvetica Neue", Arial, sans-serif;
+  --mono: "IBM Plex Mono", ui-monospace, Menlo, monospace;
+}
+html { background: var(--void); }
+body { background: var(--void); color: var(--ink); font: 15px/1.45 var(--display); margin: 0; }
+button, input, textarea, select { font: inherit; color: inherit; }
+button { cursor: pointer; touch-action: manipulation; }
+[hidden] { display: none !important; }
+:focus-visible { outline: 2px solid var(--gold); outline-offset: 2px; }
+@media (prefers-reduced-motion: reduce) { * { transition: none !important; animation: none !important; } }
+
+#app { max-width: 1180px; margin: 0 auto; padding-inline: 16px; padding-block: 18px 0; box-sizing: border-box; }
+.top { display: grid; gap: 6px; padding-bottom: 14px; }
+.top h1 { margin: 0; font-weight: 700; font-stretch: 78%; font-size: clamp(26px, 6vw, 38px); letter-spacing: .01em; line-height: 1.05; text-wrap: balance; }
+.top h1 b { color: var(--cell); font-weight: 700; }
+.top p { margin: 0; color: var(--dim); max-width: 64ch; }
+.fair { display: inline-flex; gap: 8px; align-items: baseline; font-size: 13px; color: var(--dim); }
+.fair::before { content: ""; width: 8px; height: 8px; border-radius: 50%; background: var(--repair); box-shadow: 0 0 8px var(--repair); flex: none; transform: translateY(-1px); }
+
+.cols { display: grid; gap: 18px; grid-template-columns: minmax(0, 1fr); }
+@media (min-width: 980px) {
+  .cols { grid-template-columns: minmax(0, 5fr) minmax(0, 6fr); align-items: start; }
+  .cols > .results { position: sticky; top: calc(env(safe-area-inset-top, 0px) + 12px); max-height: calc(100vh - 110px); overflow: auto; order: 2; }
+  .cols > .knobs { order: 1; }
+}
+
+.panel { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 14px; min-width: 0; }
+h2 { margin: 0; font-size: 13px; font-weight: 600; letter-spacing: .08em; text-transform: uppercase; color: var(--dim); }
+h3 { margin: 0; font-size: 17px; font-weight: 650; text-wrap: balance; }
+.muted { color: var(--dim); }
+.small { font-size: 13px; }
+.mono, .num { font-family: var(--mono); font-variant-numeric: tabular-nums; }
+.stack { display: grid; gap: 12px; }
+
+/* Tabs */
+.tabs { display: flex; gap: 4px; background: var(--panel2); padding: 4px; border-radius: 9px; }
+.tabs button { flex: 1; border: 0; background: none; padding: 8px 10px; border-radius: 6px; color: var(--dim); font-weight: 600; font-size: 14px; }
+.tabs button[aria-selected="true"] { background: var(--line); color: var(--ink); }
+
+.stale { border: 1px dashed var(--gold); color: var(--gold); border-radius: 8px; padding: 8px 10px; font-size: 13px; }
+
+/* Skill ladder */
+.ladder { display: grid; gap: 10px; }
+.skill { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 2px 12px; align-items: center; }
+.skill .name { display: flex; gap: 8px; align-items: center; font-weight: 600; min-width: 0; }
+.skill .name i { width: 10px; height: 10px; border-radius: 50%; flex: none; }
+.skill .pct { font: 500 18px var(--mono); font-variant-numeric: tabular-nums; text-align: right; }
+.skill .bar { grid-column: 1 / -1; position: relative; height: 8px; background: var(--panel2); border-radius: 4px; }
+.skill .bar span { position: absolute; inset: 0 auto 0 0; border-radius: 4px; }
+.skill .bar em { position: absolute; top: -4px; bottom: -4px; width: 2px; background: var(--ink); opacity: .55; }
+.skill .about { grid-column: 1 / -1; font-size: 12.5px; color: var(--dim); }
+.dots { grid-column: 1 / -1; display: flex; flex-wrap: wrap; gap: 3px; }
+.dots b { width: 9px; height: 9px; border-radius: 2px; background: var(--panel2); border: 1px solid var(--line); box-sizing: border-box; }
+.dots b.w1 { background: #6b5a1e; border-color: #6b5a1e; } .dots b.w2 { background: #b3922a; border-color: #b3922a; } .dots b.w3 { background: var(--gold); border-color: var(--gold); }
+.legend { display: flex; flex-wrap: wrap; gap: 4px 14px; font-size: 12px; color: var(--dim); }
+.legend span { display: inline-flex; align-items: center; gap: 5px; }
+.legend b { width: 9px; height: 9px; border-radius: 2px; display: inline-block; }
+.legend .line { width: 14px; height: 2px; border-radius: 1px; }
+
+.chart { width: 100%; height: auto; display: block; }
+.chart text { fill: var(--dim); font: 10px var(--mono); }
+.chart .grid { stroke: var(--line); stroke-width: 1; }
+
+/* Strategies */
+.headline { display: flex; flex-wrap: wrap; align-items: baseline; gap: 6px 14px; }
+.headline .big { font: 600 40px/1 var(--mono); font-variant-numeric: tabular-nums; color: var(--gold); }
+.pill { display: inline-block; font-size: 12px; font-weight: 650; letter-spacing: .04em; padding: 3px 9px; border-radius: 99px; border: 1px solid currentColor; }
+.pill.wide { color: var(--repair); } .pill.some { color: var(--cell); } .pill.narrow { color: var(--kill); } .pill.none { color: var(--damage); }
+.recipe { margin: 0; padding-left: 18px; display: grid; gap: 4px; }
+.recipe li::marker { color: var(--gold); }
+.inputs { display: grid; gap: 14px; grid-template-columns: repeat(auto-fill, minmax(min(100%, 250px), 1fr)); }
+.inp { display: grid; gap: 4px; min-width: 0; }
+.inp .hd { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 2px 8px; align-items: baseline; }
+.inp .hd span { font-size: 13px; font-weight: 600; min-width: 0; }
+.inp .hd .tag { margin-left: auto; }
+.tag { font-size: 11px; font-weight: 650; letter-spacing: .05em; text-transform: uppercase; white-space: nowrap; }
+.tag.t2 { color: var(--gold); } .tag.t1 { color: var(--cell); } .tag.t0 { color: var(--faint); }
+.inp .band { font: 12px var(--mono); color: var(--dim); }
+.inp .band b { color: var(--ink); font-weight: 500; }
+
+/* Knobs */
+.knobs details { border-top: 1px solid var(--line); }
+.knobs details:first-of-type { border-top: 0; }
+.knobs summary { cursor: pointer; padding: 11px 0; font-weight: 650; display: flex; justify-content: space-between; gap: 8px; list-style: none; }
+.knobs summary::-webkit-details-marker { display: none; }
+.knobs summary::after { content: "+"; color: var(--dim); font: 16px var(--mono); }
+.knobs details[open] > summary::after { content: "−"; }
+.knobs summary .cnt { margin-left: auto; color: var(--gold); font: 12px var(--mono); }
+.knobs .sect { display: grid; gap: 10px; padding-bottom: 14px; }
+.kh { display: flex; gap: 10px; align-items: baseline; justify-content: space-between; flex-wrap: wrap; padding-top: 6px; }
+.kh p { margin: 0; }
+.field { display: grid; grid-template-columns: minmax(0, 1fr) 92px; gap: 2px 10px; align-items: center; }
+.field label { font-size: 14px; }
+.field small { grid-column: 1 / -1; color: var(--dim); font-size: 12px; }
+.field.changed label { color: var(--gold); }
+input[type=number], input[type=text], textarea, select { background: var(--void); border: 1px solid var(--line); border-radius: 6px; padding: 7px 8px; width: 100%; box-sizing: border-box; font-family: var(--mono); font-size: 14px; font-variant-numeric: tabular-nums; }
+.field.changed input { border-color: var(--gold); }
+textarea { min-height: 88px; resize: vertical; font-size: 12px; }
+
+.waves { width: 100%; border-collapse: collapse; font-size: 13px; }
+.waves th { text-align: left; font-weight: 600; color: var(--dim); font-size: 11.5px; letter-spacing: .04em; text-transform: uppercase; padding: 0 4px 4px; }
+.waves td { padding: 3px 4px; vertical-align: middle; }
+.waves input[type=number] { padding: 6px; }
+.waves .x { border: 0; background: none; color: var(--dim); font-size: 18px; padding: 2px 6px; }
+.waves .clock { font: 11px var(--mono); color: var(--dim); }
+.wrap-x { overflow-x: auto; }
+.row { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.btn { border: 1px solid var(--line); background: var(--panel2); border-radius: 7px; padding: 8px 12px; font-weight: 600; font-size: 14px; }
+.btn:hover { border-color: var(--dim); }
+.btn.go { background: var(--cell); color: #021015; border-color: var(--cell); }
+.btn.gold { background: var(--gold); color: #1a1300; border-color: var(--gold); }
+.btn.quiet { background: none; }
+.btn:disabled { opacity: .45; cursor: default; }
+.toxlist { display: flex; flex-wrap: wrap; gap: 8px; }
+.toxlist label { display: flex; align-items: center; gap: 4px; }
+.toxlist input { width: 74px; }
+
+/* Saved */
+.saved { display: grid; gap: 8px; }
+.slot { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 4px 10px; align-items: center; padding: 10px; border: 1px solid var(--line); border-radius: 8px; }
+.slot .sum { grid-column: 1 / -1; font: 12px var(--mono); color: var(--dim); }
+
+/* Run bar: stays at the bottom on a phone */
+.runbar { position: sticky; bottom: 0; z-index: 5; margin-top: 18px; background: color-mix(in srgb, var(--void) 88%, transparent); backdrop-filter: blur(8px); border-top: 1px solid var(--line); padding: 10px 0 calc(10px + env(safe-area-inset-bottom, 0px)); }
+.runbar .inner { display: flex; flex-wrap: wrap; gap: 8px 12px; align-items: center; }
+.runbar label { display: flex; gap: 6px; align-items: center; font-size: 13px; color: var(--dim); }
+.runbar select { width: auto; padding: 6px; }
+.prog { flex: 1 1 160px; display: grid; gap: 3px; min-width: 0; }
+.prog .track { height: 6px; background: var(--panel2); border-radius: 3px; overflow: hidden; }
+.prog .track span { display: block; height: 100%; width: 0; background: var(--cell); transition: width .2s; }
+.prog small { font: 12px var(--mono); color: var(--dim); }
+.toast { position: fixed; left: 50%; bottom: calc(80px + env(safe-area-inset-bottom, 0px)); transform: translateX(-50%); background: var(--panel2); border: 1px solid var(--line); padding: 8px 14px; border-radius: 8px; font-size: 14px; z-index: 9; }
+footer { color: var(--faint); font-size: 12px; padding-block: 18px 8px; }
+</style>
+
+<div id="app">
+  <header class="top">
+    <h1>Immune RTS <b>Tuner</b></h1>
+    <p>Change the level's pressure, then let bots play it. The skill ladder shows who wins. Winning strategies tries many different ways to play and shows which ranges of choices win.</p>
+    <span class="fair">Every knob is part of the level's script or a fixed rule. Nothing reacts to how the player is doing.</span>
+  </header>
+
+  <div class="cols">
+    <section class="results panel stack" aria-label="Results">
+      <div class="tabs" role="tablist">
+        <button role="tab" id="tabLadder" aria-selected="true" type="button">Skill ladder</button>
+        <button role="tab" id="tabStrat" aria-selected="false" type="button">Winning strategies</button>
+      </div>
+      <div id="paneLadder" class="stack"></div>
+      <div id="paneStrat" class="stack" hidden></div>
+    </section>
+
+    <section class="knobs panel" aria-label="Difficulty settings">
+      <div class="kh">
+        <h2>Difficulty</h2>
+        <div class="row"><span id="changeCount" class="small muted"></span><button class="btn quiet" id="resetAll" type="button">Reset to live game</button></div>
+      </div>
+      <div id="knobs"></div>
+    </section>
+  </div>
+
+  <section class="panel stack" style="margin-top:18px" aria-label="Saved difficulties and export">
+    <h2>Saved difficulties</h2>
+    <p class="small muted" style="margin:0">Saved on this device only. Save one per difficulty (Easy, Normal, Hard) to compare how wide the winning range is on each.</p>
+    <div class="row"><input type="text" id="slotName" placeholder="Name, like Hard" style="flex:1 1 160px"><button class="btn" id="slotSave" type="button">Save current</button></div>
+    <div class="saved" id="saved"></div>
+    <h2 style="margin-top:8px">Use these numbers</h2>
+    <div class="row">
+      <button class="btn gold" id="play" type="button">Play these settings</button>
+      <button class="btn" id="copy" type="button">Copy settings</button>
+    </div>
+    <p class="small muted" style="margin:0">Play opens a copy of the game with these settings. The live game link is not changed. To make them the real game's numbers, paste the copied settings into the build thread.</p>
+    <label class="small muted" for="paste">Load settings someone copied</label>
+    <textarea id="paste" placeholder='{"tune": {...}, "waves": [...], "toxins": [...]}'></textarea>
+    <div class="row"><button class="btn" id="load" type="button">Load pasted settings</button></div>
+  </section>
+
+  <div class="runbar">
+    <div class="inner">
+      <button class="btn go" id="runLadder" type="button">Run skill ladder</button>
+      <label for="ladderN">games each <select id="ladderN"><option>4</option><option selected>8</option><option>16</option></select></label>
+      <button class="btn go" id="runStrat" type="button">Find winning strategies</button>
+      <label for="stratN">strategies <select id="stratN"><option>60</option><option selected>120</option><option>240</option><option>480</option></select></label>
+      <div class="prog" id="prog" hidden><div class="track"><span id="progBar"></span></div><small id="progTxt"></small></div>
+      <button class="btn quiet" id="stop" type="button" hidden>Stop</button>
+    </div>
+  </div>
+  <footer>Bots play the same simulation as the game, at full detail, using only the buttons a player has.</footer>
+</div>
+<div class="toast" id="toast" hidden></div>
+
+<script>
+'use strict';
+// ---------------------------------------------------------------------------
+// Immune RTS prototype v2: simulation. No DOM, so it also runs headless under
+// node (see src/headless.js). Spec: "Immune RTS: Simpler Prototype v2" doc.
+//
+// World coordinates: u runs along the lymph flow (0 = wound end, L = lymph
+// node end), v runs across it (0 = blood vessel edge). The UI maps (u, v) to
+// screen either as-is (landscape) or transposed (portrait).
+// ---------------------------------------------------------------------------
+
+// Every tunable number. The dev panel edits these live; the sim reads them each tick.
+const DEFAULTS = {
+  level:      { duration: 300, cellCap: 60, maxBacteria: 180, startNeut: 12, startMac: 4 },
+  stream:     { start: 0.5, end: 1.4, clump: 3, armoredFrom: 90, armoredShare: 0.15 },
+  marrow:     { neutEvery: 1, macEvery: 3 },
+  output:     { start: 0.5, min: 0.5, max: 2, rest: 1.15, tire: 1.2, recover: 1.2 },
+  fatigue:    { tired: 35, feverish: 60, exhausted: 85, tiredSpeed: 0.85, feverSpread: 0.3, feverLife: 0.7, exhaustedMarrow: 0.5, exhaustedRing: 0.6 },
+  neutrophil: { speed: 46, range: 64, fireEvery: 0.8, life: 30, turnEvery: 0.3, zigzag: 1.5, stray: 0.25, standoff: 36, shotSpeed: 420, spread: 0.35 },
+  macrophage: { speed: 20, eatEvery: 2, gulp: 0.45, reach: 11 },
+  support:    { ring: 50, speedMul: 1.5 },
+  bacteria:   { hp: 3, doubling: 10, armorDoubling: 20, jitter: 0.25, drift: 10, crowdDrift: 0.12, crowdStart: 25, crowdRadius: 10, crowdMax: 5, knock: 4, hitRadius: 4.5, armorRadius: 6 },
+  toxin:      { warn: 2, notice: 6, sweep: 0.6 },
+  lymph:      { fill: 20 },
+};
+
+// One line per tunable, shown in the dev panel.
+const HINTS = {
+  'level.duration': 'Seconds of scripted ingress (the progress bar). Win once it is full and the map is clear.',
+  'stream.start': 'Bacteria per second streaming in through the Wound at 0:00, between the big waves.',
+  'stream.end': 'Stream rate per second by the end of the level (it ramps up linearly).',
+  'stream.clump': 'Stream bacteria arrive in clumps of up to this many.',
+  'stream.armoredFrom': 'Seconds into the level before armored bacteria join the stream.',
+  'stream.armoredShare': 'Share of the stream that is armored after that.',
+  'output.start': 'Body output slider position at 0:00 (0 = lowest, 1 = highest).',
+  'output.min': 'Marrow speed multiplier with the slider all the way down.',
+  'output.max': 'Marrow speed multiplier with the slider all the way up.',
+  'output.rest': 'Output multiplier the body can sustain: above it fatigue builds, below it fatigue recovers.',
+  'output.tire': 'Fatigue points per second for each 1x of output above rest.',
+  'output.recover': 'Fatigue points per second recovered for each 1x of output below rest.',
+  'fatigue.tired': 'Fatigue (0-100) where Tired starts: your cells move slower.',
+  'fatigue.feverish': 'Fatigue where Feverish starts: neutrophil shots spray and neutrophils die sooner.',
+  'fatigue.exhausted': 'Fatigue where Exhausted starts: the marrow slows and Support rings shrink.',
+  'fatigue.tiredSpeed': 'Speed multiplier for all your cells while Tired or worse.',
+  'fatigue.feverSpread': 'Extra aim wobble (radians) while Feverish or worse.',
+  'fatigue.feverLife': 'Neutrophil lifespan multiplier while Feverish or worse.',
+  'fatigue.exhaustedMarrow': 'Marrow speed multiplier while Exhausted.',
+  'fatigue.exhaustedRing': 'Support ring size multiplier while Exhausted.',
+  'level.cellCap': 'Most of your cells allowed on the field at once.',
+  'level.maxBacteria': 'Bacteria stop dividing at this many on the map.',
+  'level.startNeut': 'Neutrophils on the field at 0:00.',
+  'level.startMac': 'Macrophages on the field at 0:00.',
+  'marrow.neutEvery': 'Seconds to make one neutrophil.',
+  'marrow.macEvery': 'Seconds to make one macrophage.',
+  'neutrophil.speed': 'Units per second (zones are 300 long).',
+  'neutrophil.range': 'Firing range. A neutrophil is about 16 units across.',
+  'neutrophil.fireEvery': 'Seconds between shots.',
+  'neutrophil.life': 'Seconds a neutrophil lives.',
+  'neutrophil.turnEvery': 'Seconds between zigzag turns.',
+  'neutrophil.zigzag': 'How far each turn can veer off the target line (radians).',
+  'neutrophil.stray': 'Chance each turn heads somewhere completely random instead.',
+  'neutrophil.standoff': 'Neutrophils stop closing in at about this distance.',
+  'neutrophil.shotSpeed': 'Antibody bullet speed.',
+  'neutrophil.spread': 'Aim wobble in radians; more means more misses.',
+  'macrophage.speed': 'Units per second.',
+  'macrophage.eatEvery': 'Seconds between swallows on Offense.',
+  'macrophage.gulp': 'Seconds a swallow takes.',
+  'macrophage.reach': 'How close it must get to swallow.',
+  'support.ring': 'Radius of a Support macrophage ring.',
+  'support.speedMul': 'Speed multiplier for neutrophils inside a ring.',
+  'bacteria.hp': 'Plain hits to kill a bacterium (tuned shots always kill).',
+  'bacteria.doubling': 'Seconds for a bacterium to divide while it has room.',
+  'bacteria.armorDoubling': 'Seconds for an armored bacterium to divide.',
+  'bacteria.jitter': 'Random spread on division times (fraction).',
+  'bacteria.drift': 'Lymph flow speed toward the Lymph node.',
+  'bacteria.crowdDrift': 'Extra drift per bacterium in a zone beyond crowd start (spill-over).',
+  'bacteria.crowdStart': 'Zone count where crowding starts pushing bacteria onward.',
+  'bacteria.crowdRadius': 'Neighbour radius for the room check.',
+  'bacteria.crowdMax': 'A bacterium will not divide with this many neighbours.',
+  'bacteria.knock': 'How far a plain hit nudges a bacterium back.',
+  'bacteria.hitRadius': 'How close a shot must pass to hit a plain bacterium.',
+  'bacteria.armorRadius': 'How close a shot must pass to hit an armored bacterium.',
+  'toxin.warn': 'Seconds the Wound flashes red before a burst.',
+  'toxin.notice': 'Seconds before a burst that the banner starts counting down.',
+  'toxin.sweep': 'Seconds for the toxin wave to cross the Wound.',
+  'lymph.fill': 'Seconds of bacteria in the Lymph node before you lose. Holds while it is clear.',
+};
+
+// Scripted levels. Waves: b = bacteria, a = armored bacteria. Toxins are fractions of the level.
+const LEVELS = {
+  papercut: {
+    name: 'Papercut',
+    // Doc schedule with counts scaled up after balance runs, plus two small filler waves (0:50, 3:40)
+    waves: [{ t: 0, b: 40 }, { t: 50, b: 30 }, { t: 90, a: 26, b: 24 }, { t: 150, b: 80 }, { t: 220, b: 40 }, { t: 255, b: 80, a: 28, final: true }],
+    toxins: [1 / 3, 2 / 3],
+  },
+};
+
+const clone = o => JSON.parse(JSON.stringify(o));
+let CONFIG = clone(DEFAULTS);
+function mergeConfig(saved) {
+  if (!saved || typeof saved !== 'object') return;
+  for (const g in saved) {
+    if (!CONFIG[g]) continue;
+    for (const k in saved[g]) if (k in DEFAULTS[g] && typeof saved[g][k] === 'number') CONFIG[g][k] = saved[g][k];
+  }
+}
+
+function mulberry32(a) {
+  return function () {
+    a |= 0; a = a + 0x6D2B79F5 | 0;
+    let t = Math.imul(a ^ a >>> 15, 1 | a);
+    t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t;
+    return ((t ^ t >>> 14) >>> 0) / 4294967296;
+  };
+}
+
+// Map: three zones of 300 along the flow; the blood vessel is a strip along v < VESSEL.
+const L = 900, WIDTH = 460, ZONE = 300, VESSEL = 44;
+const ZONES = ['Wound', 'Tissue', 'Lymph node'];
+const zoneOf = u => (u < ZONE ? 0 : u < 2 * ZONE ? 1 : 2);
+const WOUND = { u: 70, v: 270 }; // where waves spill in and toxins burst from
+// Support/Offense posts inside a zone, in fill order (fractions of zone length / field width)
+const POSTS = [[0.5, 0.5], [0.3, 0.3], [0.7, 0.72], [0.3, 0.75], [0.7, 0.28], [0.5, 0.15], [0.5, 0.88]];
+
+class Game {
+  constructor(levelKey, seed) {
+    this.key = levelKey || 'papercut';
+    this.lv = LEVELS[this.key];
+    this.seed = seed || 1;
+    this.rand = mulberry32(this.seed * 9973 + 17);
+    this.t = 0;
+    this.bact = []; this.neut = []; this.mac = []; this.shots = [];
+    this.fx = []; // visual events for the UI: {k, u, v, ...}
+    this.zones = ZONES.map(name => ({ name, mode: 'offense', count: 0 }));
+    this.marrow = { make: 'neut', prog: 0 };
+    this.lymph = { timer: 0, peak: 0, reached: false, beat: 0 };
+    this.waveIdx = 0; this.streamAcc = 0;
+    this.output = CONFIG.output.start; this.fatigue = 0; this.tier = 0; this.fatiguePeak = 0; this.tierTime = [0, 0, 0, 0];
+    this.toxins = this.lv.toxins.map(f => ({ at: f * CONFIG.level.duration, state: 'coming', front: 0 }));
+    this.stats = { shotKills: 0, swallows: 0, made: 0, toxinDeaths: 0, peak: 0, bounced: 0 };
+    this.history = []; this.histT = 0;
+    this.result = null;
+    this.id = 1;
+    for (let i = 0; i < CONFIG.level.startNeut; i++) this.spawnNeut(60 + this.rand() * 300, VESSEL + 30 + this.rand() * 120);
+    for (let i = 0; i < CONFIG.level.startMac; i++) this.spawnMac(true);
+    this.runWaves();
+  }
+
+  // ---- player actions ----
+  setMarrow(kind) { if (kind === 'neut' || kind === 'mac') { if (kind !== this.marrow.make) this.marrow.prog = 0; this.marrow.make = kind; } }
+  toggleZone(z) { const zn = this.zones[z]; if (zn) zn.mode = zn.mode === 'offense' ? 'support' : 'offense'; }
+  setZone(z, mode) { if (this.zones[z]) this.zones[z].mode = mode; }
+  setOutput(x) { this.output = Math.max(0, Math.min(1, +x || 0)); }
+  // Marrow speed multiplier from the slider (geometric between min and max, 1x in the middle by default)
+  outputMul() { const O = CONFIG.output; return O.min * Math.pow(O.max / O.min, this.output); }
+  // 0 fine, 1 Tired, 2 Feverish, 3 Exhausted
+  fatigueTier() { const F = CONFIG.fatigue, f = this.fatigue; return f >= F.exhausted ? 3 : f >= F.feverish ? 2 : f >= F.tired ? 1 : 0; }
+  // The toxin about to hit (inside its notice window) or mid-sweep, if any
+  pendingToxin() {
+    for (const tx of this.toxins) {
+      if (tx.state === 'sweeping') return tx;
+      if (tx.state === 'coming' && this.t >= tx.at - CONFIG.toxin.notice) return tx;
+    }
+    return null;
+  }
+
+  // ---- spawning ----
+  spawnNeut(u, v) {
+    this.neut.push({ id: this.id++, u, v, vu: 0, vv: 0, head: Math.PI / 2, turn: 0, cd: this.rand() * 0.5, age: 0, boosted: false, dead: false });
+  }
+  spawnMac(start) {
+    // New macrophages take the zone with the fewest; ties go to the earlier zone
+    const n = [0, 0, 0]; for (const m of this.mac) n[m.home]++;
+    let home = 0; for (let z = 1; z < 3; z++) if (n[z] < n[home]) home = z;
+    const slot = n[home] % POSTS.length;
+    const pu = home * ZONE + POSTS[slot][0] * ZONE, pv = VESSEL + POSTS[slot][1] * (WIDTH - VESSEL);
+    const u = start ? pu : Math.min(L - 20, Math.max(20, pu + (this.rand() - 0.5) * 80)), v = start ? pv : VESSEL * 0.5;
+    this.mac.push({ id: this.id++, u, v, home, pu, pv, mode: 'offense', cd: 0, gulp: 0, prey: null, dead: false, flip: 0 });
+  }
+  spawnBact(armored, u, v) {
+    if (this.bact.length >= CONFIG.level.maxBacteria + 140) return;
+    const r = this.rand;
+    this.bact.push({
+      id: this.id++, armored: !!armored,
+      u: u == null ? WOUND.u + (r() - 0.5) * 90 : u, v: v == null ? WOUND.v + (r() - 0.5) * 180 : v,
+      hp: armored ? 1 : CONFIG.bacteria.hp, age: 0, div: this.divTime(armored), flash: 0, rot: r() * 6.283, dead: false, eaten: false,
+    });
+  }
+  divTime(armored) { return (armored ? CONFIG.bacteria.armorDoubling : CONFIG.bacteria.doubling) * (1 + (this.rand() - 0.5) * 2 * CONFIG.bacteria.jitter); }
+
+  runWaves() {
+    const w = this.lv.waves;
+    while (this.waveIdx < w.length && this.t >= w[this.waveIdx].t) {
+      const wave = w[this.waveIdx++];
+      for (let i = 0; i < (wave.b || 0); i++) this.spawnBact(false);
+      for (let i = 0; i < (wave.a || 0); i++) this.spawnBact(true);
+      this.fx.push({ k: 'wave', u: WOUND.u, v: WOUND.v, n: (wave.b || 0) + (wave.a || 0), armored: wave.a || 0, final: !!wave.final });
+    }
+  }
+  // Progress-bar markers still to come: {t, kind: 'wave'|'toxin', final}
+  markers() {
+    const out = [];
+    for (let i = this.waveIdx; i < this.lv.waves.length; i++) out.push({ t: this.lv.waves[i].t, kind: 'wave', final: !!this.lv.waves[i].final, armored: !!this.lv.waves[i].a });
+    for (const tx of this.toxins) if (tx.state === 'coming') out.push({ t: tx.at, kind: 'toxin' });
+    return out;
+  }
+
+  // ---- queries ----
+  liveBact() { return this.bact.filter(b => !b.dead && !b.eaten); }
+  nearestBact(u, v, maxD, filter) {
+    let best = null, bd = maxD * maxD;
+    for (const b of this.bact) {
+      if (b.dead || b.eaten || (filter && !filter(b))) continue;
+      const d = (b.u - u) ** 2 + (b.v - v) ** 2;
+      if (d < bd) { bd = d; best = b; }
+    }
+    return best;
+  }
+  inRing(u, v) {
+    const r2 = (this.ringR || CONFIG.support.ring) ** 2;
+    for (const m of this.mac) if (!m.dead && m.mode === 'support' && (m.u - u) ** 2 + (m.v - v) ** 2 < r2) return true;
+    return false;
+  }
+  cellCount() { return this.neut.length + this.mac.length; }
+
+  // ---- tick ----
+  step(dt) {
+    if (this.result) return;
+    const C = CONFIG, r = this.rand;
+    this.t += dt;
+    const t = this.t;
+    if (this.fx.length > 400) this.fx.splice(0, this.fx.length - 400);
+
+    // Script: waves, trickle, toxins
+    this.runWaves();
+    // Constant stream through the Wound between the big waves, ramping up over the level
+    if (t < C.level.duration) {
+      const f = t / C.level.duration;
+      this.streamAcc += dt * (C.stream.start + (C.stream.end - C.stream.start) * f);
+      while (this.streamAcc >= 1) {
+        const n = Math.max(1, Math.min(Math.floor(this.streamAcc), 1 + Math.floor(r() * C.stream.clump)));
+        this.streamAcc -= n;
+        const cu = WOUND.u + (r() - 0.5) * 60, cv = WOUND.v + (r() - 0.5) * 160;
+        for (let i = 0; i < n; i++) this.spawnBact(t >= C.stream.armoredFrom && r() < C.stream.armoredShare, cu + (r() - 0.5) * 12, cv + (r() - 0.5) * 12);
+        this.fx.push({ k: 'trickle', u: cu, v: cv });
+      }
+    }
+
+    // Body output and fatigue: pushing the marrow past what the body can sustain builds fatigue
+    const mul = this.outputMul(), O = C.output, F = C.fatigue;
+    this.fatigue += (mul > O.rest ? (mul - O.rest) * O.tire : (mul - O.rest) * O.recover) * dt;
+    this.fatigue = Math.max(0, Math.min(100, this.fatigue));
+    this.fatiguePeak = Math.max(this.fatiguePeak, this.fatigue);
+    const tier = this.fatigueTier();
+    if (tier !== this.tier) { this.fx.push({ k: 'tier', tier, up: tier > this.tier }); this.tier = tier; }
+    this.tierTime[tier] += dt;
+    const slow = tier >= 1 ? F.tiredSpeed : 1;
+    this.ringR = C.support.ring * (tier >= 3 ? F.exhaustedRing : 1);
+    for (const tx of this.toxins) {
+      if (tx.state === 'coming' && t >= tx.at) { tx.state = 'sweeping'; tx.front = 0; this.fx.push({ k: 'burst', u: WOUND.u, v: WOUND.v }); }
+      if (tx.state === 'sweeping') {
+        tx.front += dt / C.toxin.sweep;
+        const reach = tx.front * 340; // radius from the wound that covers the whole zone
+        const kill = c => c.u < ZONE && Math.hypot(c.u - WOUND.u, c.v - WOUND.v) < reach;
+        for (const c of this.neut) if (!c.dead && kill(c)) { c.dead = true; this.stats.toxinDeaths++; this.fx.push({ k: 'die', u: c.u, v: c.v, who: 'neut' }); }
+        for (const c of this.mac) if (!c.dead && kill(c)) { c.dead = true; this.stats.toxinDeaths++; if (c.prey) c.prey.eaten = false, c.prey = null; this.fx.push({ k: 'die', u: c.u, v: c.v, who: 'mac' }); }
+        if (tx.front >= 1) tx.state = 'done';
+      }
+    }
+    const warnTx = this.toxins.find(tx => tx.state === 'coming' && t >= tx.at - C.toxin.warn);
+    this.warning = warnTx ? (warnTx.at - t) : 0;
+
+    // Marrow: a steady flow of the chosen cell, held at the cap
+    const every = this.marrow.make === 'neut' ? C.marrow.neutEvery : C.marrow.macEvery;
+    if (this.cellCount() < C.level.cellCap) {
+      this.marrow.prog += dt / every * mul * (tier >= 3 ? F.exhaustedMarrow : 1);
+      if (this.marrow.prog >= 1) {
+        this.marrow.prog = 0; this.stats.made++;
+        if (this.marrow.make === 'neut') { const u = 40 + r() * (L - 80); this.spawnNeut(u, VESSEL * 0.5); this.fx.push({ k: 'arrive', u, v: VESSEL * 0.5 }); }
+        else { this.spawnMac(false); const m = this.mac[this.mac.length - 1]; this.fx.push({ k: 'arrive', u: m.u, v: m.v }); }
+      }
+    } else this.marrow.prog = Math.min(1, this.marrow.prog);
+
+    // Macrophages: mode comes from the zone they stand in
+    for (const m of this.mac) {
+      if (m.dead) continue;
+      const mode = this.zones[zoneOf(m.u)].mode;
+      if (mode !== m.mode) { m.mode = mode; m.flip = 0.4; if (mode === 'support' && m.prey) { m.prey.eaten = false; m.prey = null; m.gulp = 0; } }
+      m.flip = Math.max(0, m.flip - dt);
+      m.cd = Math.max(0, m.cd - dt);
+      let tu = m.pu, tv = m.pv, sp = C.macrophage.speed * slow;
+      if (m.gulp > 0) {
+        m.gulp -= dt;
+        if (m.prey) { m.prey.u += (m.u - m.prey.u) * Math.min(1, dt * 8); m.prey.v += (m.v - m.prey.v) * Math.min(1, dt * 8); }
+        if (m.gulp <= 0 && m.prey) { m.prey.dead = true; m.prey = null; this.stats.swallows++; m.cd = C.macrophage.eatEvery; }
+        sp = 0;
+      } else if (m.mode === 'offense' && m.cd <= 0) {
+        const lo = m.home * ZONE - 10, hi = (m.home + 1) * ZONE + 10;
+        const b = this.nearestBact(m.u, m.v, 400, b => b.u >= lo && b.u < hi);
+        if (b) {
+          tu = b.u; tv = b.v;
+          if (Math.hypot(b.u - m.u, b.v - m.v) < C.macrophage.reach) { m.prey = b; b.eaten = true; m.gulp = C.macrophage.gulp; this.fx.push({ k: 'gulp', id: m.id, u: m.u, v: m.v }); sp = 0; }
+        }
+      }
+      const du = tu - m.u, dv = tv - m.v, d = Math.hypot(du, dv);
+      if (d > 1 && sp > 0) { const s = Math.min(d, sp * dt); m.u += du / d * s; m.v += dv / d * s; }
+    }
+
+    // Neutrophils: directed random walk toward the nearest bacterium, shooting anything in range
+    for (const n of this.neut) {
+      if (n.dead) continue;
+      n.age += dt;
+      if (n.age >= C.neutrophil.life * (tier >= 2 ? F.feverLife : 1)) { n.dead = true; this.fx.push({ k: 'expire', u: n.u, v: n.v }); continue; }
+      n.boosted = this.inRing(n.u, n.v);
+      const target = this.nearestBact(n.u, n.v, 2000);
+      n.turn -= dt;
+      if (n.turn <= 0) {
+        n.turn = C.neutrophil.turnEvery * (0.6 + r() * 0.8);
+        let want;
+        if (target) {
+          const d = Math.hypot(target.u - n.u, target.v - n.v);
+          want = Math.atan2(target.v - n.v, target.u - n.u);
+          if (d < C.neutrophil.standoff) want += Math.PI / 2 * (r() < 0.5 ? 1 : -1); // circle instead of crowding in
+        } else {
+          // Nothing to chase: drift toward the middle of the field
+          want = Math.atan2(WIDTH * 0.55 - n.v, L * 0.45 - n.u) + (r() - 0.5) * 2;
+        }
+        // Directed random walk: veer off the line each turn, and sometimes just wander off
+        n.head = r() < C.neutrophil.stray ? r() * 6.283 : want + C.neutrophil.zigzag * (r() * 2 - 1);
+      }
+      let sp = C.neutrophil.speed * slow * (n.boosted ? C.support.speedMul : 1);
+      n.vu += (Math.cos(n.head) * sp - n.vu) * Math.min(1, dt * 6);
+      n.vv += (Math.sin(n.head) * sp - n.vv) * Math.min(1, dt * 6);
+      n.u = Math.max(8, Math.min(L - 8, n.u + n.vu * dt));
+      n.v = Math.max(VESSEL * 0.3, Math.min(WIDTH - 8, n.v + n.vv * dt));
+      if (n.v < VESSEL && n.vv < 0) n.vv *= -0.5;
+      // Fire: prefer a target the shot can hurt
+      n.cd -= dt;
+      if (n.cd <= 0) {
+        const can = n.boosted ? null : b => !b.armored;
+        const aim = this.nearestBact(n.u, n.v, C.neutrophil.range, can) || this.nearestBact(n.u, n.v, C.neutrophil.range);
+        if (aim) {
+          n.cd = C.neutrophil.fireEvery;
+          const d = Math.hypot(aim.u - n.u, aim.v - n.v), tt = d / C.neutrophil.shotSpeed;
+          const au = aim.u + C.bacteria.drift * tt, av = aim.v;
+          const a = Math.atan2(av - n.v, au - n.u) + (r() - 0.5) * 2 * (C.neutrophil.spread + (tier >= 2 ? F.feverSpread : 0));
+          this.shots.push({ u: n.u, v: n.v, pu: n.u, pv: n.v, du: Math.cos(a), dv: Math.sin(a), life: C.neutrophil.range * 1.4 / C.neutrophil.shotSpeed, tuned: n.boosted, from: n.id });
+        } else n.cd = 0.05;
+      }
+    }
+
+    // Shots: straight tracers; the first bacterium touched takes the hit
+    for (const s of this.shots) {
+      s.pu = s.u; s.pv = s.v;
+      const step = C.neutrophil.shotSpeed * dt;
+      s.u += s.du * step; s.v += s.dv * step; s.life -= dt;
+      for (const b of this.bact) {
+        if (b.dead || b.eaten) continue;
+        // distance from b to the segment travelled this tick
+        const wu = b.u - s.pu, wv = b.v - s.pv, proj = Math.max(0, Math.min(step, wu * s.du + wv * s.dv));
+        const cu = s.pu + s.du * proj, cv = s.pv + s.dv * proj;
+        if ((b.u - cu) ** 2 + (b.v - cv) ** 2 > (b.armored ? C.bacteria.armorRadius : C.bacteria.hitRadius) ** 2) continue;
+        s.life = 0;
+        if (s.tuned) { b.dead = true; this.stats.shotKills++; this.fx.push({ k: 'pop', u: b.u, v: b.v, tuned: true, armored: b.armored }); }
+        else if (b.armored) { this.stats.bounced++; this.fx.push({ k: 'bounce', u: cu, v: cv, du: -s.du, dv: -s.dv }); }
+        else {
+          b.hp--; b.flash = 0.12;
+          b.u += s.du * C.bacteria.knock; b.v += s.dv * C.bacteria.knock;
+          if (b.hp <= 0) { b.dead = true; this.stats.shotKills++; this.fx.push({ k: 'pop', u: b.u, v: b.v }); }
+          else this.fx.push({ k: 'hit', u: cu, v: cv });
+        }
+        break;
+      }
+    }
+
+    // Bacteria: drift with the flow, spill on crowding, divide while there is room
+    const counts = [0, 0, 0];
+    for (const b of this.bact) if (!b.dead && !b.eaten) counts[zoneOf(b.u)]++;
+    const live = counts[0] + counts[1] + counts[2];
+    const cr2 = C.bacteria.crowdRadius ** 2;
+    const born = [];
+    for (const b of this.bact) {
+      if (b.dead || b.eaten) continue;
+      b.flash = Math.max(0, b.flash - dt);
+      const z = zoneOf(b.u);
+      let drift = C.bacteria.drift + C.bacteria.crowdDrift * Math.max(0, counts[z] - C.bacteria.crowdStart);
+      // Inside the Lymph node the flow pools: bacteria gather in a cloud around the node instead of piling at the far edge
+      const pool = z === 2 && b.u > L - 220;
+      if (pool) drift = (L - 130 - b.u) * 0.3;
+      // neighbours: separation push and the room check
+      let near = 0, pu = 0, pv = 0;
+      for (const o of this.bact) {
+        if (o === b || o.dead || o.eaten) continue;
+        const du = b.u - o.u, dv = b.v - o.v, d2 = du * du + dv * dv;
+        if (d2 < cr2) { near++; if (d2 > 0.01) { const d = Math.sqrt(d2); pu += du / d * (1 - d / C.bacteria.crowdRadius); pv += dv / d * (1 - d / C.bacteria.crowdRadius); } }
+      }
+      b.u += (drift + pu * 14) * dt;
+      b.v += (pv * (pool ? 30 : 14) + (pool ? ((WIDTH + VESSEL) / 2 - b.v) * 0.12 : 0) + Math.sin(t * 0.7 + b.id) * (pool ? 8 : 3)) * dt;
+      if (pool) b.u += pu * 16 * dt;
+      b.u = Math.max(6, Math.min(L - 10, b.u));
+      b.v = Math.max(VESSEL + 8, Math.min(WIDTH - 8, b.v));
+      b.rot += dt * 0.3;
+      if (live + born.length < C.level.maxBacteria && near < C.bacteria.crowdMax) {
+        b.age += dt;
+        if (b.age >= b.div) {
+          b.age = 0; b.div = this.divTime(b.armored);
+          const a = r() * 6.283;
+          born.push([b.armored, b.u + Math.cos(a) * 5, b.v + Math.sin(a) * 5]);
+          b.u -= Math.cos(a) * 3; b.v -= Math.sin(a) * 3;
+          if (!b.armored) b.hp = C.bacteria.hp;
+        }
+      }
+    }
+    for (const nb of born) { this.spawnBact(nb[0], nb[1], nb[2]); this.fx.push({ k: 'divide', u: nb[1], v: nb[2] }); }
+
+    // Cleanup
+    if (this.neut.some(n => n.dead)) this.neut = this.neut.filter(n => !n.dead);
+    if (this.mac.some(m => m.dead)) this.mac = this.mac.filter(m => !m.dead);
+    if (this.bact.some(b => b.dead)) this.bact = this.bact.filter(b => !b.dead);
+    if (this.shots.some(s => s.life <= 0)) this.shots = this.shots.filter(s => s.life > 0);
+
+    // Zone counts, lymph node timer
+    const zc = [0, 0, 0];
+    for (const b of this.bact) if (!b.eaten) zc[zoneOf(b.u)]++;
+    for (let z = 0; z < 3; z++) this.zones[z].count = zc[z];
+    const total = zc[0] + zc[1] + zc[2];
+    this.stats.peak = Math.max(this.stats.peak, total);
+    if (zc[2] > 0) {
+      if (!this.lymph.reached) { this.lymph.reached = true; this.fx.push({ k: 'breach' }); }
+      this.lymph.timer = Math.min(1, this.lymph.timer + dt / C.lymph.fill);
+      this.lymph.peak = Math.max(this.lymph.peak, this.lymph.timer);
+    }
+    this.histT -= dt;
+    if (this.histT <= 0) { this.histT = 2; this.history.push({ t, z: zc.slice(), n: this.neut.length, m: this.mac.length, timer: this.lymph.timer, fatigue: this.fatigue, output: this.output }); }
+
+    if (this.lymph.timer >= 1) this.finish(false, `Bacteria sat in the Lymph node for ${C.lymph.fill} s and multiplied there.`);
+    else if (t >= C.level.duration && total === 0) this.finish(true, 'The bar is full and every bacterium is gone.');
+  }
+
+  finish(win, reason) {
+    const st = this.stats;
+    const goals = [
+      { text: 'Clear every bacterium', hit: win },
+      { text: 'Lymph node timer never passed half', hit: win && this.lymph.peak <= 0.5 },
+      { text: 'No bacterium reached the Lymph node', hit: win && !this.lymph.reached },
+    ];
+    this.result = { win, reason, t: this.t, goals, stars: goals.filter(g => g.hit).length, stats: { ...st }, peakTimer: this.lymph.peak, fatiguePeak: this.fatiguePeak, tierTime: this.tierTime.slice() };
+  }
+}
+
+// (node export removed) = { Game, DEFAULTS, CONFIG, LEVELS, HINTS, mergeConfig, mulberry32, zoneOf, L, WIDTH, ZONE, VESSEL, WOUND, ZONES };
+
+'use strict';
+// ---------------------------------------------------------------------------
+// Bot players for balance runs. Shared by src/headless.js (node) and the
+// difficulty tuner page (tuner/), so both measure the same thing.
+// Bots only press the same buttons a player has; the level never reacts to
+// how they are doing (no rubber banding).
+// ---------------------------------------------------------------------------
+const BOT_LEVEL0 = JSON.parse(JSON.stringify(LEVELS.papercut)); // the live game's script
+
+const armoredIn = (g, z) => g.bact.some(b => b.armored && !b.eaten && Math.floor(b.u / ZONE) === z);
+function randomPress(g) {
+  const x = g.rand2();
+  if (x < 0.4) g.toggleZone(Math.floor(g.rand2() * 3));
+  else if (x < 0.7) g.setMarrow(g.rand2() < 0.5 ? 'neut' : 'mac');
+  else g.setOutput(g.rand2());
+}
+// Sensible zone and marrow choices: some macrophages, Support where armor shows up or a zone is swamped
+function sensible(g) {
+  g.setMarrow(g.mac.length < 14 ? 'mac' : 'neut');
+  for (let z = 0; z < 3; z++) g.setZone(z, armoredIn(g, z) || g.zones[z].count > 30 ? 'support' : 'offense');
+}
+// Body output: up before waves and when busy, down when getting tired
+function pacedOutput(g) {
+  const soon = g.markers().some(m => m.kind === 'wave' && m.t - g.t < 15);
+  const busy = soon || g.bact.length > 40;
+  g.setOutput(g.fatigue > 45 ? 0.2 : busy && g.fatigue < 30 ? 0.85 : 0.5);
+}
+// Every policy is called every 0.5 s of game time. `every` makes a bot look less often.
+const every = (n, fn) => g => { if ((g.botTick = (g.botTick || 0) + 1) % n === 0) fn(g); };
+
+const POLICIES = {
+  idle: () => {},
+  supportAll: g => { for (let z = 0; z < 3; z++) g.setZone(z, 'support'); },
+  supportWound: g => { g.setZone(0, 'support'); },
+  macHeavy: g => { g.setMarrow('mac'); },
+  maxOutput: g => { g.setOutput(1); },
+  minOutput: g => { g.setOutput(0); },
+  smart: g => { sensible(g); pacedOutput(g); },
+  smartFlat: g => { sensible(g); g.setOutput(0.5); },
+  smartMax: g => { sensible(g); g.setOutput(1); },
+  // Random button mashing: every half second, maybe press something
+  random: g => { if (g.rand2() < 0.5) randomPress(g); },
+  randomSlow: g => { if (g.rand2() < 0.06) randomPress(g); },
+  // Skill ladder between mashing and good play
+  beginner: every(6, g => { if (g.rand2() < 0.35) randomPress(g); else { sensible(g); g.setOutput(0.5); } }),
+  casual: every(3, g => { if (g.rand2() < 0.1) randomPress(g); else { sensible(g); g.setOutput(0.5); } }),
+};
+
+// The ladder the tuner shows, weakest first
+const SKILLS = [
+  { key: 'idle', name: 'Does nothing', about: 'Never touches a control. The floor.' },
+  { key: 'random', name: 'Button masher', about: 'Presses a random control about once a second.' },
+  { key: 'beginner', name: 'Beginner', about: 'Looks every 3 s. One look in three is a random press. Leaves the slider alone.' },
+  { key: 'casual', name: 'Casual', about: 'Looks every 1.5 s. Sensible zones and marrow, slider left in the middle.' },
+  { key: 'smart', name: 'Good player', about: 'Looks every 0.5 s. Support against armor, output up before waves, rests when tired.' },
+];
+
+// A family of strategies a player could follow, as ranges of inputs. The tuner samples
+// many of them at one difficulty and reports which input ranges tend to win.
+const STRATEGY = [
+  { key: 'look', name: 'Looks at the game every', unit: 's', min: 0.5, max: 3, steps: [0.5, 1, 1.5, 2, 3] },
+  { key: 'macs', name: 'Macrophages kept on the field', min: 0, max: 30, int: true },
+  { key: 'armor', name: 'Switches a zone to Support when armor shows up', bool: true },
+  { key: 'crowd', name: 'Switches a zone to Support above this many bacteria', min: 10, max: 80, int: true },
+  { key: 'base', name: 'Body output most of the time', slider: true, min: 0, max: 1 },
+  { key: 'push', name: 'Body output before a wave or when swamped', slider: true, min: 0, max: 1 },
+  { key: 'restAt', name: 'Turns output right down at fatigue', min: 20, max: 100, int: true },
+];
+function makeStrategy(p) {
+  const look = Math.max(1, Math.round(p.look / 0.5));
+  return every(look, g => {
+    g.setMarrow(g.mac.length < p.macs ? 'mac' : 'neut');
+    for (let z = 0; z < 3; z++) g.setZone(z, (p.armor && armoredIn(g, z)) || g.zones[z].count > p.crowd ? 'support' : 'offense');
+    const soon = g.markers().some(m => m.kind === 'wave' && m.t - g.t < 15);
+    g.setOutput(g.fatigue > p.restAt ? Math.min(p.base, 0.15) : soon || g.bact.length > 40 ? p.push : p.base);
+  });
+}
+// n strategies spread evenly over every input (Latin hypercube), the same n always gives the same set
+function sampleStrategies(n) {
+  const rnd = mulberry32(4242 + n);
+  const cols = STRATEGY.map(() => { const a = []; for (let i = 0; i < n; i++) a.push((i + rnd()) / n); for (let i = n - 1; i > 0; i--) { const j = Math.floor(rnd() * (i + 1)); [a[i], a[j]] = [a[j], a[i]]; } return a; });
+  const out = [];
+  for (let i = 0; i < n; i++) {
+    const p = {};
+    STRATEGY.forEach((d, k) => {
+      const x = cols[k][i];
+      p[d.key] = d.bool ? x < 0.5 : d.steps ? d.steps[Math.min(d.steps.length - 1, Math.floor(x * d.steps.length))] : d.int ? Math.round(d.min + x * (d.max - d.min)) : +(d.min + x * (d.max - d.min)).toFixed(3);
+    });
+    out.push(p);
+  }
+  return out;
+}
+
+// Put a settings bundle in place: {tune: {group: {key: n}}, waves: [...], toxins: [seconds]}
+function applySettings(s) {
+  for (const g in DEFAULTS) Object.assign(CONFIG[g], DEFAULTS[g]);
+  s = s || {};
+  mergeConfig(s.tune);
+  const lv = LEVELS.papercut;
+  lv.waves = (s.waves || BOT_LEVEL0.waves).map(w => ({ ...w })).sort((a, b) => a.t - b.t);
+  lv.toxins = s.toxins ? s.toxins.map(t => t / CONFIG.level.duration) : BOT_LEVEL0.toxins.slice();
+}
+
+// One bot match that can be advanced in slices (so a page can stay responsive)
+function startMatch(policy, seed, params) {
+  const g = new Game('papercut', seed);
+  g.rand2 = (() => { let a = seed * 7919 + 3; return () => { a = (a * 1103515245 + 12345) & 0x7fffffff; return a / 0x7fffffff; }; })();
+  const fn = params ? makeStrategy(params) : POLICIES[policy];
+  let maxB = 0;
+  return {
+    game: g,
+    // Run up to `steps` ticks. Returns a summary once the match is over, else null.
+    advance(steps) {
+      for (let i = 0; i < steps; i++) {
+        if (g.result || g.t >= 600) return this.summary();
+        if (Math.round(g.t * 60) % 30 === 0) fn(g);
+        g.step(1 / 60);
+        g.fx.length = 0;
+        if (g.bact.length > maxB) maxB = g.bact.length;
+      }
+      return g.result || g.t >= 600 ? this.summary() : null;
+    },
+    summary() {
+      const r = g.result || { win: false, stars: 0, t: g.t, reason: 'timeout', stats: g.stats, peakTimer: g.lymph.peak };
+      return {
+        policy, seed, params, win: !!r.win, stars: r.stars || 0, t: r.t, reason: r.reason,
+        peakTimer: r.peakTimer || 0, fatiguePeak: g.fatiguePeak, maxBact: maxB,
+        kills: r.stats.shotKills + r.stats.swallows, toxinDeaths: r.stats.toxinDeaths,
+        // bacteria on the map every 2 s
+        curve: g.history.map(h => h.z[0] + h.z[1] + h.z[2]),
+      };
+    },
+  };
+}
+function runMatch(policy, seed, params) { const m = startMatch(policy, seed, params); let s; while (!(s = m.advance(6000))); return s; }
+
+// (node export removed) = { POLICIES, SKILLS, STRATEGY, sampleStrategies, makeStrategy, applySettings, startMatch, runMatch, BOT_LEVEL0 };
+
+const BASELINE = {"ladder":{"sig":"live","n":16,"runs":[{"policy":"idle","seed":1,"win":false,"stars":0,"t":143,"peakTimer":1,"fatiguePeak":0,"curve":[40,34,35,2,1,30,5,1,0,50,43,84,136,180,174]},{"policy":"smart","seed":1,"win":true,"stars":3,"t":301,"peakTimer":0,"fatiguePeak":28,"curve":[40,23,10,1,1,29,6,1,0,45,1,6,8,7,5,77,11,0,1,0,2,12,40,24,0,0,43,2,1,1]},{"policy":"casual","seed":2,"win":true,"stars":2,"t":300,"peakTimer":0.47,"fatiguePeak":1,"curve":[40,34,21,3,1,30,5,1,1,46,3,10,19,21,20,88,90,66,10,1,3,16,57,62,68,47,80,70,25,5]},{"policy":"beginner","seed":3,"win":false,"stars":0,"t":263,"peakTimer":1,"fatiguePeak":5,"curve":[40,22,1,1,1,28,21,2,2,47,9,18,17,27,11,81,45,12,3,1,2,13,57,95,172,179,218]},{"policy":"random","seed":4,"win":false,"stars":0,"t":121,"peakTimer":1,"fatiguePeak":16,"curve":[40,32,8,1,0,30,21,19,29,87,83,143]},{"policy":"idle","seed":5,"win":false,"stars":0,"t":147,"peakTimer":1,"fatiguePeak":0,"curve":[40,27,16,1,0,30,8,0,0,48,35,62,102,166,179]},{"policy":"smart","seed":5,"win":true,"stars":3,"t":300,"peakTimer":0,"fatiguePeak":29,"curve":[40,24,4,0,1,29,4,1,1,48,3,10,7,1,1,73,7,0,2,0,2,15,48,32,0,0,39,2,1,1]},{"policy":"casual","seed":6,"win":true,"stars":1,"t":302,"peakTimer":0.7,"fatiguePeak":0,"curve":[40,25,15,0,1,29,21,0,2,48,6,14,25,39,44,84,64,48,5,4,4,12,57,58,64,26,72,85,44,2]},{"policy":"beginner","seed":7,"win":false,"stars":0,"t":147,"peakTimer":1,"fatiguePeak":6,"curve":[40,23,4,1,1,29,16,0,2,47,42,67,97,137,168]},{"policy":"random","seed":8,"win":false,"stars":0,"t":143,"peakTimer":1,"fatiguePeak":7,"curve":[40,41,35,18,4,33,29,18,1,48,47,92,129,154,136]},{"policy":"idle","seed":9,"win":false,"stars":0,"t":145,"peakTimer":1,"fatiguePeak":0,"curve":[40,27,2,1,0,31,13,2,2,49,39,74,116,181,178]},{"policy":"smart","seed":9,"win":true,"stars":3,"t":300,"peakTimer":0,"fatiguePeak":29,"curve":[40,18,12,1,0,29,3,1,1,47,2,13,26,38,19,73,11,0,2,1,3,14,43,24,8,0,36,2,1,1]},{"policy":"casual","seed":10,"win":false,"stars":0,"t":274,"peakTimer":1,"fatiguePeak":1,"curve":[40,33,22,7,1,29,21,1,1,47,1,9,11,4,0,81,24,3,0,1,2,11,53,69,96,96,143,124]},{"policy":"beginner","seed":11,"win":false,"stars":0,"t":193,"peakTimer":1,"fatiguePeak":3,"curve":[40,35,28,1,2,30,19,3,1,48,4,12,11,12,22,100,144,177,177,138]},{"policy":"random","seed":12,"win":false,"stars":0,"t":147,"peakTimer":1,"fatiguePeak":12,"curve":[40,30,24,1,1,29,0,1,1,49,29,65,104,163,174]},{"policy":"idle","seed":13,"win":false,"stars":0,"t":145,"peakTimer":1,"fatiguePeak":0,"curve":[40,35,23,1,0,31,4,2,1,50,39,77,104,168,180]},{"policy":"smart","seed":13,"win":true,"stars":3,"t":301,"peakTimer":0,"fatiguePeak":30,"curve":[40,31,11,2,0,29,8,1,1,48,2,8,7,14,17,77,3,0,3,1,2,14,50,52,14,1,36,18,3,0]},{"policy":"casual","seed":14,"win":false,"stars":0,"t":269,"peakTimer":1,"fatiguePeak":1,"curve":[40,15,1,1,0,28,21,1,1,46,5,15,15,12,14,79,28,1,1,0,3,15,53,83,114,125,184]},{"policy":"beginner","seed":15,"win":false,"stars":0,"t":271,"peakTimer":1,"fatiguePeak":3,"curve":[40,19,2,0,1,30,6,1,0,46,6,13,13,10,6,77,61,44,2,0,4,14,60,75,104,126,169]},{"policy":"random","seed":16,"win":false,"stars":0,"t":115,"peakTimer":1,"fatiguePeak":10,"curve":[40,21,11,1,5,37,36,35,39,67,87,163]},{"policy":"random","seed":1,"win":false,"stars":0,"t":200,"peakTimer":1,"fatiguePeak":16,"curve":[40,28,2,1,4,31,10,1,1,47,2,11,23,20,18,72,75,97,139,174]},{"policy":"idle","seed":2,"win":false,"stars":0,"t":144,"peakTimer":1,"fatiguePeak":0,"curve":[40,32,28,1,2,30,3,0,2,50,37,75,125,180,175]},{"policy":"smart","seed":2,"win":true,"stars":3,"t":300,"peakTimer":0,"fatiguePeak":28,"curve":[40,28,7,2,0,28,6,0,1,47,0,6,2,1,1,66,10,0,2,1,4,16,47,35,8,2,37,4,1,1]},{"policy":"casual","seed":3,"win":false,"stars":0,"t":275,"peakTimer":1,"fatiguePeak":1,"curve":[40,21,4,1,1,31,5,0,1,46,3,9,12,10,3,65,11,1,2,0,3,16,50,61,78,67,138,162]},{"policy":"beginner","seed":4,"win":false,"stars":0,"t":153,"peakTimer":1,"fatiguePeak":6,"curve":[40,22,1,0,1,31,25,14,2,48,18,40,53,82,126,234]},{"policy":"random","seed":5,"win":false,"stars":0,"t":113,"peakTimer":1,"fatiguePeak":6,"curve":[40,26,6,2,3,30,25,43,63,119,131,164]},{"policy":"idle","seed":6,"win":false,"stars":0,"t":142,"peakTimer":1,"fatiguePeak":0,"curve":[40,24,3,1,0,30,3,0,2,48,45,91,142,180,177]},{"policy":"smart","seed":6,"win":true,"stars":3,"t":300,"peakTimer":0,"fatiguePeak":25,"curve":[40,26,22,5,1,28,11,1,1,47,1,6,5,6,9,57,3,0,1,1,3,15,38,29,5,2,34,1,0,2]},{"policy":"casual","seed":7,"win":false,"stars":0,"t":270,"peakTimer":1,"fatiguePeak":1,"curve":[40,24,10,1,1,28,9,0,1,47,5,16,11,9,14,77,2,1,1,1,3,17,49,84,116,120,174]},{"policy":"beginner","seed":8,"win":false,"stars":0,"t":280,"peakTimer":1,"fatiguePeak":6,"curve":[40,25,9,2,0,29,16,5,1,48,7,14,27,43,50,86,63,34,3,0,3,16,53,66,88,82,159,180]},{"policy":"random","seed":9,"win":false,"stars":0,"t":149,"peakTimer":1,"fatiguePeak":8,"curve":[40,25,2,1,1,31,13,16,1,48,31,67,89,131,177]},{"policy":"idle","seed":10,"win":false,"stars":0,"t":146,"peakTimer":1,"fatiguePeak":0,"curve":[40,37,34,1,1,32,0,0,1,50,33,65,107,175,180]},{"policy":"smart","seed":10,"win":true,"stars":3,"t":300,"peakTimer":0,"fatiguePeak":26,"curve":[40,29,20,5,1,28,4,0,1,51,10,21,23,25,11,61,2,1,1,2,2,16,41,25,4,1,45,2,1,0]},{"policy":"casual","seed":11,"win":false,"stars":0,"t":269,"peakTimer":1,"fatiguePeak":0,"curve":[40,40,15,3,4,30,24,9,1,46,1,8,5,6,3,68,38,20,1,0,2,14,56,90,125,124,173]},{"policy":"beginner","seed":12,"win":false,"stars":0,"t":164,"peakTimer":1,"fatiguePeak":6,"curve":[40,25,17,1,0,29,28,35,11,48,10,29,35,65,98,200,142]},{"policy":"random","seed":13,"win":false,"stars":0,"t":185,"peakTimer":1,"fatiguePeak":10,"curve":[40,13,1,0,0,27,7,0,2,48,15,28,34,18,18,112,180,176,180]},{"policy":"idle","seed":14,"win":false,"stars":0,"t":143,"peakTimer":1,"fatiguePeak":0,"curve":[40,30,4,0,0,30,13,1,1,49,45,95,153,180,180]},{"policy":"smart","seed":14,"win":true,"stars":3,"t":300,"peakTimer":0,"fatiguePeak":28,"curve":[40,26,10,1,0,31,6,0,1,48,2,10,5,1,1,63,15,0,1,0,2,11,51,41,22,1,18,1,1,2]},{"policy":"casual","seed":15,"win":false,"stars":0,"t":269,"peakTimer":1,"fatiguePeak":0,"curve":[40,18,1,1,0,30,7,0,1,47,2,7,4,4,2,77,26,1,1,1,3,11,48,90,138,160,243]},{"policy":"beginner","seed":16,"win":false,"stars":0,"t":295,"peakTimer":1,"fatiguePeak":3,"curve":[40,27,13,1,3,29,33,11,3,46,8,21,24,25,31,88,44,20,4,3,3,16,48,40,56,50,117,152,166,132]},{"policy":"beginner","seed":1,"win":false,"stars":0,"t":186,"peakTimer":1,"fatiguePeak":0,"curve":[40,23,4,1,1,30,24,12,0,47,20,43,46,40,32,93,122,112,82]},{"policy":"random","seed":2,"win":false,"stars":0,"t":66,"peakTimer":1,"fatiguePeak":11,"curve":[40,23,18,11,26,65,48]},{"policy":"idle","seed":3,"win":false,"stars":0,"t":148,"peakTimer":1,"fatiguePeak":0,"curve":[40,22,6,0,1,31,8,1,1,49,32,60,90,155,180]},{"policy":"smart","seed":3,"win":true,"stars":3,"t":300,"peakTimer":0,"fatiguePeak":30,"curve":[40,27,2,1,1,30,4,1,1,50,1,8,7,3,1,62,3,1,1,0,2,15,57,56,25,0,19,2,1,1]},{"policy":"casual","seed":4,"win":false,"stars":0,"t":146,"peakTimer":1,"fatiguePeak":1,"curve":[40,25,19,11,11,36,11,1,2,48,19,38,62,105,167]},{"policy":"beginner","seed":5,"win":false,"stars":0,"t":263,"peakTimer":1,"fatiguePeak":5,"curve":[40,25,7,2,1,29,18,0,2,47,3,10,15,30,32,84,79,66,3,1,3,14,55,87,157,179,255]},{"policy":"random","seed":6,"win":false,"stars":0,"t":112,"peakTimer":1,"fatiguePeak":16,"curve":[40,27,16,1,2,29,27,55,64,90,66,83]},{"policy":"idle","seed":7,"win":false,"stars":0,"t":144,"peakTimer":1,"fatiguePeak":0,"curve":[40,32,10,1,0,31,7,0,2,50,41,76,114,167,180]},{"policy":"smart","seed":7,"win":true,"stars":3,"t":300,"peakTimer":0,"fatiguePeak":27,"curve":[40,31,13,2,0,28,1,0,1,48,1,7,6,1,1,74,29,1,1,1,3,14,41,34,2,1,28,2,1,1]},{"policy":"casual","seed":8,"win":false,"stars":0,"t":286,"peakTimer":1,"fatiguePeak":1,"curve":[40,28,8,0,1,29,6,0,0,46,4,14,14,24,15,82,15,1,1,2,1,12,42,57,75,59,106,101,133]},{"policy":"beginner","seed":9,"win":false,"stars":0,"t":253,"peakTimer":1,"fatiguePeak":5,"curve":[40,27,4,1,0,28,11,0,0,46,7,19,20,27,36,97,102,106,75,35,15,22,58,86,114,112]},{"policy":"random","seed":10,"win":false,"stars":0,"t":138,"peakTimer":1,"fatiguePeak":6,"curve":[40,26,17,1,1,30,17,12,14,68,81,126,180,172]},{"policy":"idle","seed":11,"win":false,"stars":0,"t":143,"peakTimer":1,"fatiguePeak":0,"curve":[40,45,32,1,1,31,4,0,2,48,46,82,134,181,179]},{"policy":"smart","seed":11,"win":true,"stars":3,"t":300,"peakTimer":0,"fatiguePeak":29,"curve":[40,38,21,2,2,28,1,0,1,48,3,14,21,23,31,77,9,0,1,1,2,10,47,23,2,2,28,2,0,2]},{"policy":"casual","seed":12,"win":false,"stars":0,"t":262,"peakTimer":1,"fatiguePeak":1,"curve":[40,31,16,1,1,29,16,1,1,47,1,10,8,1,2,78,29,2,2,0,3,18,66,116,166,180,208]},{"policy":"beginner","seed":13,"win":false,"stars":0,"t":268,"peakTimer":1,"fatiguePeak":4,"curve":[40,29,3,1,2,28,31,33,4,49,9,18,8,2,2,76,33,31,2,0,3,18,61,85,112,112,165]},{"policy":"random","seed":14,"win":false,"stars":0,"t":111,"peakTimer":1,"fatiguePeak":10,"curve":[40,19,1,1,1,29,23,46,83,141,134]},{"policy":"idle","seed":15,"win":false,"stars":0,"t":146,"peakTimer":1,"fatiguePeak":0,"curve":[40,28,8,0,1,31,6,0,2,50,36,67,106,165,180]},{"policy":"smart","seed":15,"win":true,"stars":3,"t":301,"peakTimer":0,"fatiguePeak":29,"curve":[40,29,18,3,0,28,1,1,1,46,0,7,7,4,1,61,0,0,1,0,3,12,48,18,0,1,49,8,3,1]},{"policy":"casual","seed":16,"win":false,"stars":0,"t":290,"peakTimer":1,"fatiguePeak":3,"curve":[40,22,14,0,1,28,22,2,2,48,0,6,2,4,0,76,23,2,2,1,2,12,54,57,77,47,94,113,86]},{"policy":"casual","seed":1,"win":false,"stars":0,"t":281,"peakTimer":1,"fatiguePeak":0,"curve":[40,33,16,1,1,30,15,1,0,49,7,19,18,22,17,80,50,25,1,2,2,8,47,60,81,68,143,177]},{"policy":"beginner","seed":2,"win":false,"stars":0,"t":278,"peakTimer":1,"fatiguePeak":2,"curve":[40,33,11,1,1,29,28,28,5,47,1,9,12,6,4,78,4,0,0,0,2,14,49,56,74,62,128,158]},{"policy":"random","seed":3,"win":false,"stars":0,"t":148,"peakTimer":1,"fatiguePeak":10,"curve":[40,9,1,1,1,31,12,1,2,52,37,73,76,80,84]},{"policy":"idle","seed":4,"win":false,"stars":0,"t":144,"peakTimer":1,"fatiguePeak":0,"curve":[40,30,20,0,2,30,4,1,0,49,40,77,129,180,179]},{"policy":"smart","seed":4,"win":true,"stars":3,"t":300,"peakTimer":0,"fatiguePeak":30,"curve":[40,20,5,0,1,29,10,0,1,49,0,9,3,3,1,66,30,1,1,0,3,16,44,39,4,2,21,2,0,2]},{"policy":"casual","seed":5,"win":false,"stars":0,"t":267,"peakTimer":1,"fatiguePeak":1,"curve":[40,28,19,1,1,30,16,0,1,47,2,14,18,14,11,78,28,1,1,0,2,11,50,92,149,163,220]},{"policy":"beginner","seed":6,"win":false,"stars":0,"t":261,"peakTimer":1,"fatiguePeak":6,"curve":[40,28,3,1,1,30,18,1,1,48,10,23,29,10,6,80,100,64,1,1,2,16,73,142,180,178]},{"policy":"random","seed":7,"win":false,"stars":0,"t":141,"peakTimer":1,"fatiguePeak":8,"curve":[40,32,8,3,2,31,19,28,5,51,60,102,111,116,106]},{"policy":"idle","seed":8,"win":false,"stars":0,"t":141,"peakTimer":1,"fatiguePeak":0,"curve":[40,39,11,1,1,29,1,1,1,50,55,106,170,181]},{"policy":"smart","seed":8,"win":true,"stars":3,"t":300,"peakTimer":0,"fatiguePeak":30,"curve":[40,28,6,1,1,29,5,0,1,48,0,8,8,4,1,63,1,1,1,1,1,14,60,48,1,2,16,1,1,1]},{"policy":"casual","seed":9,"win":false,"stars":0,"t":269,"peakTimer":1,"fatiguePeak":0,"curve":[40,21,7,0,1,28,0,0,1,46,6,16,23,23,23,76,25,1,2,0,2,9,49,84,135,133,183]},{"policy":"beginner","seed":10,"win":false,"stars":0,"t":170,"peakTimer":1,"fatiguePeak":2,"curve":[40,30,23,1,1,29,9,0,1,47,4,12,28,50,79,152,146]},{"policy":"random","seed":11,"win":false,"stars":0,"t":123,"peakTimer":1,"fatiguePeak":11,"curve":[40,46,47,22,14,45,31,13,3,47,56,111,167]},{"policy":"idle","seed":12,"win":false,"stars":0,"t":144,"peakTimer":1,"fatiguePeak":0,"curve":[40,31,14,1,0,31,15,0,1,49,41,77,123,180,178]},{"policy":"smart","seed":12,"win":true,"stars":3,"t":300,"peakTimer":0,"fatiguePeak":27,"curve":[40,34,17,3,1,29,2,1,1,50,1,9,9,9,7,68,0,0,1,1,3,16,46,32,1,2,32,0,2,1]},{"policy":"casual","seed":13,"win":true,"stars":1,"t":310,"peakTimer":0.92,"fatiguePeak":1,"curve":[40,29,10,1,1,29,11,0,1,46,2,11,14,16,17,79,4,0,1,0,3,10,41,48,64,29,89,116,79,59,7]},{"policy":"beginner","seed":14,"win":false,"stars":0,"t":156,"peakTimer":1,"fatiguePeak":5,"curve":[40,13,1,0,1,29,20,8,1,47,19,38,49,59,75,150]},{"policy":"random","seed":15,"win":false,"stars":0,"t":174,"peakTimer":1,"fatiguePeak":11,"curve":[40,27,16,1,1,31,13,2,1,48,22,45,56,48,36,110,138,180]},{"policy":"idle","seed":16,"win":false,"stars":0,"t":143,"peakTimer":1,"fatiguePeak":0,"curve":[40,26,10,0,0,31,4,0,1,50,42,82,132,180,180]},{"policy":"smart","seed":16,"win":true,"stars":3,"t":300,"peakTimer":0,"fatiguePeak":30,"curve":[40,29,14,1,0,28,1,0,1,47,0,7,7,5,3,68,2,0,1,1,2,16,49,46,2,2,35,3,1,1]}]},"strat":{"sig":"live","n":480,"runs":[{"i":0,"win":false,"stars":0,"t":157},{"i":4,"win":false,"stars":0,"t":156},{"i":8,"win":false,"stars":0,"t":144},{"i":12,"win":false,"stars":0,"t":304},{"i":16,"win":false,"stars":0,"t":65},{"i":20,"win":false,"stars":0,"t":104},{"i":24,"win":false,"stars":0,"t":150},{"i":28,"win":false,"stars":0,"t":169},{"i":32,"win":false,"stars":0,"t":266},{"i":36,"win":false,"stars":0,"t":154},{"i":40,"win":false,"stars":0,"t":145},{"i":44,"win":false,"stars":0,"t":270},{"i":48,"win":false,"stars":0,"t":137},{"i":52,"win":false,"stars":0,"t":264},{"i":56,"win":false,"stars":0,"t":148},{"i":60,"win":false,"stars":0,"t":201},{"i":64,"win":false,"stars":0,"t":148},{"i":68,"win":false,"stars":0,"t":149},{"i":72,"win":false,"stars":0,"t":270},{"i":76,"win":false,"stars":0,"t":146},{"i":80,"win":true,"stars":1,"t":301},{"i":84,"win":false,"stars":0,"t":143},{"i":88,"win":false,"stars":0,"t":141},{"i":92,"win":false,"stars":0,"t":145},{"i":96,"win":false,"stars":0,"t":154},{"i":100,"win":false,"stars":0,"t":62},{"i":104,"win":false,"stars":0,"t":147},{"i":108,"win":false,"stars":0,"t":64},{"i":112,"win":false,"stars":0,"t":269},{"i":116,"win":false,"stars":0,"t":156},{"i":120,"win":false,"stars":0,"t":268},{"i":124,"win":false,"stars":0,"t":105},{"i":128,"win":false,"stars":0,"t":151},{"i":132,"win":false,"stars":0,"t":63},{"i":136,"win":false,"stars":0,"t":158},{"i":140,"win":true,"stars":1,"t":301},{"i":144,"win":false,"stars":0,"t":159},{"i":148,"win":false,"stars":0,"t":147},{"i":152,"win":false,"stars":0,"t":110},{"i":156,"win":false,"stars":0,"t":152},{"i":160,"win":false,"stars":0,"t":147},{"i":164,"win":false,"stars":0,"t":100},{"i":168,"win":false,"stars":0,"t":243},{"i":172,"win":false,"stars":0,"t":257},{"i":176,"win":false,"stars":0,"t":272},{"i":180,"win":false,"stars":0,"t":62},{"i":184,"win":false,"stars":0,"t":143},{"i":188,"win":false,"stars":0,"t":143},{"i":192,"win":false,"stars":0,"t":144},{"i":196,"win":false,"stars":0,"t":106},{"i":200,"win":false,"stars":0,"t":164},{"i":204,"win":false,"stars":0,"t":156},{"i":208,"win":false,"stars":0,"t":143},{"i":212,"win":false,"stars":0,"t":178},{"i":216,"win":false,"stars":0,"t":281},{"i":220,"win":false,"stars":0,"t":64},{"i":224,"win":false,"stars":0,"t":254},{"i":228,"win":false,"stars":0,"t":268},{"i":232,"win":false,"stars":0,"t":184},{"i":236,"win":false,"stars":0,"t":110},{"i":240,"win":false,"stars":0,"t":160},{"i":244,"win":false,"stars":0,"t":151},{"i":248,"win":false,"stars":0,"t":100},{"i":252,"win":false,"stars":0,"t":152},{"i":256,"win":false,"stars":0,"t":64},{"i":260,"win":false,"stars":0,"t":155},{"i":264,"win":false,"stars":0,"t":168},{"i":268,"win":false,"stars":0,"t":251},{"i":272,"win":false,"stars":0,"t":146},{"i":276,"win":false,"stars":0,"t":145},{"i":280,"win":false,"stars":0,"t":62},{"i":284,"win":false,"stars":0,"t":258},{"i":288,"win":false,"stars":0,"t":99},{"i":292,"win":false,"stars":0,"t":100},{"i":296,"win":false,"stars":0,"t":110},{"i":300,"win":false,"stars":0,"t":64},{"i":304,"win":false,"stars":0,"t":181},{"i":308,"win":false,"stars":0,"t":160},{"i":312,"win":false,"stars":0,"t":147},{"i":316,"win":false,"stars":0,"t":158},{"i":320,"win":false,"stars":0,"t":269},{"i":324,"win":false,"stars":0,"t":148},{"i":328,"win":false,"stars":0,"t":163},{"i":332,"win":false,"stars":0,"t":154},{"i":336,"win":false,"stars":0,"t":262},{"i":340,"win":false,"stars":0,"t":147},{"i":344,"win":false,"stars":0,"t":60},{"i":348,"win":false,"stars":0,"t":153},{"i":352,"win":false,"stars":0,"t":154},{"i":356,"win":false,"stars":0,"t":102},{"i":360,"win":false,"stars":0,"t":154},{"i":364,"win":false,"stars":0,"t":110},{"i":368,"win":false,"stars":0,"t":146},{"i":372,"win":false,"stars":0,"t":107},{"i":376,"win":false,"stars":0,"t":60},{"i":380,"win":false,"stars":0,"t":181},{"i":384,"win":false,"stars":0,"t":113},{"i":388,"win":false,"stars":0,"t":100},{"i":392,"win":false,"stars":0,"t":62},{"i":396,"win":false,"stars":0,"t":63},{"i":400,"win":false,"stars":0,"t":253},{"i":404,"win":false,"stars":0,"t":144},{"i":408,"win":false,"stars":0,"t":158},{"i":412,"win":false,"stars":0,"t":152},{"i":416,"win":false,"stars":0,"t":149},{"i":420,"win":false,"stars":0,"t":100},{"i":424,"win":false,"stars":0,"t":264},{"i":428,"win":false,"stars":0,"t":64},{"i":432,"win":false,"stars":0,"t":199},{"i":436,"win":false,"stars":0,"t":64},{"i":440,"win":false,"stars":0,"t":264},{"i":444,"win":false,"stars":0,"t":147},{"i":448,"win":true,"stars":3,"t":300},{"i":452,"win":false,"stars":0,"t":269},{"i":456,"win":false,"stars":0,"t":110},{"i":460,"win":false,"stars":0,"t":142},{"i":464,"win":false,"stars":0,"t":158},{"i":468,"win":false,"stars":0,"t":133},{"i":472,"win":false,"stars":0,"t":267},{"i":476,"win":true,"stars":3,"t":300},{"i":1,"win":false,"stars":0,"t":145},{"i":5,"win":false,"stars":0,"t":64},{"i":9,"win":false,"stars":0,"t":63},{"i":13,"win":false,"stars":0,"t":99},{"i":17,"win":false,"stars":0,"t":114},{"i":21,"win":false,"stars":0,"t":143},{"i":25,"win":false,"stars":0,"t":100},{"i":29,"win":false,"stars":0,"t":305},{"i":33,"win":false,"stars":0,"t":146},{"i":37,"win":false,"stars":0,"t":156},{"i":41,"win":false,"stars":0,"t":163},{"i":45,"win":false,"stars":0,"t":154},{"i":49,"win":false,"stars":0,"t":174},{"i":53,"win":false,"stars":0,"t":148},{"i":57,"win":false,"stars":0,"t":149},{"i":61,"win":false,"stars":0,"t":182},{"i":65,"win":false,"stars":0,"t":143},{"i":69,"win":false,"stars":0,"t":109},{"i":73,"win":false,"stars":0,"t":157},{"i":77,"win":false,"stars":0,"t":110},{"i":81,"win":false,"stars":0,"t":144},{"i":85,"win":false,"stars":0,"t":100},{"i":89,"win":false,"stars":0,"t":154},{"i":93,"win":false,"stars":0,"t":60},{"i":97,"win":false,"stars":0,"t":152},{"i":101,"win":false,"stars":0,"t":281},{"i":105,"win":false,"stars":0,"t":106},{"i":109,"win":true,"stars":3,"t":301},{"i":113,"win":false,"stars":0,"t":63},{"i":117,"win":true,"stars":3,"t":300},{"i":121,"win":false,"stars":0,"t":148},{"i":125,"win":false,"stars":0,"t":158},{"i":129,"win":false,"stars":0,"t":150},{"i":133,"win":false,"stars":0,"t":265},{"i":137,"win":false,"stars":0,"t":147},{"i":141,"win":false,"stars":0,"t":151},{"i":145,"win":false,"stars":0,"t":107},{"i":149,"win":false,"stars":0,"t":154},{"i":153,"win":false,"stars":0,"t":276},{"i":157,"win":false,"stars":0,"t":151},{"i":161,"win":false,"stars":0,"t":158},{"i":165,"win":false,"stars":0,"t":252},{"i":169,"win":false,"stars":0,"t":161},{"i":173,"win":false,"stars":0,"t":157},{"i":177,"win":false,"stars":0,"t":148},{"i":181,"win":false,"stars":0,"t":63},{"i":185,"win":true,"stars":3,"t":301},{"i":189,"win":false,"stars":0,"t":162},{"i":193,"win":false,"stars":0,"t":100},{"i":197,"win":false,"stars":0,"t":151},{"i":201,"win":false,"stars":0,"t":160},{"i":205,"win":false,"stars":0,"t":153},{"i":209,"win":false,"stars":0,"t":147},{"i":213,"win":false,"stars":0,"t":144},{"i":217,"win":false,"stars":0,"t":262},{"i":221,"win":false,"stars":0,"t":146},{"i":225,"win":false,"stars":0,"t":156},{"i":229,"win":false,"stars":0,"t":106},{"i":233,"win":false,"stars":0,"t":146},{"i":237,"win":false,"stars":0,"t":100},{"i":241,"win":false,"stars":0,"t":59},{"i":245,"win":false,"stars":0,"t":148},{"i":249,"win":false,"stars":0,"t":132},{"i":253,"win":false,"stars":0,"t":161},{"i":257,"win":false,"stars":0,"t":149},{"i":261,"win":false,"stars":0,"t":260},{"i":265,"win":false,"stars":0,"t":268},{"i":269,"win":false,"stars":0,"t":268},{"i":273,"win":false,"stars":0,"t":103},{"i":277,"win":false,"stars":0,"t":150},{"i":281,"win":false,"stars":0,"t":109},{"i":285,"win":false,"stars":0,"t":245},{"i":289,"win":false,"stars":0,"t":204},{"i":293,"win":false,"stars":0,"t":103},{"i":297,"win":false,"stars":0,"t":261},{"i":301,"win":false,"stars":0,"t":156},{"i":305,"win":false,"stars":0,"t":142},{"i":309,"win":false,"stars":0,"t":145},{"i":313,"win":false,"stars":0,"t":180},{"i":317,"win":false,"stars":0,"t":269},{"i":321,"win":false,"stars":0,"t":144},{"i":325,"win":false,"stars":0,"t":144},{"i":329,"win":false,"stars":0,"t":155},{"i":333,"win":false,"stars":0,"t":150},{"i":337,"win":false,"stars":0,"t":139},{"i":341,"win":false,"stars":0,"t":145},{"i":345,"win":false,"stars":0,"t":146},{"i":349,"win":false,"stars":0,"t":151},{"i":353,"win":false,"stars":0,"t":265},{"i":357,"win":false,"stars":0,"t":153},{"i":361,"win":false,"stars":0,"t":158},{"i":365,"win":false,"stars":0,"t":171},{"i":369,"win":true,"stars":2,"t":303},{"i":373,"win":false,"stars":0,"t":266},{"i":377,"win":false,"stars":0,"t":270},{"i":381,"win":false,"stars":0,"t":112},{"i":385,"win":false,"stars":0,"t":157},{"i":389,"win":false,"stars":0,"t":59},{"i":393,"win":false,"stars":0,"t":63},{"i":397,"win":false,"stars":0,"t":151},{"i":401,"win":false,"stars":0,"t":148},{"i":405,"win":false,"stars":0,"t":148},{"i":409,"win":false,"stars":0,"t":267},{"i":413,"win":false,"stars":0,"t":147},{"i":417,"win":false,"stars":0,"t":151},{"i":421,"win":false,"stars":0,"t":147},{"i":425,"win":false,"stars":0,"t":291},{"i":429,"win":false,"stars":0,"t":154},{"i":433,"win":false,"stars":0,"t":146},{"i":437,"win":false,"stars":0,"t":151},{"i":441,"win":false,"stars":0,"t":159},{"i":445,"win":false,"stars":0,"t":180},{"i":449,"win":false,"stars":0,"t":141},{"i":453,"win":false,"stars":0,"t":145},{"i":457,"win":false,"stars":0,"t":99},{"i":461,"win":false,"stars":0,"t":158},{"i":465,"win":false,"stars":0,"t":175},{"i":469,"win":false,"stars":0,"t":64},{"i":473,"win":false,"stars":0,"t":147},{"i":477,"win":false,"stars":0,"t":152},{"i":2,"win":false,"stars":0,"t":152},{"i":6,"win":false,"stars":0,"t":268},{"i":10,"win":false,"stars":0,"t":144},{"i":14,"win":false,"stars":0,"t":304},{"i":18,"win":false,"stars":0,"t":155},{"i":22,"win":false,"stars":0,"t":131},{"i":26,"win":false,"stars":0,"t":146},{"i":30,"win":false,"stars":0,"t":63},{"i":34,"win":false,"stars":0,"t":146},{"i":38,"win":false,"stars":0,"t":267},{"i":42,"win":false,"stars":0,"t":284},{"i":46,"win":false,"stars":0,"t":61},{"i":50,"win":false,"stars":0,"t":61},{"i":54,"win":false,"stars":0,"t":145},{"i":58,"win":false,"stars":0,"t":146},{"i":62,"win":false,"stars":0,"t":177},{"i":66,"win":false,"stars":0,"t":63},{"i":70,"win":true,"stars":3,"t":300},{"i":74,"win":false,"stars":0,"t":105},{"i":78,"win":false,"stars":0,"t":105},{"i":82,"win":false,"stars":0,"t":269},{"i":86,"win":false,"stars":0,"t":157},{"i":90,"win":false,"stars":0,"t":139},{"i":94,"win":false,"stars":0,"t":270},{"i":98,"win":false,"stars":0,"t":112},{"i":102,"win":false,"stars":0,"t":101},{"i":106,"win":false,"stars":0,"t":159},{"i":110,"win":false,"stars":0,"t":152},{"i":114,"win":false,"stars":0,"t":185},{"i":118,"win":false,"stars":0,"t":143},{"i":122,"win":false,"stars":0,"t":261},{"i":126,"win":false,"stars":0,"t":154},{"i":130,"win":false,"stars":0,"t":145},{"i":134,"win":false,"stars":0,"t":157},{"i":138,"win":false,"stars":0,"t":266},{"i":142,"win":false,"stars":0,"t":165},{"i":146,"win":false,"stars":0,"t":146},{"i":150,"win":false,"stars":0,"t":294},{"i":154,"win":false,"stars":0,"t":197},{"i":158,"win":false,"stars":0,"t":148},{"i":162,"win":false,"stars":0,"t":279},{"i":166,"win":false,"stars":0,"t":264},{"i":170,"win":false,"stars":0,"t":150},{"i":174,"win":false,"stars":0,"t":262},{"i":178,"win":false,"stars":0,"t":150},{"i":182,"win":false,"stars":0,"t":272},{"i":186,"win":false,"stars":0,"t":151},{"i":190,"win":false,"stars":0,"t":110},{"i":194,"win":false,"stars":0,"t":152},{"i":198,"win":false,"stars":0,"t":165},{"i":202,"win":false,"stars":0,"t":191},{"i":206,"win":false,"stars":0,"t":149},{"i":210,"win":false,"stars":0,"t":130},{"i":214,"win":false,"stars":0,"t":111},{"i":218,"win":false,"stars":0,"t":63},{"i":222,"win":false,"stars":0,"t":61},{"i":226,"win":false,"stars":0,"t":64},{"i":230,"win":false,"stars":0,"t":140},{"i":234,"win":false,"stars":0,"t":160},{"i":238,"win":false,"stars":0,"t":269},{"i":242,"win":false,"stars":0,"t":152},{"i":246,"win":false,"stars":0,"t":62},{"i":250,"win":false,"stars":0,"t":150},{"i":254,"win":false,"stars":0,"t":159},{"i":258,"win":false,"stars":0,"t":100},{"i":262,"win":false,"stars":0,"t":153},{"i":266,"win":false,"stars":0,"t":152},{"i":270,"win":false,"stars":0,"t":149},{"i":274,"win":false,"stars":0,"t":268},{"i":278,"win":false,"stars":0,"t":144},{"i":282,"win":false,"stars":0,"t":60},{"i":286,"win":false,"stars":0,"t":267},{"i":290,"win":false,"stars":0,"t":63},{"i":294,"win":false,"stars":0,"t":146},{"i":298,"win":false,"stars":0,"t":271},{"i":302,"win":true,"stars":1,"t":300},{"i":306,"win":false,"stars":0,"t":262},{"i":310,"win":false,"stars":0,"t":153},{"i":314,"win":false,"stars":0,"t":204},{"i":318,"win":false,"stars":0,"t":160},{"i":322,"win":false,"stars":0,"t":153},{"i":326,"win":false,"stars":0,"t":151},{"i":330,"win":false,"stars":0,"t":108},{"i":334,"win":false,"stars":0,"t":156},{"i":338,"win":false,"stars":0,"t":147},{"i":342,"win":false,"stars":0,"t":150},{"i":346,"win":false,"stars":0,"t":145},{"i":350,"win":false,"stars":0,"t":148},{"i":354,"win":false,"stars":0,"t":159},{"i":358,"win":false,"stars":0,"t":147},{"i":362,"win":false,"stars":0,"t":205},{"i":366,"win":false,"stars":0,"t":194},{"i":370,"win":false,"stars":0,"t":173},{"i":374,"win":false,"stars":0,"t":157},{"i":378,"win":false,"stars":0,"t":150},{"i":382,"win":false,"stars":0,"t":277},{"i":386,"win":false,"stars":0,"t":267},{"i":390,"win":false,"stars":0,"t":262},{"i":394,"win":true,"stars":3,"t":302},{"i":398,"win":false,"stars":0,"t":153},{"i":402,"win":false,"stars":0,"t":145},{"i":406,"win":false,"stars":0,"t":154},{"i":410,"win":false,"stars":0,"t":150},{"i":414,"win":false,"stars":0,"t":158},{"i":418,"win":false,"stars":0,"t":139},{"i":422,"win":false,"stars":0,"t":100},{"i":426,"win":false,"stars":0,"t":181},{"i":430,"win":false,"stars":0,"t":259},{"i":434,"win":false,"stars":0,"t":63},{"i":438,"win":false,"stars":0,"t":154},{"i":442,"win":false,"stars":0,"t":144},{"i":446,"win":false,"stars":0,"t":259},{"i":450,"win":false,"stars":0,"t":144},{"i":454,"win":false,"stars":0,"t":298},{"i":458,"win":true,"stars":2,"t":300},{"i":462,"win":false,"stars":0,"t":269},{"i":466,"win":false,"stars":0,"t":269},{"i":470,"win":false,"stars":0,"t":100},{"i":474,"win":false,"stars":0,"t":102},{"i":478,"win":false,"stars":0,"t":63},{"i":3,"win":false,"stars":0,"t":100},{"i":7,"win":false,"stars":0,"t":62},{"i":11,"win":false,"stars":0,"t":154},{"i":15,"win":false,"stars":0,"t":150},{"i":19,"win":false,"stars":0,"t":164},{"i":23,"win":false,"stars":0,"t":201},{"i":27,"win":false,"stars":0,"t":100},{"i":31,"win":false,"stars":0,"t":146},{"i":35,"win":false,"stars":0,"t":197},{"i":39,"win":false,"stars":0,"t":153},{"i":43,"win":false,"stars":0,"t":98},{"i":47,"win":false,"stars":0,"t":135},{"i":51,"win":false,"stars":0,"t":154},{"i":55,"win":false,"stars":0,"t":107},{"i":59,"win":false,"stars":0,"t":269},{"i":63,"win":false,"stars":0,"t":148},{"i":67,"win":false,"stars":0,"t":154},{"i":71,"win":false,"stars":0,"t":288},{"i":75,"win":false,"stars":0,"t":61},{"i":79,"win":false,"stars":0,"t":181},{"i":83,"win":false,"stars":0,"t":101},{"i":87,"win":false,"stars":0,"t":269},{"i":91,"win":true,"stars":3,"t":301},{"i":95,"win":false,"stars":0,"t":252},{"i":99,"win":true,"stars":3,"t":300},{"i":103,"win":false,"stars":0,"t":276},{"i":107,"win":false,"stars":0,"t":150},{"i":111,"win":false,"stars":0,"t":144},{"i":115,"win":false,"stars":0,"t":276},{"i":119,"win":false,"stars":0,"t":153},{"i":123,"win":false,"stars":0,"t":149},{"i":127,"win":false,"stars":0,"t":143},{"i":131,"win":false,"stars":0,"t":58},{"i":135,"win":false,"stars":0,"t":155},{"i":139,"win":false,"stars":0,"t":197},{"i":143,"win":false,"stars":0,"t":100},{"i":147,"win":false,"stars":0,"t":152},{"i":151,"win":false,"stars":0,"t":265},{"i":155,"win":false,"stars":0,"t":105},{"i":159,"win":false,"stars":0,"t":105},{"i":163,"win":false,"stars":0,"t":146},{"i":167,"win":false,"stars":0,"t":271},{"i":171,"win":false,"stars":0,"t":146},{"i":175,"win":false,"stars":0,"t":63},{"i":179,"win":false,"stars":0,"t":146},{"i":183,"win":false,"stars":0,"t":264},{"i":187,"win":false,"stars":0,"t":60},{"i":191,"win":false,"stars":0,"t":100},{"i":195,"win":false,"stars":0,"t":154},{"i":199,"win":false,"stars":0,"t":150},{"i":203,"win":false,"stars":0,"t":271},{"i":207,"win":false,"stars":0,"t":141},{"i":211,"win":false,"stars":0,"t":149},{"i":215,"win":false,"stars":0,"t":266},{"i":219,"win":false,"stars":0,"t":149},{"i":223,"win":false,"stars":0,"t":299},{"i":227,"win":false,"stars":0,"t":148},{"i":231,"win":false,"stars":0,"t":60},{"i":235,"win":false,"stars":0,"t":259},{"i":239,"win":false,"stars":0,"t":170},{"i":243,"win":false,"stars":0,"t":159},{"i":247,"win":false,"stars":0,"t":64},{"i":251,"win":false,"stars":0,"t":149},{"i":255,"win":true,"stars":2,"t":300},{"i":259,"win":false,"stars":0,"t":133},{"i":263,"win":false,"stars":0,"t":261},{"i":267,"win":false,"stars":0,"t":155},{"i":271,"win":false,"stars":0,"t":64},{"i":275,"win":false,"stars":0,"t":62},{"i":279,"win":false,"stars":0,"t":158},{"i":283,"win":false,"stars":0,"t":188},{"i":287,"win":false,"stars":0,"t":159},{"i":291,"win":false,"stars":0,"t":158},{"i":295,"win":false,"stars":0,"t":104},{"i":299,"win":false,"stars":0,"t":99},{"i":303,"win":false,"stars":0,"t":151},{"i":307,"win":false,"stars":0,"t":159},{"i":311,"win":false,"stars":0,"t":288},{"i":315,"win":false,"stars":0,"t":149},{"i":319,"win":false,"stars":0,"t":155},{"i":323,"win":false,"stars":0,"t":143},{"i":327,"win":false,"stars":0,"t":151},{"i":331,"win":false,"stars":0,"t":157},{"i":335,"win":false,"stars":0,"t":270},{"i":339,"win":false,"stars":0,"t":146},{"i":343,"win":false,"stars":0,"t":181},{"i":347,"win":false,"stars":0,"t":148},{"i":351,"win":false,"stars":0,"t":272},{"i":355,"win":false,"stars":0,"t":146},{"i":359,"win":false,"stars":0,"t":143},{"i":363,"win":true,"stars":3,"t":300},{"i":367,"win":false,"stars":0,"t":161},{"i":371,"win":false,"stars":0,"t":151},{"i":375,"win":false,"stars":0,"t":241},{"i":379,"win":false,"stars":0,"t":159},{"i":383,"win":false,"stars":0,"t":109},{"i":387,"win":false,"stars":0,"t":162},{"i":391,"win":false,"stars":0,"t":183},{"i":395,"win":false,"stars":0,"t":144},{"i":399,"win":true,"stars":3,"t":300},{"i":403,"win":false,"stars":0,"t":151},{"i":407,"win":false,"stars":0,"t":63},{"i":411,"win":false,"stars":0,"t":144},{"i":415,"win":false,"stars":0,"t":107},{"i":419,"win":false,"stars":0,"t":156},{"i":423,"win":false,"stars":0,"t":66},{"i":427,"win":false,"stars":0,"t":168},{"i":431,"win":false,"stars":0,"t":106},{"i":435,"win":false,"stars":0,"t":130},{"i":439,"win":false,"stars":0,"t":101},{"i":443,"win":false,"stars":0,"t":160},{"i":447,"win":false,"stars":0,"t":148},{"i":451,"win":false,"stars":0,"t":150},{"i":455,"win":false,"stars":0,"t":105},{"i":459,"win":false,"stars":0,"t":158},{"i":463,"win":false,"stars":0,"t":162},{"i":467,"win":false,"stars":0,"t":266},{"i":471,"win":false,"stars":0,"t":269},{"i":475,"win":false,"stars":0,"t":111},{"i":479,"win":false,"stars":0,"t":158}]}};
+const WORKER_SRC = "'use strict';\n// ---------------------------------------------------------------------------\n// Immune RTS prototype v2: simulation. No DOM, so it also runs headless under\n// node (see src/headless.js). Spec: \"Immune RTS: Simpler Prototype v2\" doc.\n//\n// World coordinates: u runs along the lymph flow (0 = wound end, L = lymph\n// node end), v runs across it (0 = blood vessel edge). The UI maps (u, v) to\n// screen either as-is (landscape) or transposed (portrait).\n// ---------------------------------------------------------------------------\n\n// Every tunable number. The dev panel edits these live; the sim reads them each tick.\nconst DEFAULTS = {\n  level:      { duration: 300, cellCap: 60, maxBacteria: 180, startNeut: 12, startMac: 4 },\n  stream:     { start: 0.5, end: 1.4, clump: 3, armoredFrom: 90, armoredShare: 0.15 },\n  marrow:     { neutEvery: 1, macEvery: 3 },\n  output:     { start: 0.5, min: 0.5, max: 2, rest: 1.15, tire: 1.2, recover: 1.2 },\n  fatigue:    { tired: 35, feverish: 60, exhausted: 85, tiredSpeed: 0.85, feverSpread: 0.3, feverLife: 0.7, exhaustedMarrow: 0.5, exhaustedRing: 0.6 },\n  neutrophil: { speed: 46, range: 64, fireEvery: 0.8, life: 30, turnEvery: 0.3, zigzag: 1.5, stray: 0.25, standoff: 36, shotSpeed: 420, spread: 0.35 },\n  macrophage: { speed: 20, eatEvery: 2, gulp: 0.45, reach: 11 },\n  support:    { ring: 50, speedMul: 1.5 },\n  bacteria:   { hp: 3, doubling: 10, armorDoubling: 20, jitter: 0.25, drift: 10, crowdDrift: 0.12, crowdStart: 25, crowdRadius: 10, crowdMax: 5, knock: 4, hitRadius: 4.5, armorRadius: 6 },\n  toxin:      { warn: 2, notice: 6, sweep: 0.6 },\n  lymph:      { fill: 20 },\n};\n\n// One line per tunable, shown in the dev panel.\nconst HINTS = {\n  'level.duration': 'Seconds of scripted ingress (the progress bar). Win once it is full and the map is clear.',\n  'stream.start': 'Bacteria per second streaming in through the Wound at 0:00, between the big waves.',\n  'stream.end': 'Stream rate per second by the end of the level (it ramps up linearly).',\n  'stream.clump': 'Stream bacteria arrive in clumps of up to this many.',\n  'stream.armoredFrom': 'Seconds into the level before armored bacteria join the stream.',\n  'stream.armoredShare': 'Share of the stream that is armored after that.',\n  'output.start': 'Body output slider position at 0:00 (0 = lowest, 1 = highest).',\n  'output.min': 'Marrow speed multiplier with the slider all the way down.',\n  'output.max': 'Marrow speed multiplier with the slider all the way up.',\n  'output.rest': 'Output multiplier the body can sustain: above it fatigue builds, below it fatigue recovers.',\n  'output.tire': 'Fatigue points per second for each 1x of output above rest.',\n  'output.recover': 'Fatigue points per second recovered for each 1x of output below rest.',\n  'fatigue.tired': 'Fatigue (0-100) where Tired starts: your cells move slower.',\n  'fatigue.feverish': 'Fatigue where Feverish starts: neutrophil shots spray and neutrophils die sooner.',\n  'fatigue.exhausted': 'Fatigue where Exhausted starts: the marrow slows and Support rings shrink.',\n  'fatigue.tiredSpeed': 'Speed multiplier for all your cells while Tired or worse.',\n  'fatigue.feverSpread': 'Extra aim wobble (radians) while Feverish or worse.',\n  'fatigue.feverLife': 'Neutrophil lifespan multiplier while Feverish or worse.',\n  'fatigue.exhaustedMarrow': 'Marrow speed multiplier while Exhausted.',\n  'fatigue.exhaustedRing': 'Support ring size multiplier while Exhausted.',\n  'level.cellCap': 'Most of your cells allowed on the field at once.',\n  'level.maxBacteria': 'Bacteria stop dividing at this many on the map.',\n  'level.startNeut': 'Neutrophils on the field at 0:00.',\n  'level.startMac': 'Macrophages on the field at 0:00.',\n  'marrow.neutEvery': 'Seconds to make one neutrophil.',\n  'marrow.macEvery': 'Seconds to make one macrophage.',\n  'neutrophil.speed': 'Units per second (zones are 300 long).',\n  'neutrophil.range': 'Firing range. A neutrophil is about 16 units across.',\n  'neutrophil.fireEvery': 'Seconds between shots.',\n  'neutrophil.life': 'Seconds a neutrophil lives.',\n  'neutrophil.turnEvery': 'Seconds between zigzag turns.',\n  'neutrophil.zigzag': 'How far each turn can veer off the target line (radians).',\n  'neutrophil.stray': 'Chance each turn heads somewhere completely random instead.',\n  'neutrophil.standoff': 'Neutrophils stop closing in at about this distance.',\n  'neutrophil.shotSpeed': 'Antibody bullet speed.',\n  'neutrophil.spread': 'Aim wobble in radians; more means more misses.',\n  'macrophage.speed': 'Units per second.',\n  'macrophage.eatEvery': 'Seconds between swallows on Offense.',\n  'macrophage.gulp': 'Seconds a swallow takes.',\n  'macrophage.reach': 'How close it must get to swallow.',\n  'support.ring': 'Radius of a Support macrophage ring.',\n  'support.speedMul': 'Speed multiplier for neutrophils inside a ring.',\n  'bacteria.hp': 'Plain hits to kill a bacterium (tuned shots always kill).',\n  'bacteria.doubling': 'Seconds for a bacterium to divide while it has room.',\n  'bacteria.armorDoubling': 'Seconds for an armored bacterium to divide.',\n  'bacteria.jitter': 'Random spread on division times (fraction).',\n  'bacteria.drift': 'Lymph flow speed toward the Lymph node.',\n  'bacteria.crowdDrift': 'Extra drift per bacterium in a zone beyond crowd start (spill-over).',\n  'bacteria.crowdStart': 'Zone count where crowding starts pushing bacteria onward.',\n  'bacteria.crowdRadius': 'Neighbour radius for the room check.',\n  'bacteria.crowdMax': 'A bacterium will not divide with this many neighbours.',\n  'bacteria.knock': 'How far a plain hit nudges a bacterium back.',\n  'bacteria.hitRadius': 'How close a shot must pass to hit a plain bacterium.',\n  'bacteria.armorRadius': 'How close a shot must pass to hit an armored bacterium.',\n  'toxin.warn': 'Seconds the Wound flashes red before a burst.',\n  'toxin.notice': 'Seconds before a burst that the banner starts counting down.',\n  'toxin.sweep': 'Seconds for the toxin wave to cross the Wound.',\n  'lymph.fill': 'Seconds of bacteria in the Lymph node before you lose. Holds while it is clear.',\n};\n\n// Scripted levels. Waves: b = bacteria, a = armored bacteria. Toxins are fractions of the level.\nconst LEVELS = {\n  papercut: {\n    name: 'Papercut',\n    // Doc schedule with counts scaled up after balance runs, plus two small filler waves (0:50, 3:40)\n    waves: [{ t: 0, b: 40 }, { t: 50, b: 30 }, { t: 90, a: 26, b: 24 }, { t: 150, b: 80 }, { t: 220, b: 40 }, { t: 255, b: 80, a: 28, final: true }],\n    toxins: [1 / 3, 2 / 3],\n  },\n};\n\nconst clone = o => JSON.parse(JSON.stringify(o));\nlet CONFIG = clone(DEFAULTS);\nfunction mergeConfig(saved) {\n  if (!saved || typeof saved !== 'object') return;\n  for (const g in saved) {\n    if (!CONFIG[g]) continue;\n    for (const k in saved[g]) if (k in DEFAULTS[g] && typeof saved[g][k] === 'number') CONFIG[g][k] = saved[g][k];\n  }\n}\n\nfunction mulberry32(a) {\n  return function () {\n    a |= 0; a = a + 0x6D2B79F5 | 0;\n    let t = Math.imul(a ^ a >>> 15, 1 | a);\n    t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t;\n    return ((t ^ t >>> 14) >>> 0) / 4294967296;\n  };\n}\n\n// Map: three zones of 300 along the flow; the blood vessel is a strip along v < VESSEL.\nconst L = 900, WIDTH = 460, ZONE = 300, VESSEL = 44;\nconst ZONES = ['Wound', 'Tissue', 'Lymph node'];\nconst zoneOf = u => (u < ZONE ? 0 : u < 2 * ZONE ? 1 : 2);\nconst WOUND = { u: 70, v: 270 }; // where waves spill in and toxins burst from\n// Support/Offense posts inside a zone, in fill order (fractions of zone length / field width)\nconst POSTS = [[0.5, 0.5], [0.3, 0.3], [0.7, 0.72], [0.3, 0.75], [0.7, 0.28], [0.5, 0.15], [0.5, 0.88]];\n\nclass Game {\n  constructor(levelKey, seed) {\n    this.key = levelKey || 'papercut';\n    this.lv = LEVELS[this.key];\n    this.seed = seed || 1;\n    this.rand = mulberry32(this.seed * 9973 + 17);\n    this.t = 0;\n    this.bact = []; this.neut = []; this.mac = []; this.shots = [];\n    this.fx = []; // visual events for the UI: {k, u, v, ...}\n    this.zones = ZONES.map(name => ({ name, mode: 'offense', count: 0 }));\n    this.marrow = { make: 'neut', prog: 0 };\n    this.lymph = { timer: 0, peak: 0, reached: false, beat: 0 };\n    this.waveIdx = 0; this.streamAcc = 0;\n    this.output = CONFIG.output.start; this.fatigue = 0; this.tier = 0; this.fatiguePeak = 0; this.tierTime = [0, 0, 0, 0];\n    this.toxins = this.lv.toxins.map(f => ({ at: f * CONFIG.level.duration, state: 'coming', front: 0 }));\n    this.stats = { shotKills: 0, swallows: 0, made: 0, toxinDeaths: 0, peak: 0, bounced: 0 };\n    this.history = []; this.histT = 0;\n    this.result = null;\n    this.id = 1;\n    for (let i = 0; i < CONFIG.level.startNeut; i++) this.spawnNeut(60 + this.rand() * 300, VESSEL + 30 + this.rand() * 120);\n    for (let i = 0; i < CONFIG.level.startMac; i++) this.spawnMac(true);\n    this.runWaves();\n  }\n\n  // ---- player actions ----\n  setMarrow(kind) { if (kind === 'neut' || kind === 'mac') { if (kind !== this.marrow.make) this.marrow.prog = 0; this.marrow.make = kind; } }\n  toggleZone(z) { const zn = this.zones[z]; if (zn) zn.mode = zn.mode === 'offense' ? 'support' : 'offense'; }\n  setZone(z, mode) { if (this.zones[z]) this.zones[z].mode = mode; }\n  setOutput(x) { this.output = Math.max(0, Math.min(1, +x || 0)); }\n  // Marrow speed multiplier from the slider (geometric between min and max, 1x in the middle by default)\n  outputMul() { const O = CONFIG.output; return O.min * Math.pow(O.max / O.min, this.output); }\n  // 0 fine, 1 Tired, 2 Feverish, 3 Exhausted\n  fatigueTier() { const F = CONFIG.fatigue, f = this.fatigue; return f >= F.exhausted ? 3 : f >= F.feverish ? 2 : f >= F.tired ? 1 : 0; }\n  // The toxin about to hit (inside its notice window) or mid-sweep, if any\n  pendingToxin() {\n    for (const tx of this.toxins) {\n      if (tx.state === 'sweeping') return tx;\n      if (tx.state === 'coming' && this.t >= tx.at - CONFIG.toxin.notice) return tx;\n    }\n    return null;\n  }\n\n  // ---- spawning ----\n  spawnNeut(u, v) {\n    this.neut.push({ id: this.id++, u, v, vu: 0, vv: 0, head: Math.PI / 2, turn: 0, cd: this.rand() * 0.5, age: 0, boosted: false, dead: false });\n  }\n  spawnMac(start) {\n    // New macrophages take the zone with the fewest; ties go to the earlier zone\n    const n = [0, 0, 0]; for (const m of this.mac) n[m.home]++;\n    let home = 0; for (let z = 1; z < 3; z++) if (n[z] < n[home]) home = z;\n    const slot = n[home] % POSTS.length;\n    const pu = home * ZONE + POSTS[slot][0] * ZONE, pv = VESSEL + POSTS[slot][1] * (WIDTH - VESSEL);\n    const u = start ? pu : Math.min(L - 20, Math.max(20, pu + (this.rand() - 0.5) * 80)), v = start ? pv : VESSEL * 0.5;\n    this.mac.push({ id: this.id++, u, v, home, pu, pv, mode: 'offense', cd: 0, gulp: 0, prey: null, dead: false, flip: 0 });\n  }\n  spawnBact(armored, u, v) {\n    if (this.bact.length >= CONFIG.level.maxBacteria + 140) return;\n    const r = this.rand;\n    this.bact.push({\n      id: this.id++, armored: !!armored,\n      u: u == null ? WOUND.u + (r() - 0.5) * 90 : u, v: v == null ? WOUND.v + (r() - 0.5) * 180 : v,\n      hp: armored ? 1 : CONFIG.bacteria.hp, age: 0, div: this.divTime(armored), flash: 0, rot: r() * 6.283, dead: false, eaten: false,\n    });\n  }\n  divTime(armored) { return (armored ? CONFIG.bacteria.armorDoubling : CONFIG.bacteria.doubling) * (1 + (this.rand() - 0.5) * 2 * CONFIG.bacteria.jitter); }\n\n  runWaves() {\n    const w = this.lv.waves;\n    while (this.waveIdx < w.length && this.t >= w[this.waveIdx].t) {\n      const wave = w[this.waveIdx++];\n      for (let i = 0; i < (wave.b || 0); i++) this.spawnBact(false);\n      for (let i = 0; i < (wave.a || 0); i++) this.spawnBact(true);\n      this.fx.push({ k: 'wave', u: WOUND.u, v: WOUND.v, n: (wave.b || 0) + (wave.a || 0), armored: wave.a || 0, final: !!wave.final });\n    }\n  }\n  // Progress-bar markers still to come: {t, kind: 'wave'|'toxin', final}\n  markers() {\n    const out = [];\n    for (let i = this.waveIdx; i < this.lv.waves.length; i++) out.push({ t: this.lv.waves[i].t, kind: 'wave', final: !!this.lv.waves[i].final, armored: !!this.lv.waves[i].a });\n    for (const tx of this.toxins) if (tx.state === 'coming') out.push({ t: tx.at, kind: 'toxin' });\n    return out;\n  }\n\n  // ---- queries ----\n  liveBact() { return this.bact.filter(b => !b.dead && !b.eaten); }\n  nearestBact(u, v, maxD, filter) {\n    let best = null, bd = maxD * maxD;\n    for (const b of this.bact) {\n      if (b.dead || b.eaten || (filter && !filter(b))) continue;\n      const d = (b.u - u) ** 2 + (b.v - v) ** 2;\n      if (d < bd) { bd = d; best = b; }\n    }\n    return best;\n  }\n  inRing(u, v) {\n    const r2 = (this.ringR || CONFIG.support.ring) ** 2;\n    for (const m of this.mac) if (!m.dead && m.mode === 'support' && (m.u - u) ** 2 + (m.v - v) ** 2 < r2) return true;\n    return false;\n  }\n  cellCount() { return this.neut.length + this.mac.length; }\n\n  // ---- tick ----\n  step(dt) {\n    if (this.result) return;\n    const C = CONFIG, r = this.rand;\n    this.t += dt;\n    const t = this.t;\n    if (this.fx.length > 400) this.fx.splice(0, this.fx.length - 400);\n\n    // Script: waves, trickle, toxins\n    this.runWaves();\n    // Constant stream through the Wound between the big waves, ramping up over the level\n    if (t < C.level.duration) {\n      const f = t / C.level.duration;\n      this.streamAcc += dt * (C.stream.start + (C.stream.end - C.stream.start) * f);\n      while (this.streamAcc >= 1) {\n        const n = Math.max(1, Math.min(Math.floor(this.streamAcc), 1 + Math.floor(r() * C.stream.clump)));\n        this.streamAcc -= n;\n        const cu = WOUND.u + (r() - 0.5) * 60, cv = WOUND.v + (r() - 0.5) * 160;\n        for (let i = 0; i < n; i++) this.spawnBact(t >= C.stream.armoredFrom && r() < C.stream.armoredShare, cu + (r() - 0.5) * 12, cv + (r() - 0.5) * 12);\n        this.fx.push({ k: 'trickle', u: cu, v: cv });\n      }\n    }\n\n    // Body output and fatigue: pushing the marrow past what the body can sustain builds fatigue\n    const mul = this.outputMul(), O = C.output, F = C.fatigue;\n    this.fatigue += (mul > O.rest ? (mul - O.rest) * O.tire : (mul - O.rest) * O.recover) * dt;\n    this.fatigue = Math.max(0, Math.min(100, this.fatigue));\n    this.fatiguePeak = Math.max(this.fatiguePeak, this.fatigue);\n    const tier = this.fatigueTier();\n    if (tier !== this.tier) { this.fx.push({ k: 'tier', tier, up: tier > this.tier }); this.tier = tier; }\n    this.tierTime[tier] += dt;\n    const slow = tier >= 1 ? F.tiredSpeed : 1;\n    this.ringR = C.support.ring * (tier >= 3 ? F.exhaustedRing : 1);\n    for (const tx of this.toxins) {\n      if (tx.state === 'coming' && t >= tx.at) { tx.state = 'sweeping'; tx.front = 0; this.fx.push({ k: 'burst', u: WOUND.u, v: WOUND.v }); }\n      if (tx.state === 'sweeping') {\n        tx.front += dt / C.toxin.sweep;\n        const reach = tx.front * 340; // radius from the wound that covers the whole zone\n        const kill = c => c.u < ZONE && Math.hypot(c.u - WOUND.u, c.v - WOUND.v) < reach;\n        for (const c of this.neut) if (!c.dead && kill(c)) { c.dead = true; this.stats.toxinDeaths++; this.fx.push({ k: 'die', u: c.u, v: c.v, who: 'neut' }); }\n        for (const c of this.mac) if (!c.dead && kill(c)) { c.dead = true; this.stats.toxinDeaths++; if (c.prey) c.prey.eaten = false, c.prey = null; this.fx.push({ k: 'die', u: c.u, v: c.v, who: 'mac' }); }\n        if (tx.front >= 1) tx.state = 'done';\n      }\n    }\n    const warnTx = this.toxins.find(tx => tx.state === 'coming' && t >= tx.at - C.toxin.warn);\n    this.warning = warnTx ? (warnTx.at - t) : 0;\n\n    // Marrow: a steady flow of the chosen cell, held at the cap\n    const every = this.marrow.make === 'neut' ? C.marrow.neutEvery : C.marrow.macEvery;\n    if (this.cellCount() < C.level.cellCap) {\n      this.marrow.prog += dt / every * mul * (tier >= 3 ? F.exhaustedMarrow : 1);\n      if (this.marrow.prog >= 1) {\n        this.marrow.prog = 0; this.stats.made++;\n        if (this.marrow.make === 'neut') { const u = 40 + r() * (L - 80); this.spawnNeut(u, VESSEL * 0.5); this.fx.push({ k: 'arrive', u, v: VESSEL * 0.5 }); }\n        else { this.spawnMac(false); const m = this.mac[this.mac.length - 1]; this.fx.push({ k: 'arrive', u: m.u, v: m.v }); }\n      }\n    } else this.marrow.prog = Math.min(1, this.marrow.prog);\n\n    // Macrophages: mode comes from the zone they stand in\n    for (const m of this.mac) {\n      if (m.dead) continue;\n      const mode = this.zones[zoneOf(m.u)].mode;\n      if (mode !== m.mode) { m.mode = mode; m.flip = 0.4; if (mode === 'support' && m.prey) { m.prey.eaten = false; m.prey = null; m.gulp = 0; } }\n      m.flip = Math.max(0, m.flip - dt);\n      m.cd = Math.max(0, m.cd - dt);\n      let tu = m.pu, tv = m.pv, sp = C.macrophage.speed * slow;\n      if (m.gulp > 0) {\n        m.gulp -= dt;\n        if (m.prey) { m.prey.u += (m.u - m.prey.u) * Math.min(1, dt * 8); m.prey.v += (m.v - m.prey.v) * Math.min(1, dt * 8); }\n        if (m.gulp <= 0 && m.prey) { m.prey.dead = true; m.prey = null; this.stats.swallows++; m.cd = C.macrophage.eatEvery; }\n        sp = 0;\n      } else if (m.mode === 'offense' && m.cd <= 0) {\n        const lo = m.home * ZONE - 10, hi = (m.home + 1) * ZONE + 10;\n        const b = this.nearestBact(m.u, m.v, 400, b => b.u >= lo && b.u < hi);\n        if (b) {\n          tu = b.u; tv = b.v;\n          if (Math.hypot(b.u - m.u, b.v - m.v) < C.macrophage.reach) { m.prey = b; b.eaten = true; m.gulp = C.macrophage.gulp; this.fx.push({ k: 'gulp', id: m.id, u: m.u, v: m.v }); sp = 0; }\n        }\n      }\n      const du = tu - m.u, dv = tv - m.v, d = Math.hypot(du, dv);\n      if (d > 1 && sp > 0) { const s = Math.min(d, sp * dt); m.u += du / d * s; m.v += dv / d * s; }\n    }\n\n    // Neutrophils: directed random walk toward the nearest bacterium, shooting anything in range\n    for (const n of this.neut) {\n      if (n.dead) continue;\n      n.age += dt;\n      if (n.age >= C.neutrophil.life * (tier >= 2 ? F.feverLife : 1)) { n.dead = true; this.fx.push({ k: 'expire', u: n.u, v: n.v }); continue; }\n      n.boosted = this.inRing(n.u, n.v);\n      const target = this.nearestBact(n.u, n.v, 2000);\n      n.turn -= dt;\n      if (n.turn <= 0) {\n        n.turn = C.neutrophil.turnEvery * (0.6 + r() * 0.8);\n        let want;\n        if (target) {\n          const d = Math.hypot(target.u - n.u, target.v - n.v);\n          want = Math.atan2(target.v - n.v, target.u - n.u);\n          if (d < C.neutrophil.standoff) want += Math.PI / 2 * (r() < 0.5 ? 1 : -1); // circle instead of crowding in\n        } else {\n          // Nothing to chase: drift toward the middle of the field\n          want = Math.atan2(WIDTH * 0.55 - n.v, L * 0.45 - n.u) + (r() - 0.5) * 2;\n        }\n        // Directed random walk: veer off the line each turn, and sometimes just wander off\n        n.head = r() < C.neutrophil.stray ? r() * 6.283 : want + C.neutrophil.zigzag * (r() * 2 - 1);\n      }\n      let sp = C.neutrophil.speed * slow * (n.boosted ? C.support.speedMul : 1);\n      n.vu += (Math.cos(n.head) * sp - n.vu) * Math.min(1, dt * 6);\n      n.vv += (Math.sin(n.head) * sp - n.vv) * Math.min(1, dt * 6);\n      n.u = Math.max(8, Math.min(L - 8, n.u + n.vu * dt));\n      n.v = Math.max(VESSEL * 0.3, Math.min(WIDTH - 8, n.v + n.vv * dt));\n      if (n.v < VESSEL && n.vv < 0) n.vv *= -0.5;\n      // Fire: prefer a target the shot can hurt\n      n.cd -= dt;\n      if (n.cd <= 0) {\n        const can = n.boosted ? null : b => !b.armored;\n        const aim = this.nearestBact(n.u, n.v, C.neutrophil.range, can) || this.nearestBact(n.u, n.v, C.neutrophil.range);\n        if (aim) {\n          n.cd = C.neutrophil.fireEvery;\n          const d = Math.hypot(aim.u - n.u, aim.v - n.v), tt = d / C.neutrophil.shotSpeed;\n          const au = aim.u + C.bacteria.drift * tt, av = aim.v;\n          const a = Math.atan2(av - n.v, au - n.u) + (r() - 0.5) * 2 * (C.neutrophil.spread + (tier >= 2 ? F.feverSpread : 0));\n          this.shots.push({ u: n.u, v: n.v, pu: n.u, pv: n.v, du: Math.cos(a), dv: Math.sin(a), life: C.neutrophil.range * 1.4 / C.neutrophil.shotSpeed, tuned: n.boosted, from: n.id });\n        } else n.cd = 0.05;\n      }\n    }\n\n    // Shots: straight tracers; the first bacterium touched takes the hit\n    for (const s of this.shots) {\n      s.pu = s.u; s.pv = s.v;\n      const step = C.neutrophil.shotSpeed * dt;\n      s.u += s.du * step; s.v += s.dv * step; s.life -= dt;\n      for (const b of this.bact) {\n        if (b.dead || b.eaten) continue;\n        // distance from b to the segment travelled this tick\n        const wu = b.u - s.pu, wv = b.v - s.pv, proj = Math.max(0, Math.min(step, wu * s.du + wv * s.dv));\n        const cu = s.pu + s.du * proj, cv = s.pv + s.dv * proj;\n        if ((b.u - cu) ** 2 + (b.v - cv) ** 2 > (b.armored ? C.bacteria.armorRadius : C.bacteria.hitRadius) ** 2) continue;\n        s.life = 0;\n        if (s.tuned) { b.dead = true; this.stats.shotKills++; this.fx.push({ k: 'pop', u: b.u, v: b.v, tuned: true, armored: b.armored }); }\n        else if (b.armored) { this.stats.bounced++; this.fx.push({ k: 'bounce', u: cu, v: cv, du: -s.du, dv: -s.dv }); }\n        else {\n          b.hp--; b.flash = 0.12;\n          b.u += s.du * C.bacteria.knock; b.v += s.dv * C.bacteria.knock;\n          if (b.hp <= 0) { b.dead = true; this.stats.shotKills++; this.fx.push({ k: 'pop', u: b.u, v: b.v }); }\n          else this.fx.push({ k: 'hit', u: cu, v: cv });\n        }\n        break;\n      }\n    }\n\n    // Bacteria: drift with the flow, spill on crowding, divide while there is room\n    const counts = [0, 0, 0];\n    for (const b of this.bact) if (!b.dead && !b.eaten) counts[zoneOf(b.u)]++;\n    const live = counts[0] + counts[1] + counts[2];\n    const cr2 = C.bacteria.crowdRadius ** 2;\n    const born = [];\n    for (const b of this.bact) {\n      if (b.dead || b.eaten) continue;\n      b.flash = Math.max(0, b.flash - dt);\n      const z = zoneOf(b.u);\n      let drift = C.bacteria.drift + C.bacteria.crowdDrift * Math.max(0, counts[z] - C.bacteria.crowdStart);\n      // Inside the Lymph node the flow pools: bacteria gather in a cloud around the node instead of piling at the far edge\n      const pool = z === 2 && b.u > L - 220;\n      if (pool) drift = (L - 130 - b.u) * 0.3;\n      // neighbours: separation push and the room check\n      let near = 0, pu = 0, pv = 0;\n      for (const o of this.bact) {\n        if (o === b || o.dead || o.eaten) continue;\n        const du = b.u - o.u, dv = b.v - o.v, d2 = du * du + dv * dv;\n        if (d2 < cr2) { near++; if (d2 > 0.01) { const d = Math.sqrt(d2); pu += du / d * (1 - d / C.bacteria.crowdRadius); pv += dv / d * (1 - d / C.bacteria.crowdRadius); } }\n      }\n      b.u += (drift + pu * 14) * dt;\n      b.v += (pv * (pool ? 30 : 14) + (pool ? ((WIDTH + VESSEL) / 2 - b.v) * 0.12 : 0) + Math.sin(t * 0.7 + b.id) * (pool ? 8 : 3)) * dt;\n      if (pool) b.u += pu * 16 * dt;\n      b.u = Math.max(6, Math.min(L - 10, b.u));\n      b.v = Math.max(VESSEL + 8, Math.min(WIDTH - 8, b.v));\n      b.rot += dt * 0.3;\n      if (live + born.length < C.level.maxBacteria && near < C.bacteria.crowdMax) {\n        b.age += dt;\n        if (b.age >= b.div) {\n          b.age = 0; b.div = this.divTime(b.armored);\n          const a = r() * 6.283;\n          born.push([b.armored, b.u + Math.cos(a) * 5, b.v + Math.sin(a) * 5]);\n          b.u -= Math.cos(a) * 3; b.v -= Math.sin(a) * 3;\n          if (!b.armored) b.hp = C.bacteria.hp;\n        }\n      }\n    }\n    for (const nb of born) { this.spawnBact(nb[0], nb[1], nb[2]); this.fx.push({ k: 'divide', u: nb[1], v: nb[2] }); }\n\n    // Cleanup\n    if (this.neut.some(n => n.dead)) this.neut = this.neut.filter(n => !n.dead);\n    if (this.mac.some(m => m.dead)) this.mac = this.mac.filter(m => !m.dead);\n    if (this.bact.some(b => b.dead)) this.bact = this.bact.filter(b => !b.dead);\n    if (this.shots.some(s => s.life <= 0)) this.shots = this.shots.filter(s => s.life > 0);\n\n    // Zone counts, lymph node timer\n    const zc = [0, 0, 0];\n    for (const b of this.bact) if (!b.eaten) zc[zoneOf(b.u)]++;\n    for (let z = 0; z < 3; z++) this.zones[z].count = zc[z];\n    const total = zc[0] + zc[1] + zc[2];\n    this.stats.peak = Math.max(this.stats.peak, total);\n    if (zc[2] > 0) {\n      if (!this.lymph.reached) { this.lymph.reached = true; this.fx.push({ k: 'breach' }); }\n      this.lymph.timer = Math.min(1, this.lymph.timer + dt / C.lymph.fill);\n      this.lymph.peak = Math.max(this.lymph.peak, this.lymph.timer);\n    }\n    this.histT -= dt;\n    if (this.histT <= 0) { this.histT = 2; this.history.push({ t, z: zc.slice(), n: this.neut.length, m: this.mac.length, timer: this.lymph.timer, fatigue: this.fatigue, output: this.output }); }\n\n    if (this.lymph.timer >= 1) this.finish(false, `Bacteria sat in the Lymph node for ${C.lymph.fill} s and multiplied there.`);\n    else if (t >= C.level.duration && total === 0) this.finish(true, 'The bar is full and every bacterium is gone.');\n  }\n\n  finish(win, reason) {\n    const st = this.stats;\n    const goals = [\n      { text: 'Clear every bacterium', hit: win },\n      { text: 'Lymph node timer never passed half', hit: win && this.lymph.peak <= 0.5 },\n      { text: 'No bacterium reached the Lymph node', hit: win && !this.lymph.reached },\n    ];\n    this.result = { win, reason, t: this.t, goals, stars: goals.filter(g => g.hit).length, stats: { ...st }, peakTimer: this.lymph.peak, fatiguePeak: this.fatiguePeak, tierTime: this.tierTime.slice() };\n  }\n}\n\n// (node export removed) = { Game, DEFAULTS, CONFIG, LEVELS, HINTS, mergeConfig, mulberry32, zoneOf, L, WIDTH, ZONE, VESSEL, WOUND, ZONES };\n\n'use strict';\n// ---------------------------------------------------------------------------\n// Bot players for balance runs. Shared by src/headless.js (node) and the\n// difficulty tuner page (tuner/), so both measure the same thing.\n// Bots only press the same buttons a player has; the level never reacts to\n// how they are doing (no rubber banding).\n// ---------------------------------------------------------------------------\nconst BOT_LEVEL0 = JSON.parse(JSON.stringify(LEVELS.papercut)); // the live game's script\n\nconst armoredIn = (g, z) => g.bact.some(b => b.armored && !b.eaten && Math.floor(b.u / ZONE) === z);\nfunction randomPress(g) {\n  const x = g.rand2();\n  if (x < 0.4) g.toggleZone(Math.floor(g.rand2() * 3));\n  else if (x < 0.7) g.setMarrow(g.rand2() < 0.5 ? 'neut' : 'mac');\n  else g.setOutput(g.rand2());\n}\n// Sensible zone and marrow choices: some macrophages, Support where armor shows up or a zone is swamped\nfunction sensible(g) {\n  g.setMarrow(g.mac.length < 14 ? 'mac' : 'neut');\n  for (let z = 0; z < 3; z++) g.setZone(z, armoredIn(g, z) || g.zones[z].count > 30 ? 'support' : 'offense');\n}\n// Body output: up before waves and when busy, down when getting tired\nfunction pacedOutput(g) {\n  const soon = g.markers().some(m => m.kind === 'wave' && m.t - g.t < 15);\n  const busy = soon || g.bact.length > 40;\n  g.setOutput(g.fatigue > 45 ? 0.2 : busy && g.fatigue < 30 ? 0.85 : 0.5);\n}\n// Every policy is called every 0.5 s of game time. `every` makes a bot look less often.\nconst every = (n, fn) => g => { if ((g.botTick = (g.botTick || 0) + 1) % n === 0) fn(g); };\n\nconst POLICIES = {\n  idle: () => {},\n  supportAll: g => { for (let z = 0; z < 3; z++) g.setZone(z, 'support'); },\n  supportWound: g => { g.setZone(0, 'support'); },\n  macHeavy: g => { g.setMarrow('mac'); },\n  maxOutput: g => { g.setOutput(1); },\n  minOutput: g => { g.setOutput(0); },\n  smart: g => { sensible(g); pacedOutput(g); },\n  smartFlat: g => { sensible(g); g.setOutput(0.5); },\n  smartMax: g => { sensible(g); g.setOutput(1); },\n  // Random button mashing: every half second, maybe press something\n  random: g => { if (g.rand2() < 0.5) randomPress(g); },\n  randomSlow: g => { if (g.rand2() < 0.06) randomPress(g); },\n  // Skill ladder between mashing and good play\n  beginner: every(6, g => { if (g.rand2() < 0.35) randomPress(g); else { sensible(g); g.setOutput(0.5); } }),\n  casual: every(3, g => { if (g.rand2() < 0.1) randomPress(g); else { sensible(g); g.setOutput(0.5); } }),\n};\n\n// The ladder the tuner shows, weakest first\nconst SKILLS = [\n  { key: 'idle', name: 'Does nothing', about: 'Never touches a control. The floor.' },\n  { key: 'random', name: 'Button masher', about: 'Presses a random control about once a second.' },\n  { key: 'beginner', name: 'Beginner', about: 'Looks every 3 s. One look in three is a random press. Leaves the slider alone.' },\n  { key: 'casual', name: 'Casual', about: 'Looks every 1.5 s. Sensible zones and marrow, slider left in the middle.' },\n  { key: 'smart', name: 'Good player', about: 'Looks every 0.5 s. Support against armor, output up before waves, rests when tired.' },\n];\n\n// A family of strategies a player could follow, as ranges of inputs. The tuner samples\n// many of them at one difficulty and reports which input ranges tend to win.\nconst STRATEGY = [\n  { key: 'look', name: 'Looks at the game every', unit: 's', min: 0.5, max: 3, steps: [0.5, 1, 1.5, 2, 3] },\n  { key: 'macs', name: 'Macrophages kept on the field', min: 0, max: 30, int: true },\n  { key: 'armor', name: 'Switches a zone to Support when armor shows up', bool: true },\n  { key: 'crowd', name: 'Switches a zone to Support above this many bacteria', min: 10, max: 80, int: true },\n  { key: 'base', name: 'Body output most of the time', slider: true, min: 0, max: 1 },\n  { key: 'push', name: 'Body output before a wave or when swamped', slider: true, min: 0, max: 1 },\n  { key: 'restAt', name: 'Turns output right down at fatigue', min: 20, max: 100, int: true },\n];\nfunction makeStrategy(p) {\n  const look = Math.max(1, Math.round(p.look / 0.5));\n  return every(look, g => {\n    g.setMarrow(g.mac.length < p.macs ? 'mac' : 'neut');\n    for (let z = 0; z < 3; z++) g.setZone(z, (p.armor && armoredIn(g, z)) || g.zones[z].count > p.crowd ? 'support' : 'offense');\n    const soon = g.markers().some(m => m.kind === 'wave' && m.t - g.t < 15);\n    g.setOutput(g.fatigue > p.restAt ? Math.min(p.base, 0.15) : soon || g.bact.length > 40 ? p.push : p.base);\n  });\n}\n// n strategies spread evenly over every input (Latin hypercube), the same n always gives the same set\nfunction sampleStrategies(n) {\n  const rnd = mulberry32(4242 + n);\n  const cols = STRATEGY.map(() => { const a = []; for (let i = 0; i < n; i++) a.push((i + rnd()) / n); for (let i = n - 1; i > 0; i--) { const j = Math.floor(rnd() * (i + 1)); [a[i], a[j]] = [a[j], a[i]]; } return a; });\n  const out = [];\n  for (let i = 0; i < n; i++) {\n    const p = {};\n    STRATEGY.forEach((d, k) => {\n      const x = cols[k][i];\n      p[d.key] = d.bool ? x < 0.5 : d.steps ? d.steps[Math.min(d.steps.length - 1, Math.floor(x * d.steps.length))] : d.int ? Math.round(d.min + x * (d.max - d.min)) : +(d.min + x * (d.max - d.min)).toFixed(3);\n    });\n    out.push(p);\n  }\n  return out;\n}\n\n// Put a settings bundle in place: {tune: {group: {key: n}}, waves: [...], toxins: [seconds]}\nfunction applySettings(s) {\n  for (const g in DEFAULTS) Object.assign(CONFIG[g], DEFAULTS[g]);\n  s = s || {};\n  mergeConfig(s.tune);\n  const lv = LEVELS.papercut;\n  lv.waves = (s.waves || BOT_LEVEL0.waves).map(w => ({ ...w })).sort((a, b) => a.t - b.t);\n  lv.toxins = s.toxins ? s.toxins.map(t => t / CONFIG.level.duration) : BOT_LEVEL0.toxins.slice();\n}\n\n// One bot match that can be advanced in slices (so a page can stay responsive)\nfunction startMatch(policy, seed, params) {\n  const g = new Game('papercut', seed);\n  g.rand2 = (() => { let a = seed * 7919 + 3; return () => { a = (a * 1103515245 + 12345) & 0x7fffffff; return a / 0x7fffffff; }; })();\n  const fn = params ? makeStrategy(params) : POLICIES[policy];\n  let maxB = 0;\n  return {\n    game: g,\n    // Run up to `steps` ticks. Returns a summary once the match is over, else null.\n    advance(steps) {\n      for (let i = 0; i < steps; i++) {\n        if (g.result || g.t >= 600) return this.summary();\n        if (Math.round(g.t * 60) % 30 === 0) fn(g);\n        g.step(1 / 60);\n        g.fx.length = 0;\n        if (g.bact.length > maxB) maxB = g.bact.length;\n      }\n      return g.result || g.t >= 600 ? this.summary() : null;\n    },\n    summary() {\n      const r = g.result || { win: false, stars: 0, t: g.t, reason: 'timeout', stats: g.stats, peakTimer: g.lymph.peak };\n      return {\n        policy, seed, params, win: !!r.win, stars: r.stars || 0, t: r.t, reason: r.reason,\n        peakTimer: r.peakTimer || 0, fatiguePeak: g.fatiguePeak, maxBact: maxB,\n        kills: r.stats.shotKills + r.stats.swallows, toxinDeaths: r.stats.toxinDeaths,\n        // bacteria on the map every 2 s\n        curve: g.history.map(h => h.z[0] + h.z[1] + h.z[2]),\n      };\n    },\n  };\n}\nfunction runMatch(policy, seed, params) { const m = startMatch(policy, seed, params); let s; while (!(s = m.advance(6000))); return s; }\n\n// (node export removed) = { POLICIES, SKILLS, STRATEGY, sampleStrategies, makeStrategy, applySettings, startMatch, runMatch, BOT_LEVEL0 };\n\nconst slim = r => ({ win: r.win, stars: r.stars, t: Math.round(r.t), peakTimer: +r.peakTimer.toFixed(2), fatiguePeak: Math.round(r.fatiguePeak), curve: r.curve.filter((_, i) => i % 5 === 0) });\nself.onmessage = e => { const { job, settings } = e.data; applySettings(settings); self.postMessage({ job, r: slim(runMatch(job.policy, job.seed, job.params)) }); };\n";
+// Difficulty tuner: edit the level's pressure, run bot matches in Web Workers, show who wins and how.
+// Uses the game's own sim.js and src/bots.js (inlined above by tuner/build.py).
+(() => {
+  'use strict';
+  const $ = s => document.querySelector(s);
+  const esc = s => String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+  const fmtT = s => `${Math.floor(s / 60)}:${String(Math.floor(s % 60)).padStart(2, '0')}`;
+  const pct = x => `${Math.round(x * 100)}%`;
+  const store = {
+    get(k) { try { return JSON.parse(localStorage.getItem(k)); } catch (e) { return null; } },
+    set(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch (e) { /* storage blocked */ } },
+  };
+  const COLORS = { idle: '#5A6480', random: '#FF7A3D', beginner: '#B45CFF', casual: '#5CFFA1', smart: '#3FE6FF' };
+
+  // ---- settings: {tune: {group: {key: n}}, waves: [{t, b, a, final}], toxins: [seconds]} ----
+  const LIVE = {
+    tune: {},
+    waves: BOT_LEVEL0.waves.map(w => ({ t: w.t, b: w.b || 0, a: w.a || 0, final: !!w.final })),
+    toxins: BOT_LEVEL0.toxins.map(f => Math.round(f * DEFAULTS.level.duration)),
+  };
+  const copy = o => JSON.parse(JSON.stringify(o));
+  function normalize(s) {
+    const tune = {};
+    for (const g in DEFAULTS) for (const k in DEFAULTS[g]) {
+      const v = s.tune && s.tune[g] && s.tune[g][k];
+      if (typeof v === 'number' && isFinite(v) && v !== DEFAULTS[g][k]) (tune[g] = tune[g] || {})[k] = v;
+    }
+    const waves = (s.waves || LIVE.waves).filter(w => isFinite(w.t)).map(w => {
+      const o = { t: Math.max(0, +w.t) };
+      if (+w.b > 0) o.b = Math.round(+w.b);
+      if (+w.a > 0) o.a = Math.round(+w.a);
+      if (w.final) o.final = true;
+      return o;
+    }).sort((a, b) => a.t - b.t);
+    const toxins = (s.toxins || LIVE.toxins).filter(t => isFinite(t) && t >= 0).map(Number).sort((a, b) => a - b);
+    return { tune, waves, toxins };
+  }
+  const sig = s => JSON.stringify(normalize(s));
+  const val = (s, g, k) => (s.tune[g] && typeof s.tune[g][k] === 'number' ? s.tune[g][k] : DEFAULTS[g][k]);
+  const LIVE_SIG = sig(LIVE);
+  for (const k of ['ladder', 'strat']) if (BASELINE[k].sig === 'live') BASELINE[k].sig = LIVE_SIG;
+
+  const saved = store.get('immuneTuner.state') || {};
+  let settings = saved.settings ? normalize(saved.settings) : normalize(LIVE);
+  // Results: {sig, ...}. The live game's results ship with the page (computed when it was built).
+  let ladder = saved.ladder || BASELINE.ladder;
+  let strat = saved.strat || BASELINE.strat;
+  let slots = store.get('immuneTuner.slots') || [];
+  for (const r of [ladder, strat]) if (r.partial === true) r.partial = 'stopped';
+  let tab = saved.tab === 'strat' ? 'strat' : 'ladder';
+  const persist = () => store.set('immuneTuner.state', { settings, ladder, strat, tab });
+
+  // ---- knobs ----
+  const GROUP_NAMES = {
+    stream: 'Bacteria stream', bacteria: 'Bacteria', toxin: 'Toxin bursts', lymph: 'Lymph node', level: 'Level',
+    marrow: 'Marrow', output: 'Body output', fatigue: 'Fatigue', neutrophil: 'Neutrophils', macrophage: 'Macrophages', support: 'Support rings',
+  };
+  const PRESSURE = ['stream', 'bacteria', 'toxin', 'lymph'];
+  const PLAYER = ['level', 'marrow', 'output', 'fatigue', 'neutrophil', 'macrophage', 'support'];
+  const human = k => k.replace(/([A-Z])/g, ' $1').replace(/^./, c => c.toUpperCase()).replace('Neut', 'Neutrophils').replace('Mac', 'Macrophages');
+  const stepFor = v => (Number.isInteger(v) && Math.abs(v) >= 2 ? 1 : 0.05);
+  const changes = () => {
+    let n = 0;
+    for (const g in settings.tune) n += Object.keys(settings.tune[g]).length;
+    if (JSON.stringify(settings.waves) !== JSON.stringify(normalize(LIVE).waves)) n++;
+    if (JSON.stringify(settings.toxins) !== JSON.stringify(LIVE.toxins)) n++;
+    return n;
+  };
+  const openState = store.get('immuneTuner.open') || { script: true, stream: true };
+
+  function setVal(g, k, v) {
+    if (!settings.tune[g]) settings.tune[g] = {};
+    settings.tune[g][k] = v;
+    settings = normalize(settings);
+    edited();
+  }
+  function edited() { persist(); renderCounts(); drawArrivals(); renderResults(); }
+
+  function fieldHTML(g, k) {
+    const id = `k-${g}-${k}`, v = val(settings, g, k), changed = v !== DEFAULTS[g][k];
+    const hint = HINTS[`${g}.${k}`];
+    return `<div class="field${changed ? ' changed' : ''}" data-g="${g}" data-k="${k}"><label for="${id}">${esc(human(k))}</label>` +
+      `<input type="number" id="${id}" inputmode="decimal" step="${stepFor(DEFAULTS[g][k])}" value="${v}">` +
+      (hint ? `<small>${esc(hint)}${changed ? ` Live game: ${DEFAULTS[g][k]}.` : ''}</small>` : '') + '</div>';
+  }
+  function groupHTML(g, keys) {
+    const n = keys.filter(k => val(settings, g, k) !== DEFAULTS[g][k]).length;
+    return `<details data-sec="${g}"${openState[g] ? ' open' : ''}><summary>${GROUP_NAMES[g]}<span class="cnt" data-cnt="${g}">${n ? n + ' changed' : ''}</span></summary><div class="sect">${keys.map(k => fieldHTML(g, k)).join('')}</div></details>`;
+  }
+  function buildKnobs() {
+    const host = $('#knobs');
+    let h = `<details data-sec="script"${openState.script ? ' open' : ''}><summary>Level script<span class="cnt" data-cnt="script"></span></summary><div class="sect">
+      <p class="small muted" style="margin:0">Big waves pour in at the Wound at set times. The chart shows everything the script sends in, per 15 seconds, before any bacteria divide.</p>
+      <svg class="chart" id="arrivals" viewBox="0 0 600 150" role="img" aria-label="Scripted arrivals over the level"></svg>
+      <div class="legend"><span><b style="background:var(--germ)"></b>Wave</span><span><b style="background:#7a2a64"></b>Stream</span><span><b style="background:var(--gold)"></b>Armored</span><span><b style="background:var(--damage)"></b>Toxin burst</span></div>
+      ${fieldHTML('level', 'duration')}
+      <div class="wrap-x"><table class="waves"><thead><tr><th>Time (s)</th><th>Bacteria</th><th>Armored</th><th>Final</th><th></th></tr></thead><tbody id="waveRows"></tbody></table></div>
+      <div class="row"><button class="btn" id="addWave" type="button">Add wave</button></div>
+      <div><div class="small" style="font-weight:600;margin-bottom:6px">Toxin bursts (seconds)</div><div class="toxlist" id="toxRows"></div></div>
+      <div class="row"><button class="btn" id="addTox" type="button">Add toxin burst</button></div>
+    </div></details>`;
+    h += PRESSURE.map(g => groupHTML(g, Object.keys(DEFAULTS[g]))).join('');
+    h += `<div class="kh" style="padding-top:14px;border-top:1px solid var(--line)"><h2>Your side</h2><p class="small muted">These change the player's power, not the pressure.</p></div>`;
+    h += PLAYER.map(g => groupHTML(g, Object.keys(DEFAULTS[g]).filter(k => !(g === 'level' && k === 'duration')))).join('');
+    host.innerHTML = h;
+    renderWaves(); renderToxins(); drawArrivals(); renderCounts();
+  }
+  $('#knobs').addEventListener('input', e => {
+    const f = e.target.closest('.field');
+    if (!f) return;
+    const v = parseFloat(e.target.value);
+    if (!isFinite(v)) return;
+    setVal(f.dataset.g, f.dataset.k, v);
+    const changed = v !== DEFAULTS[f.dataset.g][f.dataset.k];
+    f.classList.toggle('changed', changed);
+  });
+  $('#knobs').addEventListener('toggle', e => {
+    const d = e.target; if (!d.dataset || !d.dataset.sec) return;
+    openState[d.dataset.sec] = d.open; store.set('immuneTuner.open', openState);
+  }, true);
+
+  function renderWaves() {
+    $('#waveRows').innerHTML = settings.waves.map((w, i) => `<tr data-i="${i}">
+      <td><input type="number" aria-label="Wave ${i + 1} time in seconds" data-f="t" min="0" step="5" value="${w.t}"><div class="clock">${fmtT(w.t)}</div></td>
+      <td><input type="number" aria-label="Wave ${i + 1} bacteria" data-f="b" min="0" step="5" value="${w.b || 0}"></td>
+      <td><input type="number" aria-label="Wave ${i + 1} armored bacteria" data-f="a" min="0" step="2" value="${w.a || 0}"></td>
+      <td><input type="checkbox" aria-label="Wave ${i + 1} is the final wave" data-f="final"${w.final ? ' checked' : ''}></td>
+      <td><button class="x" type="button" aria-label="Remove wave ${i + 1}" data-del="${i}">×</button></td></tr>`).join('');
+  }
+  // Waves keep their row while typing; they are re-sorted when a field is left
+  $('#knobs').addEventListener('input', e => {
+    const tr = e.target.closest('#waveRows tr'); if (!tr) return;
+    const w = settings.waves[+tr.dataset.i], f = e.target.dataset.f;
+    if (f === 'final') w.final = e.target.checked;
+    else { const v = parseFloat(e.target.value); if (!isFinite(v)) return; w[f] = Math.max(0, v); }
+    if (f === 't') tr.querySelector('.clock').textContent = fmtT(w.t);
+    persist(); renderCounts(); drawArrivals(); renderResults();
+  });
+  $('#knobs').addEventListener('change', e => {
+    if (e.target.closest('#waveRows')) { settings = normalize(settings); persist(); renderWaves(); }
+    if (e.target.closest('#toxRows')) { settings = normalize(settings); persist(); renderToxins(); }
+  });
+  $('#knobs').addEventListener('click', e => {
+    if (e.target.dataset.del != null) { settings.waves.splice(+e.target.dataset.del, 1); settings = normalize(settings); renderWaves(); edited(); }
+    else if (e.target.dataset.deltox != null) { settings.toxins.splice(+e.target.dataset.deltox, 1); renderToxins(); edited(); }
+    else if (e.target.id === 'addWave') {
+      const last = settings.waves[settings.waves.length - 1];
+      settings.waves.push({ t: Math.min(val(settings, 'level', 'duration'), (last ? last.t : 0) + 30), b: 30 });
+      settings = normalize(settings); renderWaves(); edited();
+    } else if (e.target.id === 'addTox') {
+      settings.toxins.push(Math.round(val(settings, 'level', 'duration') / 2)); settings = normalize(settings); renderToxins(); edited();
+    }
+  });
+  function renderToxins() {
+    $('#toxRows').innerHTML = settings.toxins.map((t, i) => `<label><input type="number" aria-label="Toxin burst ${i + 1} time in seconds" min="0" step="5" value="${t}" data-tox="${i}"><span class="clock mono small muted">${fmtT(t)}</span><button class="x btn quiet" style="padding:2px 8px" type="button" aria-label="Remove toxin burst ${i + 1}" data-deltox="${i}">×</button></label>`).join('') || '<span class="small muted">None</span>';
+  }
+  $('#knobs').addEventListener('input', e => {
+    if (e.target.dataset.tox == null) return;
+    const v = parseFloat(e.target.value); if (!isFinite(v)) return;
+    settings.toxins[+e.target.dataset.tox] = Math.max(0, v);
+    e.target.nextElementSibling.textContent = fmtT(v);
+    persist(); renderCounts(); drawArrivals(); renderResults();
+  });
+
+  function renderCounts() {
+    const n = changes();
+    $('#changeCount').textContent = n ? `${n} change${n > 1 ? 's' : ''} from the live game` : 'Same as the live game';
+    document.querySelectorAll('[data-cnt]').forEach(el => {
+      const g = el.dataset.cnt;
+      if (g === 'script') {
+        const c = (JSON.stringify(settings.waves) !== JSON.stringify(normalize(LIVE).waves)) + (JSON.stringify(settings.toxins) !== JSON.stringify(LIVE.toxins)) + (val(settings, 'level', 'duration') !== DEFAULTS.level.duration);
+        el.textContent = c ? 'changed' : '';
+      } else {
+        const c = Object.keys(DEFAULTS[g]).filter(k => !(g === 'level' && k === 'duration') && val(settings, g, k) !== DEFAULTS[g][k]).length;
+        el.textContent = c ? `${c} changed` : '';
+      }
+    });
+  }
+
+  // Scripted arrivals per 15 s: stream (expected), waves, armored share; toxin bursts as red lines
+  function drawArrivals() {
+    const svg = $('#arrivals'); if (!svg) return;
+    const dur = val(settings, 'level', 'duration'), S = { start: val(settings, 'stream', 'start'), end: val(settings, 'stream', 'end'), from: val(settings, 'stream', 'armoredFrom'), share: val(settings, 'stream', 'armoredShare') };
+    const B = 15, nb = Math.ceil(Math.max(dur, ...settings.waves.map(w => w.t + 1)) / B);
+    const bins = Array.from({ length: nb }, () => ({ s: 0, sa: 0, w: 0, wa: 0 }));
+    for (let i = 0; i < nb; i++) for (let t = i * B; t < (i + 1) * B; t += 0.5) {
+      if (t >= dur) break;
+      const rate = (S.start + (S.end - S.start) * t / dur) * 0.5;
+      if (t >= S.from) { bins[i].sa += rate * S.share; bins[i].s += rate * (1 - S.share); } else bins[i].s += rate;
+    }
+    for (const w of settings.waves) { const i = Math.min(nb - 1, Math.floor(w.t / B)); bins[i].w += w.b || 0; bins[i].wa += w.a || 0; }
+    const max = Math.max(10, ...bins.map(b => b.s + b.sa + b.w + b.wa));
+    const W = 600, H = 150, l = 30, r = 6, top = 8, bot = 22, pw = (W - l - r) / nb, sy = v => top + (H - top - bot) * (1 - v / max);
+    let h = '';
+    const tick = max > 100 ? 50 : max > 40 ? 20 : 10;
+    for (let v = 0; v <= max; v += tick) h += `<line class="grid" x1="${l}" x2="${W - r}" y1="${sy(v)}" y2="${sy(v)}"/><text x="${l - 4}" y="${sy(v) + 3}" text-anchor="end">${v}</text>`;
+    bins.forEach((b, i) => {
+      const x = l + i * pw + 1, w = pw - 2;
+      let acc = 0;
+      for (const [v, c] of [[b.s, '#7a2a64'], [b.sa, '#b3922a'], [b.w, '#FF3DCB'], [b.wa, '#FFD23F']]) {
+        if (v <= 0) continue;
+        h += `<rect x="${x}" y="${sy(acc + v)}" width="${w}" height="${sy(acc) - sy(acc + v)}" fill="${c}"/>`;
+        acc += v;
+      }
+    });
+    for (const t of settings.toxins) { const x = l + t / B * pw; h += `<line x1="${x}" x2="${x}" y1="${top}" y2="${H - bot}" stroke="#FF3B4E" stroke-width="2" stroke-dasharray="4 3"/>`; }
+    for (let t = 0; t <= nb * B; t += 60) h += `<text x="${l + t / B * pw}" y="${H - 6}" text-anchor="middle">${fmtT(t)}</text>`;
+    svg.innerHTML = h;
+  }
+
+  // ---- running bots ----
+  const Runner = {
+    workers: [], queue: [], onResult: null, onDone: null, mainThread: false, timer: 0, set: null,
+    size() { return Math.max(1, Math.min(4, navigator.hardwareConcurrency || 2)); },
+    busy() { return this.mainThread ? !!this.slicing : this.workers.some(w => w.job); },
+    makeWorkers() {
+      if (this.workers.length || this.mainThread) return;
+      try {
+        const url = URL.createObjectURL(new Blob([WORKER_SRC], { type: 'text/javascript' }));
+        for (let i = 0; i < this.size(); i++) {
+          const w = new Worker(url);
+          w.onmessage = e => { w.job = null; this.onResult && this.onResult(e.data); this.pump(); };
+          w.onerror = e => { e.preventDefault && e.preventDefault(); this.fallback(); };
+          this.workers.push(w);
+        }
+      } catch (e) { this.mainThread = true; }
+    },
+    fallback() { // workers refused: run on the page in small slices
+      if (this.mainThread) return;
+      this.mainThread = true;
+      for (const w of this.workers) { if (w.job) this.queue.unshift(w.job); w.terminate(); }
+      this.workers = [];
+      this.pump();
+    },
+    run(set, jobs, onResult, onDone) {
+      this.set = normalize(set); this.queue = jobs.slice(); this.onResult = onResult; this.onDone = onDone;
+      this.makeWorkers();
+      this.pump();
+    },
+    pump() {
+      if (!this.onDone) return;
+      if (!this.queue.length && !this.busy()) { const d = this.onDone; this.onDone = this.onResult = null; d(); return; }
+      if (this.mainThread) {
+        if (this.slicing || !this.queue.length) return;
+        const job = this.queue.shift();
+        applySettings(this.set);
+        const m = startMatch(job.policy, job.seed, job.params);
+        this.slicing = true;
+        const slice = () => {
+          applySettings(this.set);
+          const r = m.advance(900);
+          if (r) { this.slicing = false; this.onResult && this.onResult({ job, r: slim(r) }); this.pump(); } else this.timer = setTimeout(slice, 0);
+        };
+        this.timer = setTimeout(slice, 0);
+        return;
+      }
+      for (const w of this.workers) {
+        if (w.job || !this.queue.length) continue;
+        w.job = this.queue.shift();
+        w.postMessage({ job: w.job, settings: this.set });
+      }
+    },
+    stop() {
+      clearTimeout(this.timer); this.slicing = false;
+      if (this.workers.some(w => w.job)) { this.workers.forEach(w => w.terminate()); this.workers = []; }
+      this.queue = []; this.onResult = this.onDone = null;
+    },
+  };
+  // Keep only what the page shows; bacteria counts every 10 s
+  function slim(r) { return { win: r.win, stars: r.stars, t: Math.round(r.t), peakTimer: +r.peakTimer.toFixed(2), fatiguePeak: Math.round(r.fatiguePeak), curve: r.curve.filter((_, i) => i % 5 === 0) }; }
+
+  let running = null; // 'ladder' | 'strat'
+  function setProgress(done, total) {
+    $('#prog').hidden = !running; $('#stop').hidden = !running;
+    $('#runLadder').disabled = $('#runStrat').disabled = !!running;
+    if (!running) return;
+    $('#progBar').style.width = pct(done / total);
+    $('#progTxt').textContent = `${done} of ${total} games played · ${Runner.mainThread ? 'one' : Runner.workers.length || Runner.size()} at a time`;
+  }
+  function runLadder() {
+    const n = +$('#ladderN').value, jobs = [];
+    for (let s = 1; s <= n; s++) for (const sk of SKILLS) jobs.push({ kind: 'ladder', policy: sk.key, seed: s });
+    ladder = { sig: sig(settings), n, runs: [], partial: true };
+    running = 'ladder'; selectTab('ladder'); setProgress(0, jobs.length);
+    Runner.run(settings, jobs, ({ job, r }) => {
+      ladder.runs.push({ policy: job.policy, seed: job.seed, ...r });
+      setProgress(ladder.runs.length, jobs.length); renderLadder();
+    }, () => { ladder.partial = false; running = null; setProgress(); persist(); renderLadder(); toast('Skill ladder done'); });
+  }
+  function runStrat() {
+    const n = +$('#stratN').value, S = sampleStrategies(n);
+    const jobs = S.map((p, i) => ({ kind: 'strat', policy: 'strategy', seed: 1000 + i, params: p, i }));
+    strat = { sig: sig(settings), n, runs: [], partial: true };
+    running = 'strat'; selectTab('strat'); setProgress(0, jobs.length);
+    Runner.run(settings, jobs, ({ job, r }) => {
+      strat.runs.push({ i: job.i, win: r.win, stars: r.stars, t: r.t });
+      setProgress(strat.runs.length, jobs.length);
+      if (strat.runs.length % 4 === 0 || strat.runs.length === jobs.length) renderStrat();
+    }, () => { strat.partial = false; running = null; setProgress(); persist(); renderStrat(); toast('Strategy search done'); });
+  }
+  $('#runLadder').addEventListener('click', runLadder);
+  $('#runStrat').addEventListener('click', runStrat);
+  $('#stop').addEventListener('click', () => {
+    Runner.stop(); running = null; setProgress();
+    if (ladder.partial) ladder.partial = 'stopped';
+    if (strat.partial) strat.partial = 'stopped';
+    persist(); renderResults(); toast('Stopped');
+  });
+
+  // ---- results ----
+  function selectTab(t) {
+    tab = t; persist();
+    $('#tabLadder').setAttribute('aria-selected', t === 'ladder'); $('#tabStrat').setAttribute('aria-selected', t === 'strat');
+    $('#paneLadder').hidden = t !== 'ladder'; $('#paneStrat').hidden = t !== 'strat';
+  }
+  $('#tabLadder').addEventListener('click', () => selectTab('ladder'));
+  $('#tabStrat').addEventListener('click', () => selectTab('strat'));
+
+  function staleNote(res) {
+    if (running) return '';
+    const label = res.sig === LIVE_SIG ? 'the live game' : 'other settings';
+    if (res.sig === sig(settings)) return res.partial === 'stopped' ? `<div class="stale">Stopped early: ${res.runs.length} games played.</div>` : '';
+    return `<div class="stale">These results are for ${label}, not the settings you have now. Run again to update them.</div>`;
+  }
+  const ladderStats = res => SKILLS.map(sk => {
+    const rs = res.runs.filter(r => r.policy === sk.key).sort((a, b) => a.seed - b.seed);
+    const wins = rs.filter(r => r.win), losses = rs.filter(r => !r.win).map(r => r.t).sort((a, b) => a - b);
+    return { sk, rs, n: rs.length, wins: wins.length, rate: rs.length ? wins.length / rs.length : 0, stars: wins.length ? wins.reduce((a, r) => a + r.stars, 0) / wins.length : 0, lossT: losses.length ? losses[Math.floor(losses.length / 2)] : null, fat: rs.length ? rs.reduce((a, r) => a + r.fatiguePeak, 0) / rs.length : 0 };
+  });
+
+  function renderLadder() {
+    const stats = ladderStats(ladder), base = ladder.sig !== LIVE_SIG ? ladderStats(BASELINE.ladder) : null;
+    let h = `<div class="stack" style="gap:4px"><h3>Who wins at this difficulty</h3><p class="small muted" style="margin:0">${ladder.sig === LIVE_SIG ? 'The live game\'s numbers' : 'Your settings'}, ${ladder.n} games per player${base ? '. The white tick is the live game.' : '.'}</p></div>${staleNote(ladder)}<div class="ladder">`;
+    stats.forEach((s, i) => {
+      const b = base && base[i];
+      const detail = !s.n ? 'Not played yet' : [
+        s.wins ? `wins average ${s.stars.toFixed(1)}★` : '',
+        s.lossT != null ? `usually loses around ${fmtT(s.lossT)}` : '',
+        `fatigue peak ${Math.round(s.fat)}`,
+      ].filter(Boolean).join(' · ');
+      h += `<div class="skill">
+        <div class="name"><i style="background:${COLORS[s.sk.key]};box-shadow:0 0 6px ${COLORS[s.sk.key]}"></i><span>${s.sk.name}</span></div>
+        <div class="pct">${s.n ? pct(s.rate) : '–'}</div>
+        <div class="bar"><span style="width:${pct(s.rate)};background:${COLORS[s.sk.key]}"></span>${b && b.n ? `<em style="left:calc(${pct(b.rate)} - 1px)" title="Live game ${pct(b.rate)}"></em>` : ''}</div>
+        <div class="dots" aria-label="${s.wins} wins of ${s.n}">${s.rs.map(r => `<b class="${r.win ? 'w' + r.stars : ''}" title="Seed ${r.seed}: ${r.win ? 'won, ' + r.stars + ' stars' : 'lost at ' + fmtT(r.t)}"></b>`).join('')}</div>
+        <div class="about">${s.sk.about}<br><span class="mono">${detail.charAt(0).toUpperCase() + detail.slice(1)}</span></div></div>`;
+    });
+    h += `</div><div class="legend"><span><b style="background:var(--gold)"></b>Won, 3 stars</span><span><b style="background:#b3922a"></b>2 stars</span><span><b style="background:#6b5a1e"></b>1 star</span><span><b style="background:var(--panel2);border:1px solid var(--line)"></b>Lost</span></div>`;
+    h += `<div class="stack" style="gap:6px"><h3>Bacteria on the map</h3><p class="small muted" style="margin:0">Average over each player's games, while at least a quarter of them are still going.</p>${curveChart(ladder, stats)}<div class="legend">${SKILLS.map(sk => `<span><b class="line" style="background:${COLORS[sk.key]}"></b>${sk.name}</span>`).join('')}<span><b class="line" style="background:var(--damage)"></b>Toxin burst</span><span><b class="line" style="background:var(--germ)"></b>Wave</span></div></div>`;
+    $('#paneLadder').innerHTML = h;
+  }
+  function curveChart(res, stats) {
+    const set = res.sig === sig(settings) ? settings : res.sig === LIVE_SIG ? normalize(LIVE) : settings;
+    const W = 600, H = 190, l = 32, r = 8, top = 14, bot = 22;
+    const lines = stats.map(s => {
+      const pts = [], n = s.rs.length;
+      for (let k = 0; ; k++) {
+        const alive = s.rs.filter(r => r.curve.length > k);
+        if (!n || alive.length < Math.max(1, n / 4)) break;
+        pts.push([k * 10, alive.reduce((a, r) => a + r.curve[k], 0) / alive.length]);
+      }
+      return { key: s.sk.key, pts };
+    });
+    const tmax = Math.max(val(set, 'level', 'duration') + 20, ...lines.map(L => L.pts.length ? L.pts[L.pts.length - 1][0] : 0));
+    const vmax = Math.max(20, ...lines.flatMap(L => L.pts.map(p => p[1])));
+    const sx = t => l + (W - l - r) * t / tmax, sy = v => top + (H - top - bot) * (1 - v / vmax);
+    let h = `<svg class="chart" viewBox="0 0 ${W} ${H}" role="img" aria-label="Average bacteria on the map over time for each player">`;
+    const tick = vmax > 200 ? 100 : vmax > 80 ? 50 : 20;
+    for (let v = 0; v <= vmax; v += tick) h += `<line class="grid" x1="${l}" x2="${W - r}" y1="${sy(v)}" y2="${sy(v)}"/><text x="${l - 4}" y="${sy(v) + 3}" text-anchor="end">${v}</text>`;
+    for (let t = 0; t <= tmax; t += 60) h += `<text x="${sx(t)}" y="${H - 6}" text-anchor="middle">${fmtT(t)}</text>`;
+    for (const t of set.toxins) h += `<line x1="${sx(t)}" x2="${sx(t)}" y1="${top}" y2="${H - bot}" stroke="#FF3B4E" stroke-width="1.5" stroke-dasharray="4 3"/>`;
+    for (const w of set.waves) h += `<path d="M${sx(w.t) - 4},${top - 10} h8 l-4,7 z" fill="#FF3DCB"/>`;
+    for (const L of lines) if (L.pts.length > 1) {
+      h += `<polyline fill="none" stroke="${COLORS[L.key]}" stroke-width="2" stroke-linejoin="round" points="${L.pts.map(p => `${sx(p[0]).toFixed(1)},${sy(p[1]).toFixed(1)}`).join(' ')}"/>`;
+      const e = L.pts[L.pts.length - 1]; h += `<circle cx="${sx(e[0])}" cy="${sy(e[1])}" r="3" fill="${COLORS[L.key]}"/>`;
+    }
+    return h + '</svg>';
+  }
+
+  // Winning strategies: which ranges of each input win
+  function stratAnalysis(res) {
+    const S = sampleStrategies(res.n), runs = res.runs.map(r => ({ ...r, p: S[r.i] }));
+    const wins = runs.filter(r => r.win), share = runs.length ? wins.length / runs.length : 0;
+    const inputs = STRATEGY.map(d => {
+      let bins;
+      if (d.bool) bins = [true, false].map(v => ({ label: v ? 'Yes' : 'No', test: x => x === v }));
+      else if (d.steps) bins = d.steps.map(v => ({ label: `${v}`, test: x => x === v }));
+      else { const nb = 6, w = (d.max - d.min) / nb; bins = Array.from({ length: nb }, (_, i) => ({ lo: d.min + i * w, hi: d.min + (i + 1) * w, test: x => x >= d.min + i * w && (x < d.min + (i + 1) * w || (i === nb - 1 && x <= d.max)) })); }
+      bins.forEach(b => { const rs = runs.filter(r => b.test(r.p[d.key])); b.n = rs.length; b.w = rs.filter(r => r.win).length; b.rate = b.n ? b.w / b.n : 0; });
+      const solid = bins.filter(b => b.n >= 3);
+      const spread = solid.length ? Math.max(...solid.map(b => b.rate)) - Math.min(...solid.map(b => b.rate)) : 0;
+      // One game per strategy and a chaotic game: only call a habit important when the gap beats sampling noise
+      const binN = solid.length ? solid.reduce((a, b) => a + b.n, 0) / solid.length : 1, se = Math.sqrt(share * (1 - share) / binN);
+      const tier = !wins.length ? 0 : spread >= Math.max(0.2, 1.5 * share, 5 * se) ? 2 : spread >= Math.max(0.08, 0.6 * share, 3 * se) ? 1 : 0;
+      let band = null;
+      if (wins.length && !d.bool) {
+        const xs = wins.map(r => r.p[d.key]).sort((a, b) => a - b);
+        const q = f => xs[Math.min(xs.length - 1, Math.max(0, Math.round(f * (xs.length - 1))))];
+        band = xs.length >= 5 ? [q(0.1), q(0.9)] : [xs[0], xs[xs.length - 1]];
+      }
+      const yes = d.bool && wins.length ? wins.filter(r => r.p[d.key]).length / wins.length : null;
+      return { d, bins, spread, tier, band, yes };
+    });
+    return { runs, wins, share, inputs };
+  }
+  const outMul = (x, set) => { const mn = val(set, 'output', 'min'), mx = val(set, 'output', 'max'); return mn * Math.pow(mx / mn, x); };
+  function fmtIn(d, x, set) {
+    if (d.bool) return x ? 'Yes' : 'No';
+    if (d.slider) return `${outMul(x, set).toFixed(1)}×`;
+    if (d.unit) return `${+x.toFixed(1)} ${d.unit}`;
+    return `${Math.round(x)}`;
+  }
+  const range = (d, a, b, set) => (fmtIn(d, a, set) === fmtIn(d, b, set) ? fmtIn(d, a, set) : `${fmtIn(d, a, set).replace(/ s$/, '')}–${fmtIn(d, b, set)}`);
+  function verdict(share) {
+    if (share === 0) return ['none', 'Nothing tried wins'];
+    if (share < 0.1) return ['narrow', 'Narrow path to victory'];
+    if (share < 0.3) return ['some', 'A few ways to win'];
+    return ['wide', 'Many ways to win'];
+  }
+  function renderStrat() {
+    const set = strat.sig === sig(settings) ? settings : strat.sig === LIVE_SIG ? normalize(LIVE) : settings;
+    const A = stratAnalysis(strat), [vk, vt] = verdict(A.share);
+    const base = strat.sig !== LIVE_SIG ? stratAnalysis(BASELINE.strat) : null;
+    let h = `<div class="stack" style="gap:4px"><h3>How many ways to win</h3><p class="small muted" style="margin:0">Each strategy is a fixed set of habits below, picked to cover every range evenly, and plays one game. ${strat.sig === LIVE_SIG ? 'These are the live game\'s numbers.' : 'These are your settings.'}</p></div>${staleNote(strat)}`;
+    h += `<div class="headline"><span class="big">${A.runs.length ? pct(A.share) : '–'}</span><span>of ${A.runs.length} strategies won${strat.partial === true ? ' so far' : ''}</span>${A.runs.length ? `<span class="pill ${vk}">${vt}</span>` : ''}${base ? `<span class="small muted">Live game: ${pct(base.share)}</span>` : ''}</div>`;
+    if (A.wins.length) {
+      const key = A.inputs.filter(x => x.tier > 0).sort((a, b) => b.spread - a.spread);
+      const flat = A.inputs.filter(x => x.tier === 0);
+      h += `<div class="stack" style="gap:6px"><div class="small" style="font-weight:600">What winning looks like here</div><ul class="recipe">`;
+      for (const x of key) h += `<li>${x.d.bool ? (x.yes >= 0.5 ? `${x.d.name}: yes in ${pct(x.yes)} of wins` : `${x.d.name}: no in ${pct(1 - x.yes)} of wins`) : `${x.d.name} <b class="mono">${range(x.d, x.band[0], x.band[1], set)}</b>`} <span class="tag t${x.tier}">${x.tier === 2 ? 'decides it' : 'matters'}</span></li>`;
+      if (!key.length) h += '<li>No single habit stands out. Most of the choices below work.</li>';
+      h += `</ul>${flat.length ? `<p class="small muted" style="margin:0">Barely matters: ${flat.map(x => x.d.name.toLowerCase()).join('; ')}.</p>` : ''}<p class="small muted" style="margin:0">Ranges are where the middle 80% of winning strategies sat. A narrow range on something that decides it means a narrow path.</p></div>`;
+    } else if (A.runs.length) h += `<p class="small muted" style="margin:0">No strategy won, so there is no range to show. Try more strategies, or ease off the pressure.</p>`;
+    h += `<div class="inputs">`;
+    for (const x of A.inputs) {
+      const W = 260, H = 84, l = 2, r = 2, top = 14, bot = 16, n = x.bins.length, bw = (W - l - r) / n;
+      const maxR = Math.max(0.1, 3 * A.share, ...x.bins.map(b => b.rate));
+      let s = `<svg class="chart" viewBox="0 0 ${W} ${H}" role="img" aria-label="Win rate by ${esc(x.d.name)}">`;
+      s += `<line class="grid" x1="${l}" x2="${W - r}" y1="${H - bot}" y2="${H - bot}"/>`;
+      x.bins.forEach((b, i) => {
+        const bh = (H - top - bot) * b.rate / maxR, inBand = x.band && b.lo != null ? b.hi > x.band[0] && b.lo <= x.band[1] : x.band && b.label ? +b.label >= x.band[0] && +b.label <= x.band[1] : false;
+        s += `<rect x="${l + i * bw + 2}" y="${H - bot - bh}" width="${bw - 4}" height="${Math.max(bh, b.n ? 1 : 0)}" fill="${b.rate > 0 ? (inBand || x.d.bool ? '#FFD23F' : '#8a7426') : '#2a3150'}"><title>${b.w} of ${b.n} won</title></rect>`;
+        if (b.n && b.rate > 0) s += `<text x="${l + i * bw + bw / 2}" y="${H - bot - bh - 2}" text-anchor="middle">${Math.round(b.rate * 100)}</text>`;
+        if (b.label != null) s += `<text x="${l + i * bw + bw / 2}" y="${H - 4}" text-anchor="middle">${b.label}</text>`;
+      });
+      if (!x.d.bool && !x.d.steps) s += `<text x="${l}" y="${H - 4}">${fmtIn(x.d, x.d.min, set)}</text><text x="${W - r}" y="${H - 4}" text-anchor="end">${fmtIn(x.d, x.d.max, set)}</text>`;
+      s += '</svg>';
+      const bandTxt = x.d.bool ? (x.yes != null ? `Winners: <b>yes ${pct(x.yes)}</b>` : 'No winners') : x.band ? `Winners: <b>${range(x.d, x.band[0], x.band[1], set)}</b> · tried ${range(x.d, x.d.min, x.d.max, set)}` : `No winners · tried ${range(x.d, x.d.min, x.d.max, set)}`;
+      h += `<div class="inp"><div class="hd"><span>${esc(x.d.name)}${x.d.steps ? ' (s)' : ''}</span>${A.wins.length ? `<span class="tag t${x.tier}">${['barely matters', 'matters', 'decides it'][x.tier]}</span>` : ''}</div>${s}<div class="band">${bandTxt}</div></div>`;
+    }
+    h += `</div><p class="small muted" style="margin:0">Bars are the win rate (%) for strategies in that range of one habit, with every other habit varied. Gold bars sit inside the winners' range. Each strategy plays one game and small timing differences snowball, so a gap of a few points between bars is noise. More strategies give a clearer picture.</p>`;
+    $('#paneStrat').innerHTML = h;
+  }
+  function renderResults() { renderLadder(); renderStrat(); }
+
+  // ---- saved difficulties ----
+  function summaryOf(s) {
+    const g = sig(s), parts = [];
+    const L = ladder.sig === g && !ladder.partial ? ladder : g === LIVE_SIG ? BASELINE.ladder : null;
+    if (L) parts.push(ladderStats(L).map(x => `${x.sk.name.split(' ')[0]} ${pct(x.rate)}`).join(' · '));
+    const T = strat.sig === g && !strat.partial ? strat : g === LIVE_SIG ? BASELINE.strat : null;
+    if (T) { const A = stratAnalysis(T); parts.push(`Strategies that win: ${pct(A.share)} (${verdict(A.share)[1].toLowerCase()})`); }
+    return parts;
+  }
+  function renderSlots() {
+    const host = $('#saved');
+    if (!slots.length) { host.innerHTML = '<p class="small muted" style="margin:0">Nothing saved yet.</p>'; return; }
+    host.innerHTML = slots.map((s, i) => {
+      const sum = s.summary && s.summary.length ? s.summary : ['Run the ladder or strategies with these settings, then save again to keep the results here.'];
+      return `<div class="slot"><strong>${esc(s.name)}</strong><div class="row"><button class="btn" type="button" data-load="${i}">Load</button><button class="btn quiet" type="button" data-rm="${i}">${s.confirm ? 'Tap again to delete' : 'Delete'}</button></div><div class="sum">${sum.map(esc).join('<br>')}</div></div>`;
+    }).join('');
+  }
+  $('#slotSave').addEventListener('click', () => {
+    const name = $('#slotName').value.trim() || `Difficulty ${slots.length + 1}`;
+    const entry = { name, settings: normalize(settings), summary: summaryOf(settings) };
+    const i = slots.findIndex(s => s.name === name);
+    if (i >= 0) slots[i] = entry; else slots.push(entry);
+    store.set('immuneTuner.slots', slots.map(({ confirm, ...s }) => s)); renderSlots(); toast(`Saved ${name}`);
+  });
+  $('#saved').addEventListener('click', e => {
+    const ld = e.target.dataset.load, rm = e.target.dataset.rm;
+    if (ld != null) { settings = normalize(slots[+ld].settings); persist(); buildKnobs(); renderResults(); toast(`Loaded ${slots[+ld].name}`); }
+    if (rm != null) {
+      const s = slots[+rm];
+      if (s.confirm) { slots.splice(+rm, 1); store.set('immuneTuner.slots', slots); } else { slots.forEach(x => { x.confirm = false; }); s.confirm = true; }
+      renderSlots();
+    }
+  });
+  $('#resetAll').addEventListener('click', () => { settings = normalize(LIVE); persist(); buildKnobs(); renderResults(); toast('Back to the live game\'s numbers'); });
+
+  // ---- export, import, play ----
+  const exportText = () => JSON.stringify(normalize(settings));
+  $('#copy').addEventListener('click', () => {
+    const txt = exportText(), ta = $('#paste');
+    const fallback = () => { ta.value = txt; ta.focus(); ta.select(); toast('Select and copy the text in the box'); };
+    try { navigator.clipboard.writeText(txt).then(() => toast('Settings copied'), fallback); } catch (e) { fallback(); }
+  });
+  $('#load').addEventListener('click', () => {
+    let s;
+    try { s = JSON.parse($('#paste').value); } catch (e) { toast('That text is not settings JSON. Copy it again with Copy settings.'); return; }
+    if (!s || typeof s !== 'object') { toast('That text is not settings JSON.'); return; }
+    settings = normalize({ tune: s.tune || {}, waves: Array.isArray(s.waves) ? s.waves : LIVE.waves, toxins: Array.isArray(s.toxins) ? s.toxins : LIVE.toxins });
+    persist(); buildKnobs(); renderResults(); toast('Settings loaded');
+  });
+  $('#play').addEventListener('click', () => {
+    const s = normalize(settings), dur = val(s, 'level', 'duration');
+    store.set('immuneRtsV2.tuning', s.tune);
+    store.set('immuneRtsV2.level', { waves: s.waves, toxins: s.toxins.map(t => t / dur) });
+    location.href = 'play.html';
+  });
+
+  let toastT = 0;
+  function toast(msg) { const t = $('#toast'); t.textContent = msg; t.hidden = false; clearTimeout(toastT); toastT = setTimeout(() => { t.hidden = true; }, 2200); }
+
+  // ---- boot ----
+  buildKnobs();
+  selectTab(tab);
+  renderResults();
+  renderSlots();
+  setProgress();
+})();
+
+</script>

@@ -1,0 +1,1349 @@
+<title>Cytostorm Sound Lab</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Instrument+Sans:wdth,wght@75..100,400..700&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+/* Layout: one phone-width column of sound cards on the game's black, glowing-cell palette.
+   Single dark theme on purpose, same tokens as the Cytostorm hub. */
+:root {
+  color-scheme: dark;
+  --void: #04050A; --panel: #0A0D18; --panel2: #10152A; --line: #1E2540;
+  --ink: #DDE6F5; --dim: #7A86A0; --cell: #3FE6FF; --germ: #FF3DCB; --gold: #FFD23F;
+  --risky: #FF9A3C; --lethal: #FF4057;
+  --display: "Instrument Sans", "Helvetica Neue", Arial, sans-serif;
+  --mono: "IBM Plex Mono", ui-monospace, Menlo, monospace;
+}
+* { box-sizing: border-box; }
+html { background: var(--void); }
+body {
+  margin: 0; color: var(--ink); font: 16px/1.45 var(--display);
+  background: radial-gradient(120% 50% at 50% -10%, rgba(63,230,255,.10), transparent 60%), var(--void);
+  padding-inline: 16px; padding-block: 0 48px;
+  -webkit-tap-highlight-color: transparent;
+}
+main { max-width: 620px; margin: 0 auto; display: grid; gap: 28px; }
+header { display: grid; gap: 8px; padding-top: 28px; }
+.kicker { font: 500 12px var(--mono); letter-spacing: .18em; text-transform: uppercase; color: var(--dim); margin: 0; }
+h1 { font: 700 44px/1 var(--display); font-stretch: 85%; margin: 0; letter-spacing: -.01em; text-wrap: balance; }
+h1 span { color: var(--cell); text-shadow: 0 0 18px rgba(63,230,255,.45); }
+h2 { font: 650 22px/1.2 var(--display); font-stretch: 90%; margin: 0; text-wrap: balance; }
+p { margin: 0; color: var(--dim); text-wrap: pretty; max-width: 62ch; }
+p b { color: var(--ink); font-weight: 600; }
+
+.bar {
+  position: sticky; top: env(safe-area-inset-top, 0px); z-index: 5;
+  display: flex; flex-wrap: wrap; align-items: center; gap: 10px 14px;
+  padding: 10px 12px; margin-inline: -4px; border: 1px solid var(--line); border-radius: 14px;
+  background: rgba(10,13,24,.92); backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px);
+}
+.bar label { font: 500 12px var(--mono); letter-spacing: .1em; text-transform: uppercase; color: var(--dim); display: flex; align-items: center; gap: 8px; flex: 1 1 180px; min-width: 0; }
+.bar input[type=range] { flex: 1; min-width: 0; accent-color: var(--cell); }
+.state { font: 500 12px var(--mono); color: var(--dim); }
+.state.on { color: var(--cell); }
+
+section { display: grid; gap: 12px; }
+.sechead { display: grid; gap: 4px; }
+.cards { display: grid; gap: 10px; }
+.card {
+  display: grid; grid-template-columns: 48px 1fr; gap: 10px 14px; align-items: start;
+  padding: 14px; background: var(--panel); border: 1px solid var(--line); border-radius: 14px;
+}
+.card.live { border-color: var(--cell); background: var(--panel2); }
+.card img { width: 48px; height: 48px; filter: drop-shadow(0 0 8px rgba(63,230,255,.3)); }
+.card.germ img { filter: drop-shadow(0 0 8px rgba(255,61,203,.35)); }
+.card .body { display: grid; gap: 8px; min-width: 0; }
+.card h3 { font: 650 18px/1.2 var(--display); margin: 0; }
+.card .when { font-size: 14px; }
+.row { display: flex; flex-wrap: wrap; gap: 8px; }
+
+button { font: inherit; color: inherit; cursor: pointer; touch-action: manipulation; }
+button:focus-visible, input:focus-visible { outline: 2px solid var(--cell); outline-offset: 2px; }
+.play {
+  display: inline-flex; align-items: center; gap: 8px; min-height: 40px;
+  padding: 0 14px; border-radius: 999px; border: 1px solid var(--line); background: var(--panel2);
+  font: 600 15px var(--display);
+}
+.play::before { content: ""; width: 0; height: 0; border-left: 9px solid var(--cell); border-top: 6px solid transparent; border-bottom: 6px solid transparent; }
+.play.on { border-color: var(--cell); box-shadow: 0 0 14px rgba(63,230,255,.25); }
+.play.on::before { border: 0; width: 9px; height: 10px; background: var(--cell); }
+.play.flash { border-color: var(--cell); }
+.play.sm { min-height: 34px; padding: 0 12px; font-size: 14px; }
+.swarm { font: 500 13px var(--mono); letter-spacing: .04em; min-height: 40px; padding: 0 12px; border-radius: 999px; border: 1px dashed var(--line); background: none; color: var(--dim); }
+.swarm:active { color: var(--cell); border-color: var(--cell); }
+.pick { display: inline-flex; align-items: center; }
+.pick .play { border-radius: 999px 0 0 999px; border-right: 0; }
+.star { min-height: 40px; min-width: 40px; border-radius: 0 999px 999px 0; border: 1px solid var(--line); background: var(--panel2); color: var(--dim); font-size: 17px; line-height: 1; }
+.star[aria-pressed=true] { color: var(--gold); text-shadow: 0 0 10px rgba(255,210,63,.6); }
+.pick.sel .play { border-color: rgba(63,230,255,.55); }
+.pick.sel .star { border-color: rgba(63,230,255,.55); }
+
+.seg { display: flex; flex-wrap: wrap; gap: 6px; }
+.seg button { min-height: 36px; padding: 0 12px; border-radius: 999px; border: 1px solid var(--line); background: none; color: var(--dim); font: 600 14px var(--display); }
+.seg button[aria-pressed=true] { color: var(--void); background: var(--cell); border-color: var(--cell); }
+.seg.heat button[data-k=feverish][aria-pressed=true], .seg.heat button[data-k=hot][aria-pressed=true] { background: var(--risky); border-color: var(--risky); }
+.seg.heat button[data-k=exhausted][aria-pressed=true], .seg.heat button[data-k=overload][aria-pressed=true], .seg.heat button[data-k=fever][aria-pressed=true], .seg.heat button[data-k=crisis][aria-pressed=true] { background: var(--lethal); border-color: var(--lethal); }
+
+.eq { display: inline-flex; gap: 2px; height: 12px; align-items: end; margin-left: 4px; }
+.eq i { width: 3px; background: var(--cell); height: 30%; }
+.on .eq i { animation: eq .5s ease-in-out infinite alternate; }
+.eq i:nth-child(2) { animation-delay: -.2s !important; } .eq i:nth-child(3) { animation-delay: -.35s !important; }
+@keyframes eq { to { height: 100%; } }
+
+.storm { display: grid; grid-template-columns: auto 1fr; gap: 16px; align-items: center; }
+.hold {
+  --p: 0; --c: var(--cell);
+  width: 112px; height: 112px; border-radius: 50%; border: 0; padding: 8px;
+  background: conic-gradient(var(--c) calc(var(--p) * 1turn), var(--line) 0);
+  user-select: none; -webkit-user-select: none; -webkit-touch-callout: none; touch-action: none;
+}
+.hold span {
+  display: grid; place-items: center; width: 100%; height: 100%; border-radius: 50%; background: var(--panel2);
+  font: 700 15px/1.1 var(--display); text-align: center; text-transform: uppercase; letter-spacing: .06em;
+}
+.hold img { width: 40px; height: 40px; display: block; margin: 0 auto 2px; }
+.hold.risky { --c: var(--risky); } .hold.lethal { --c: var(--lethal); }
+.hold.ready span { box-shadow: inset 0 0 24px rgba(255,64,87,.6); }
+
+.feature { border-color: rgba(255,61,203,.45); background: linear-gradient(160deg, rgba(255,61,203,.08), transparent 55%), var(--panel); }
+#groups { display: grid; gap: 28px; }
+.star.solo { border-radius: 999px; padding: 0 14px; font: 600 14px var(--display); }
+.picks { padding: 14px; border: 1px solid var(--line); border-radius: 14px; display: grid; gap: 8px; }
+.picks ul { margin: 0; padding-left: 18px; color: var(--ink); font-size: 15px; }
+.picks .none { color: var(--dim); }
+.tip { font-size: 14px; border-left: 2px solid var(--gold); padding-left: 10px; }
+@media (max-width: 420px) { h1 { font-size: 38px; } .storm { grid-template-columns: 1fr; justify-items: center; } }
+@media (prefers-reduced-motion: reduce) { .on .eq i { animation: none; height: 80%; } }
+</style>
+
+<main>
+  <header>
+    <p class="kicker">Cytostorm · Sound lab · Draft 1</p>
+    <h1>What does a <span>fight</span> sound like?</h1>
+    <p>The game is silent right now. These are first drafts of music and sound effects, all made from scratch with code, so there is nothing licensed in here and they are yours. Tap anything to hear it and <b>star the ones you like</b>; I can see your stars.</p>
+    <p class="tip">No sound on iPhone? Flip the silent switch off and turn the volume up.</p>
+  </header>
+
+  <div class="bar" role="region" aria-label="Playback">
+    <label for="vol">Volume <input id="vol" type="range" min="0" max="1" step="0.01" value="0.8"></label>
+    <button class="play sm" id="stopall" type="button">Stop all</button>
+    <span class="state" id="state">Sound off until you tap</span>
+  </div>
+
+  <section id="music">
+    <div class="sechead">
+      <h2>Music</h2>
+      <p>Four loops. Each one repeats forever until you stop it.</p>
+    </div>
+    <div class="cards" id="musiccards"></div>
+  </section>
+
+  <div id="groups"></div>
+
+  <section id="picks">
+    <div class="sechead"><h2>Your stars</h2></div>
+    <div class="picks"><ul id="picklist"></ul><p id="picknote">Stars save as you tap them. Tell me in the thread when you're done and I'll wire your favorites into the game.</p></div>
+  </section>
+</main>
+
+<script>
+// Cytostorm sound engine: every sound is synthesized with Web Audio, no samples.
+// Works on any BaseAudioContext, so the same code plays live on the page and
+// renders to files offline (render.js). Exposes one global: CytoSound.
+(function (G) {
+'use strict';
+
+// ---------- helpers ----------
+const mtof = m => 440 * Math.pow(2, (m - 69) / 12);
+function rng(seed) { let s = seed >>> 0 || 1; return () => ((s = (s * 1664525 + 1013904223) >>> 0) / 4294967296); }
+let R = Math.random;  // swapped for a seeded rng during offline renders
+
+const noiseCache = new WeakMap();
+function noiseBuf(ctx) {
+  let b = noiseCache.get(ctx);
+  if (!b) {
+    b = ctx.createBuffer(1, ctx.sampleRate * 2, ctx.sampleRate);
+    const d = b.getChannelData(0), r = rng(7);
+    for (let i = 0; i < d.length; i++) d[i] = r() * 2 - 1;
+    noiseCache.set(ctx, b);
+  }
+  return b;
+}
+function noise(ctx, t, dur) {
+  const s = ctx.createBufferSource();
+  s.buffer = noiseBuf(ctx); s.loop = true;
+  s.start(t, R() * 1.5); s.stop(t + dur + 0.05);
+  return s;
+}
+function osc(ctx, type, f, t, dur) {
+  const o = ctx.createOscillator();
+  o.type = type; o.frequency.setValueAtTime(f, t);
+  o.start(t); o.stop(t + dur + 0.05);
+  return o;
+}
+function filt(ctx, type, f, q) {
+  const n = ctx.createBiquadFilter();
+  n.type = type; n.frequency.value = f; if (q != null) n.Q.value = q;
+  return n;
+}
+// Percussive envelope: quick attack to peak, exponential decay to silence by t+dur.
+function perc(ctx, t, peak, a, dur) {
+  const g = ctx.createGain();
+  g.gain.setValueAtTime(0.0001, t);
+  g.gain.linearRampToValueAtTime(peak, t + a);
+  g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+  return g;
+}
+// Sustained envelope: attack, hold at level, release.
+function adsr(ctx, t, peak, a, hold, rel) {
+  const g = ctx.createGain();
+  g.gain.setValueAtTime(0.0001, t);
+  g.gain.linearRampToValueAtTime(peak, t + a);
+  g.gain.setValueAtTime(peak, t + a + hold);
+  g.gain.exponentialRampToValueAtTime(0.0001, t + a + hold + rel);
+  return g;
+}
+function sweep(param, t, from, to, dur) {
+  param.setValueAtTime(from, t);
+  param.exponentialRampToValueAtTime(Math.max(to, 0.01), t + dur);
+}
+function chain(...nodes) { for (let i = 0; i < nodes.length - 1; i++) nodes[i].connect(nodes[i + 1]); return nodes[nodes.length - 1]; }
+function panner(ctx, p) {
+  if (!ctx.createStereoPanner) return ctx.createGain();
+  const n = ctx.createStereoPanner(); n.pan.value = Math.max(-1, Math.min(1, p || 0)); return n;
+}
+function shaper(ctx, amt) {
+  const n = ctx.createWaveShaper(), c = new Float32Array(1024);
+  for (let i = 0; i < 1024; i++) { const x = i / 511.5 - 1; c[i] = Math.tanh(x * amt) / Math.tanh(amt); }
+  n.curve = c; return n;
+}
+
+// ---------- mixer ----------
+// out = { sfx, music, verb, ctx }. Each sound connects into o.dest (dry) and o.verb (reverb send).
+function makeBus(ctx, dest) {
+  const master = ctx.createGain(); master.gain.value = 0.9;
+  const comp = ctx.createDynamicsCompressor();
+  comp.threshold.value = -14; comp.knee.value = 10; comp.ratio.value = 4; comp.attack.value = 0.004; comp.release.value = 0.2;
+  chain(master, comp, dest || ctx.destination);
+  const verb = ctx.createConvolver();
+  const len = Math.floor(ctx.sampleRate * 2.4), ir = ctx.createBuffer(2, len, ctx.sampleRate), r = rng(11);
+  for (let ch = 0; ch < 2; ch++) {
+    const d = ir.getChannelData(ch);
+    for (let i = 0; i < len; i++) d[i] = (r() * 2 - 1) * Math.pow(1 - i / len, 3.2);
+  }
+  verb.buffer = ir;
+  const verbIn = ctx.createGain(); verbIn.gain.value = 0.32;
+  const verbTone = filt(ctx, 'lowpass', 5200);
+  chain(verbIn, verb, verbTone, master);
+  const sfx = ctx.createGain(); sfx.gain.value = 0.75; sfx.connect(master);   // effects sit a little under the music (Alex)
+  const music = ctx.createGain(); music.gain.value = 0.62; music.connect(master);
+  return { ctx, master, sfx, music, verb: verbIn };
+}
+// A per-sound output: pan + volume, with optional reverb send.
+function voice(bus, t, opts, wet) {
+  const ctx = bus.ctx, o = opts || {};
+  const g = ctx.createGain(); g.gain.value = o.v == null ? 1 : o.v;
+  const p = panner(ctx, o.pan);
+  chain(g, p, o.dest || bus.sfx);
+  if (wet) { const s = ctx.createGain(); s.gain.value = wet; p.connect(s); s.connect(bus.verb); }
+  return g;
+}
+
+// ---------- sound effects ----------
+// Each play(bus, t, opts) schedules everything at audio time t and returns its length in seconds.
+// opts.p = pitch multiplier, opts.pan, opts.v = volume; swarm mode varies them per hit.
+const SFX = {};
+
+SFX.shotPew = (b, t, o = {}) => {           // neutrophil shot: bright laser pew
+  const c = b.ctx, out = voice(b, t, o, 0.08), p = o.p || 1;
+  const s = osc(c, 'square', 1500 * p, t, 0.11);
+  sweep(s.frequency, t, 1500 * p, 240 * p, 0.09);
+  chain(s, filt(c, 'lowpass', 3800, 1), perc(c, t, 0.16, 0.002, 0.11), out);
+  const n = noise(c, t, 0.02);
+  chain(n, filt(c, 'highpass', 3000), perc(c, t, 0.12, 0.001, 0.02), out);
+  return 0.15;
+};
+SFX.shotSpit = (b, t, o = {}) => {          // neutrophil shot: wet organic spit
+  const c = b.ctx, out = voice(b, t, o, 0.06), p = o.p || 1;
+  const n = noise(c, t, 0.09), bp = filt(c, 'bandpass', 3800 * p, 2.2);
+  sweep(bp.frequency, t, 4200 * p, 800 * p, 0.08);
+  chain(n, bp, perc(c, t, 0.7, 0.002, 0.09), out);
+  const s = osc(c, 'sine', 700 * p, t, 0.07);
+  sweep(s.frequency, t, 700 * p, 160 * p, 0.06);
+  chain(s, perc(c, t, 0.32, 0.002, 0.07), out);
+  return 0.12;
+};
+SFX.gulp = (b, t, o = {}) => {              // macrophage swallow: one deep gulp
+  const c = b.ctx, out = voice(b, t, o, 0.1), p = o.p || 1;
+  const s = osc(c, 'sine', 200 * p, t, 0.34);
+  s.frequency.setValueAtTime(200 * p, t);
+  s.frequency.linearRampToValueAtTime(430 * p, t + 0.045);
+  s.frequency.exponentialRampToValueAtTime(75 * p, t + 0.3);
+  chain(s, filt(c, 'lowpass', 1400), perc(c, t, 0.55, 0.012, 0.32), out);
+  const n = noise(c, t, 0.22), bp = filt(c, 'bandpass', 700 * p, 5);
+  sweep(bp.frequency, t, 900 * p, 260 * p, 0.2);
+  chain(n, bp, perc(c, t + 0.02, 0.35, 0.02, 0.22), out);
+  return 0.38;
+};
+SFX.slurp = (b, t, o = {}) => {             // macrophage swallow: two-stage wobbly slurp
+  const c = b.ctx, out = voice(b, t, o, 0.1), p = o.p || 1;
+  [[0, 320, 1], [0.1, 190, 0.85]].forEach(([dt, f, v]) => {
+    const s = osc(c, 'triangle', f * p, t + dt, 0.2);
+    sweep(s.frequency, t + dt, f * 1.6 * p, f * 0.55 * p, 0.16);
+    const lfo = osc(c, 'sine', 34, t + dt, 0.2), depth = c.createGain(); depth.gain.value = f * 0.25 * p;
+    chain(lfo, depth, s.frequency);
+    chain(s, filt(c, 'lowpass', 1600), perc(c, t + dt, 0.45 * v, 0.01, 0.18), out);
+  });
+  return 0.34;
+};
+SFX.blink = (b, t, o = {}) => {             // germ about to divide: soft blink blips
+  const c = b.ctx, out = voice(b, t, o, 0.15), p = o.p || 1;
+  [0, 0.12].forEach(dt => {
+    const s = osc(c, 'sine', 1760 * p, t + dt, 0.06);
+    chain(s, perc(c, t + dt, 0.12, 0.004, 0.06), out);
+  });
+  return 0.25;
+};
+SFX.divideSquelch = (b, t, o = {}) => {     // germ divides: blink, blink, squelch
+  const c = b.ctx, p = o.p || 1;
+  SFX.blink(b, t, o);
+  const out = voice(b, t, o, 0.1), t2 = t + 0.28;
+  const car = osc(c, 'sine', 260 * p, t2, 0.22), mod = osc(c, 'sine', 390 * p, t2, 0.22), idx = c.createGain();
+  sweep(car.frequency, t2, 260 * p, 900 * p, 0.16);
+  sweep(mod.frequency, t2, 390 * p, 1350 * p, 0.16);
+  idx.gain.setValueAtTime(600 * p, t2); idx.gain.exponentialRampToValueAtTime(20, t2 + 0.18);
+  chain(mod, idx, car.frequency);
+  chain(car, perc(c, t2, 0.3, 0.01, 0.2), out);
+  const n = noise(c, t2, 0.12), bp = filt(c, 'bandpass', 600, 3);
+  sweep(bp.frequency, t2, 600, 2400, 0.12);
+  chain(n, bp, perc(c, t2, 0.25, 0.005, 0.12), out);
+  return 0.55;
+};
+SFX.divideBubble = (b, t, o = {}) => {      // germ divides: blink, then bloop-bloop
+  const c = b.ctx, p = o.p || 1;
+  SFX.blink(b, t, o);
+  const out = voice(b, t, o, 0.12);
+  [[0.28, 380], [0.37, 520]].forEach(([dt, f]) => {
+    const s = osc(c, 'sine', f * p, t + dt, 0.1);
+    sweep(s.frequency, t + dt, f * p, f * 2.6 * p, 0.05);
+    chain(s, perc(c, t + dt, 0.32, 0.004, 0.09), out);
+  });
+  return 0.5;
+};
+SFX.pop = (b, t, o = {}) => {               // kill: bubble pop
+  const c = b.ctx, out = voice(b, t, o, 0.05), p = o.p || 1;
+  const s = osc(c, 'sine', 480 * p, t, 0.08);
+  sweep(s.frequency, t, 480 * p, 1700 * p, 0.03);
+  chain(s, perc(c, t, 0.4, 0.002, 0.07), out);
+  const n = noise(c, t, 0.012);
+  chain(n, filt(c, 'highpass', 2500), perc(c, t, 0.18, 0.001, 0.012), out);
+  return 0.1;
+};
+SFX.crunch = (b, t, o = {}) => {            // kill: crisp crunch
+  const c = b.ctx, out = voice(b, t, o, 0.05), p = o.p || 1;
+  const n = noise(c, t, 0.07);
+  chain(n, filt(c, 'bandpass', 1900 * p, 1.1), perc(c, t, 0.8, 0.001, 0.06), out);
+  const s = osc(c, 'square', 170 * p, t, 0.04);
+  sweep(s.frequency, t, 170 * p, 70 * p, 0.04);
+  chain(s, filt(c, 'lowpass', 900), perc(c, t, 0.3, 0.001, 0.04), out);
+  return 0.09;
+};
+// Big burst, kept small and dry (Alex: effects should be subtle, the first splat was too big and loose).
+SFX.burstPops = (b, t, o = {}) => {         // a quick cluster of tiny pops
+  const c = b.ctx, out = voice(b, t, o, 0.03), p = o.p || 1;
+  for (let i = 0; i < 5; i++) {
+    const dt = i * 0.022 + R() * 0.012, f = (520 + R() * 500) * p, s = osc(c, 'sine', f, t + dt, 0.05);
+    sweep(s.frequency, t + dt, f, f * 2.4, 0.025);
+    chain(s, perc(c, t + dt, 0.2, 0.002, 0.045), panner(c, (R() - 0.5) * 0.5), out);
+  }
+  const th = osc(c, 'sine', 180 * p, t, 0.09);
+  sweep(th.frequency, t, 180 * p, 90 * p, 0.07);
+  chain(th, perc(c, t, 0.3, 0.002, 0.08), out);
+  return 0.16;
+};
+SFX.burstTight = (b, t, o = {}) => {        // one short, tight splat
+  const c = b.ctx, out = voice(b, t, o, 0.03), p = o.p || 1;
+  const n = noise(c, t, 0.1), bp = filt(c, 'bandpass', 2200 * p, 1.4);
+  sweep(bp.frequency, t, 2600 * p, 900 * p, 0.08);
+  chain(n, bp, perc(c, t, 0.55, 0.001, 0.09), out);
+  const th = osc(c, 'sine', 220 * p, t, 0.08);
+  sweep(th.frequency, t, 220 * p, 110 * p, 0.06);
+  chain(th, perc(c, t, 0.3, 0.002, 0.07), out);
+  return 0.12;
+};
+// Net traps, dry and fast like the NK zap.
+SFX.netSnap = (b, t, o = {}) => {           // a quick zip that snaps shut
+  const c = b.ctx, out = voice(b, t, o, 0), p = o.p || 1;
+  const n = noise(c, t, 0.06), bp = filt(c, 'bandpass', 1500 * p, 3);
+  sweep(bp.frequency, t, 1500 * p, 6000 * p, 0.05);
+  chain(n, bp, perc(c, t, 0.45, 0.004, 0.055), out);
+  const s = osc(c, 'square', 900 * p, t + 0.045, 0.03);
+  chain(s, filt(c, 'lowpass', 3500), perc(c, t + 0.045, 0.12, 0.001, 0.03), out);
+  return 0.09;
+};
+SFX.netCinch = (b, t, o = {}) => {          // two tight zips, like a drawstring pulled closed
+  const c = b.ctx, out = voice(b, t, o, 0), p = o.p || 1;
+  [[0, 1200, 3400], [0.06, 1800, 5200]].forEach(([dt, f0, f1]) => {
+    const n = noise(c, t + dt, 0.04), bp = filt(c, 'bandpass', f0 * p, 4);
+    sweep(bp.frequency, t + dt, f0 * p, f1 * p, 0.035);
+    chain(n, bp, perc(c, t + dt, 0.4, 0.003, 0.04), out);
+  });
+  const s = osc(c, 'triangle', 1300 * p, t + 0.1, 0.04);
+  chain(s, perc(c, t + 0.1, 0.14, 0.001, 0.035), out);
+  return 0.15;
+};
+SFX.zap = (b, t, o = {}) => {               // NK cell strike: electric zap
+  const c = b.ctx, out = voice(b, t, o, 0.12), p = o.p || 1;
+  const s = osc(c, 'sawtooth', 2200 * p, t, 0.18);
+  sweep(s.frequency, t, 2200 * p, 110 * p, 0.16);
+  const am = c.createGain(); am.gain.value = 0.5;
+  const lfo = osc(c, 'square', 70, t, 0.18), ld = c.createGain(); ld.gain.value = 0.5;
+  chain(lfo, ld, am.gain);
+  const bp = filt(c, 'bandpass', 1800, 1.4);
+  sweep(bp.frequency, t, 3000 * p, 400 * p, 0.16);
+  chain(s, bp, am, perc(c, t, 0.45, 0.002, 0.18), out);
+  chain(noise(c, t, 0.015), filt(c, 'highpass', 4000), perc(c, t, 0.3, 0.001, 0.015), out);
+  return 0.22;
+};
+
+// Cytokine storm: charge() returns a live handle so the page can mirror the game's
+// hold-5-seconds-then-release control. fire() is the release, cancel() an early let-go.
+SFX.stormCharge = (b, t, o = {}) => {
+  const c = b.ctx, out = voice(b, t, o, 0.2), HOLD = 5;
+  const bus = c.createGain(); bus.gain.value = 1; bus.connect(out);
+  const lp = filt(c, 'lowpass', 180, 6);
+  sweep(lp.frequency, t, 180, 3800, HOLD);
+  const trem = c.createGain(); trem.gain.value = 0.6;
+  const tl = osc(c, 'sine', 3, t, 60), td = c.createGain(); td.gain.value = 0.4;
+  tl.frequency.setValueAtTime(3, t); tl.frequency.exponentialRampToValueAtTime(18, t + HOLD);
+  chain(tl, td, trem.gain);
+  const env = c.createGain(); env.gain.setValueAtTime(0.0001, t); env.gain.exponentialRampToValueAtTime(0.5, t + HOLD);
+  chain(lp, trem, env, bus);
+  const srcs = [tl];
+  [0, 7, 12.1].forEach(det => {
+    const s = osc(c, 'sawtooth', 55, t, 60);
+    s.frequency.setValueAtTime(55 * Math.pow(2, det / 12), t);
+    s.frequency.exponentialRampToValueAtTime(220 * Math.pow(2, det / 12), t + HOLD);
+    s.connect(lp); srcs.push(s);
+  });
+  const n = noise(c, t, 60), hp = filt(c, 'highpass', 2000);
+  const ng = c.createGain(); ng.gain.setValueAtTime(0.0001, t); ng.gain.exponentialRampToValueAtTime(0.18, t + HOLD);
+  chain(n, hp, ng, bus); srcs.push(n);
+  // Warning ticks once the charge turns Risky (orange) then Lethal (red).
+  const ticks = [];
+  for (let k = 0; k < 18; k++) {
+    const tt = t + 2 + k * (k < 8 ? 0.25 : 0.14); if (tt > t + HOLD) break;
+    const s = osc(c, 'square', k < 8 ? 1320 : 1760, tt, 0.04);
+    chain(s, filt(c, 'lowpass', 4000), perc(c, tt, 0.07, 0.002, 0.04), bus); ticks.push(s);
+  }
+  // Fully charged: a held high whine until release.
+  const ready = osc(c, 'sine', 1760, t + HOLD, 60), rg = c.createGain();
+  rg.gain.setValueAtTime(0, t); rg.gain.setValueAtTime(0, t + HOLD); rg.gain.linearRampToValueAtTime(0.06, t + HOLD + 0.05);
+  chain(ready, rg, bus); srcs.push(ready);
+  const stopAll = (at) => { srcs.concat(ticks).forEach(s => { try { s.stop(at); } catch (e) {} }); };
+  return {
+    start: t, hold: HOLD,
+    fire(at) {
+      at = Math.max(at, c.currentTime);
+      bus.gain.setValueAtTime(1, at); bus.gain.linearRampToValueAtTime(0.0001, at + 0.06); stopAll(at + 0.1);
+      return SFX.stormBlast(b, at, o);
+    },
+    cancel(at) {
+      at = Math.max(at, c.currentTime);
+      srcs.forEach(s => { if (s.frequency) s.frequency.cancelScheduledValues(at), s.frequency.setValueAtTime(s.frequency.value || 110, at), s.frequency.exponentialRampToValueAtTime(30, at + 0.35); });
+      bus.gain.setValueAtTime(1, at); bus.gain.exponentialRampToValueAtTime(0.0001, at + 0.4); stopAll(at + 0.45);
+      return 0.5;
+    }
+  };
+};
+SFX.stormBlast = (b, t, o = {}) => {        // storm released: shockwave, crackle, ringing afterburn
+  const c = b.ctx, out = voice(b, t, o, 0.45);
+  const crack = osc(c, 'sawtooth', 90, t, 0.25);
+  chain(crack, shaper(c, 6), filt(c, 'lowpass', 2400), perc(c, t, 0.5, 0.001, 0.22), out);
+  const boom = osc(c, 'sine', 95, t, 1.6);
+  sweep(boom.frequency, t, 95, 24, 1.4);
+  chain(boom, perc(c, t, 1.0, 0.004, 1.5), out);
+  const n = noise(c, t, 2.4), lp = filt(c, 'lowpass', 9000, 0.7);
+  sweep(lp.frequency, t, 9000, 160, 2.2);
+  chain(n, lp, perc(c, t, 0.8, 0.005, 2.3), out);
+  for (let i = 0; i < 26; i++) {               // shards
+    const dt = 0.08 + Math.pow(R(), 1.6) * 1.6, f = 2000 + R() * 5000;
+    const s = osc(c, 'sine', f, t + dt, 0.03);
+    chain(s, perc(c, t + dt, 0.05 + R() * 0.06, 0.001, 0.03), panner(c, R() * 2 - 1), out);
+  }
+  const ring = osc(c, 'triangle', 330, t + 0.3, 3.2), ring2 = osc(c, 'triangle', 349, t + 0.3, 3.2);  // afterburn: a sour minor-second hum
+  const rg = adsr(c, t + 0.3, 0.07, 0.6, 1.2, 1.4);
+  ring.connect(rg); ring2.connect(rg); chain(rg, filt(c, 'lowpass', 1200), out);
+  return 3.6;
+};
+
+SFX.organMonitor = (b, t, o = {}) => {      // organ loses a bar: cold two-tone monitor drop + thud
+  const c = b.ctx, out = voice(b, t, o, 0.25);
+  [[0, 880], [0.2, 659.3]].forEach(([dt, f]) => {
+    const s = osc(c, 'sine', f, t + dt, 0.2);
+    chain(s, adsr(c, t + dt, 0.22, 0.01, 0.13, 0.05), out);
+  });
+  const th = osc(c, 'sine', 70, t + 0.2, 0.45);
+  sweep(th.frequency, t + 0.2, 70, 40, 0.4);
+  chain(th, perc(c, t + 0.2, 0.7, 0.005, 0.45), out);
+  return 0.75;
+};
+SFX.organCrack = (b, t, o = {}) => {        // organ loses a bar: brittle metallic crack
+  const c = b.ctx, out = voice(b, t, o, 0.3);
+  const car = osc(c, 'sine', 1180, t, 0.9), mod = osc(c, 'sine', 1180 * 3.51, t, 0.9), idx = c.createGain();
+  idx.gain.setValueAtTime(2600, t); idx.gain.exponentialRampToValueAtTime(30, t + 0.8);
+  chain(mod, idx, car.frequency);
+  chain(car, perc(c, t, 0.22, 0.001, 0.9), out);
+  chain(noise(c, t, 0.12), filt(c, 'highpass', 3500), perc(c, t, 0.4, 0.001, 0.1), out);
+  const th = osc(c, 'sine', 55, t, 0.5);
+  chain(th, perc(c, t, 0.6, 0.004, 0.5), out);
+  return 1.0;
+};
+// Organ loses a bar: short hospital flatlines (Alex 2026-10-08; the synthesized oofs didn't work).
+// Kept short so they read as a warning; the long flatline stays reserved for Host failure.
+function monitorTone(c, out, t, dur, v, f) {
+  const s = osc(c, 'sine', f || 960, t, dur + 0.05), g = c.createGain();
+  g.gain.setValueAtTime(0.0001, t); g.gain.linearRampToValueAtTime(v, t + 0.01);
+  const rel = Math.min(0.12, dur * 0.4);
+  g.gain.setValueAtTime(v, t + dur - rel); g.gain.linearRampToValueAtTime(0.0001, t + dur);
+  chain(s, g, out);
+}
+SFX.flatShort = (b, t, o = {}) => {         // one beep, then a short flat tone
+  const c = b.ctx, out = voice(b, t, o, 0.08);
+  monitorTone(c, out, t, 0.1, 0.12);
+  monitorTone(c, out, t + 0.35, 0.9, 0.13);
+  return 1.3;
+};
+SFX.flatBlip = (b, t, o = {}) => {          // just a brief flat tone, quietest
+  const c = b.ctx, out = voice(b, t, o, 0.06);
+  monitorTone(c, out, t, 0.55, 0.11);
+  return 0.6;
+};
+SFX.flatAlarm = (b, t, o = {}) => {         // three quick alarm beeps, then the flat tone
+  const c = b.ctx, out = voice(b, t, o, 0.08);
+  [0, 0.14, 0.28].forEach(dt => monitorTone(c, out, t + dt, 0.09, 0.1, 880));
+  monitorTone(c, out, t + 0.5, 0.8, 0.13);
+  return 1.35;
+};
+
+// One breach-clock tick (o.k alternates tick/tock) and the buzzer when a clock fills.
+// The game plays ticks faster as a clock fills, then breachLand, then the organ-hit sound.
+SFX.breachTick = (b, t, o = {}) => {
+  const c = b.ctx, out = voice(b, t, o, 0.08), s = osc(c, 'sine', o.k % 2 ? 1500 : 1900, t, 0.03);
+  chain(s, perc(c, t, 0.18, 0.001, 0.03), out);
+  chain(noise(c, t, 0.02), filt(c, 'bandpass', 3000, 4), perc(c, t, 0.12, 0.001, 0.02), out);
+  return 0.05;
+};
+SFX.breachLand = (b, t, o = {}) => {
+  const c = b.ctx, out = voice(b, t, o, 0.08), buzz = c.createGain();
+  [110, 116.5].forEach(f => osc(c, 'square', f, t, 0.7).connect(buzz));
+  chain(buzz, filt(c, 'lowpass', 1000), adsr(c, t, 0.18, 0.01, 0.45, 0.2), out);
+  return 0.7;
+};
+SFX.breachTicks = (b, t, o = {}) => {       // demo: a clock filling over 4 s
+  const FILL = 4;
+  let tt = t, k = 0;
+  while (tt < t + FILL) {
+    SFX.breachTick(b, tt, Object.assign({}, o, { k }));
+    const prog = (tt - t) / FILL; tt += 0.5 - prog * 0.4; k++;
+  }
+  SFX.breachLand(b, tt, o);
+  SFX.organMonitor(b, tt + 0.1, o);
+  return tt - t + 0.9;
+};
+SFX.breachPulse = (b, t, o = {}) => {       // breach clock: rising pulse tone instead of ticks
+  const c = b.ctx, out = voice(b, t, o, 0.1), FILL = 4;
+  const s = osc(c, 'triangle', 220, t, FILL + 0.1);
+  s.frequency.setValueAtTime(220, t); s.frequency.exponentialRampToValueAtTime(520, t + FILL);
+  const am = c.createGain(); am.gain.value = 0.5;
+  const lfo = osc(c, 'sine', 3, t, FILL + 0.1), ld = c.createGain(); ld.gain.value = 0.5;
+  lfo.frequency.setValueAtTime(3, t); lfo.frequency.exponentialRampToValueAtTime(14, t + FILL);
+  chain(lfo, ld, am.gain);
+  const env = c.createGain(); env.gain.setValueAtTime(0.0001, t); env.gain.exponentialRampToValueAtTime(0.22, t + FILL); env.gain.setValueAtTime(0.22, t + FILL); env.gain.linearRampToValueAtTime(0.0001, t + FILL + 0.05);
+  chain(s, filt(c, 'lowpass', 1800), am, env, out);
+  SFX.organMonitor(b, t + FILL, o);
+  return FILL + 0.8;
+};
+
+// Heartbeat for the fatigue meter. rate = seconds between beats.
+const HEART = {
+  fine: { gap: 0.95, label: 'Fine' },
+  tired: { gap: 0.72, label: 'Tired' },
+  feverish: { gap: 0.52, label: 'Feverish' },
+  exhausted: { gap: 0.4, label: 'Exhausted' },
+  overload: { gap: 0.33, label: 'Overload', skip: true }
+};
+SFX.heartbeat = (b, t, o = {}) => {         // one lub-dub
+  const c = b.ctx, out = voice(b, t, o, 0.04), hard = o.hard || 0;
+  [[0, 95, 1], [0.16, 78, 0.7]].forEach(([dt, f, v]) => {
+    const s = osc(c, 'sine', f, t + dt, 0.2);
+    sweep(s.frequency, t + dt, f, f * 0.5, 0.15);
+    chain(s, filt(c, 'lowpass', 220 + hard * 500), perc(c, t + dt, 0.95 * v, 0.006, 0.18), out);
+    // phone speakers barely play below ~150 Hz, so add an overtone and a soft thump they can reproduce
+    const h = osc(c, 'triangle', f * 2.2, t + dt, 0.12);
+    sweep(h.frequency, t + dt, f * 2.2, f * 1.2, 0.1);
+    chain(h, filt(c, 'lowpass', 700), perc(c, t + dt, 0.3 * v, 0.004, 0.1), out);
+    chain(noise(c, t + dt, 0.03), filt(c, 'lowpass', 900), perc(c, t + dt, 0.12 * v, 0.002, 0.03), out);
+    if (hard > 0.3) chain(noise(c, t + dt, 0.04), filt(c, 'lowpass', 600), perc(c, t + dt, 0.2 * hard * v, 0.003, 0.05), out);
+  });
+  return 0.4;
+};
+
+SFX.flatline = (b, t, o = {}) => {          // Host failure: last slowing beats, then a flat tone
+  const c = b.ctx, out = voice(b, t, o, 0.3);
+  const beats = [0, 0.75, 1.75];
+  beats.forEach((dt, i) => {
+    SFX.heartbeat(b, t + dt, { v: 1 - i * 0.25 });
+    const s = osc(c, 'sine', 960, t + dt, 0.14);
+    chain(s, adsr(c, t + dt, 0.13, 0.005, 0.08, 0.04), out);
+  });
+  const t2 = t + 3.1, flat = osc(c, 'sine', 960, t2, 3.2);
+  const g = c.createGain(); g.gain.setValueAtTime(0.0001, t2); g.gain.linearRampToValueAtTime(0.14, t2 + 0.02);
+  g.gain.setValueAtTime(0.14, t2 + 2.4); g.gain.linearRampToValueAtTime(0.0001, t2 + 3.1);
+  chain(flat, g, out);
+  const drone = osc(c, 'triangle', 110, t2, 3.2), dg = adsr(c, t2, 0.22, 0.8, 1.2, 1.2);
+  sweep(drone.frequency, t2, 110, 82, 3);
+  chain(drone, filt(c, 'lowpass', 500), dg, out);
+  return 6.4;
+};
+SFX.shutdown = (b, t, o = {}) => {          // Host failure: everything powers down
+  const c = b.ctx, out = voice(b, t, o, 0.35), D = 2.6;
+  const lp = filt(c, 'lowpass', 3000, 2);
+  sweep(lp.frequency, t, 3000, 80, D);
+  const g = adsr(c, t, 0.22, 0.02, D - 0.6, 0.6);
+  [45, 52, 57, 64].forEach(m => {           // A minor chord falling like a dying motor
+    const s = osc(c, 'sawtooth', mtof(m), t, D);
+    s.frequency.setValueAtTime(mtof(m), t);
+    s.frequency.setTargetAtTime(mtof(m) * 0.12, t + 0.15, 0.7);
+    s.connect(lp);
+  });
+  chain(lp, g, out);
+  const th = osc(c, 'sine', 60, t + D - 0.4, 1.2);
+  sweep(th.frequency, t + D - 0.4, 60, 30, 1);
+  chain(th, perc(c, t + D - 0.4, 0.8, 0.005, 1.1), out);
+  return D + 1.2;
+};
+
+function drum(b, t, v, out) {               // taiko-ish hit
+  const c = b.ctx, s = osc(c, 'sine', 120, t, 0.6);
+  sweep(s.frequency, t, 120, 48, 0.4);
+  chain(s, perc(c, t, v, 0.004, 0.6), out);
+  chain(noise(c, t, 0.08), filt(c, 'lowpass', 1200), perc(c, t, v * 0.4, 0.002, 0.08), out);
+}
+SFX.waveDrums = (b, t, o = {}) => {         // wave start: two drum hits and a swelling horn
+  const c = b.ctx, out = voice(b, t, o, 0.35);
+  drum(b, t, 0.9, out); drum(b, t + 0.22, 0.7, out);
+  const lp = filt(c, 'lowpass', 300, 3);
+  lp.frequency.setValueAtTime(300, t + 0.3); lp.frequency.exponentialRampToValueAtTime(2400, t + 0.9);
+  [50, 57, 62].forEach((m, i) => [0, 0.08].forEach(det => {
+    osc(c, 'sawtooth', mtof(m) * (1 + det * 0.01 * (i + 1)), t + 0.3, 1.3).connect(lp);
+  }));
+  chain(lp, adsr(c, t + 0.3, 0.12, 0.45, 0.4, 0.5), out);
+  return 1.8;
+};
+SFX.waveStabs = (b, t, o = {}) => {         // wave start: three rising alarm stabs
+  const c = b.ctx, out = voice(b, t, o, 0.25);
+  [[0, 57], [0.18, 60], [0.36, 64]].forEach(([dt, m], i) => {
+    const lp = filt(c, 'lowpass', 2600, 2);
+    [m, m + 7, m + 12].forEach(n => [-6, 6].forEach(cents => {
+      const s = osc(c, 'sawtooth', mtof(n), t + dt, 0.3); s.detune.value = cents; s.connect(lp);
+    }));
+    chain(lp, perc(c, t + dt, i === 2 ? 0.14 : 0.1, 0.004, i === 2 ? 0.7 : 0.16), out);
+    drum(b, t + dt, 0.35 + i * 0.15, out);
+  });
+  return 1.2;
+};
+SFX.victoryArp = (b, t, o = {}) => {        // victory: bright arpeggio into a held chord
+  const c = b.ctx, out = voice(b, t, o, 0.35);
+  [60, 64, 67, 72, 76].forEach((m, i) => {
+    const s = osc(c, 'square', mtof(m), t + i * 0.09, 0.25);
+    chain(s, filt(c, 'lowpass', 3000), perc(c, t + i * 0.09, 0.09, 0.004, 0.24), out);
+  });
+  const t2 = t + 0.5, lp = filt(c, 'lowpass', 2600);
+  [60, 64, 67, 71, 74].forEach(m => [-7, 7].forEach(cents => {
+    const s = osc(c, 'sawtooth', mtof(m), t2, 2.1); s.detune.value = cents; s.connect(lp);
+  }));
+  chain(lp, adsr(c, t2, 0.06, 0.05, 0.9, 1.1), out);
+  drum(b, t2, 0.6, out);
+  return 2.8;
+};
+SFX.victoryBells = (b, t, o = {}) => {      // victory: soft glassy bells
+  const c = b.ctx, out = voice(b, t, o, 0.5);
+  [[0, 72], [0.14, 76], [0.28, 79], [0.42, 83], [0.62, 84]].forEach(([dt, m], i) => {
+    const f = mtof(m), car = osc(c, 'sine', f, t + dt, 2), mod = osc(c, 'sine', f * 3.5, t + dt, 2), idx = c.createGain();
+    idx.gain.setValueAtTime(f * 2, t + dt); idx.gain.exponentialRampToValueAtTime(1, t + dt + 1.2);
+    chain(mod, idx, car.frequency);
+    chain(car, perc(c, t + dt, i === 4 ? 0.22 : 0.15, 0.002, i === 4 ? 2 : 1.2), out);
+  });
+  return 2.8;
+};
+SFX.tapClick = (b, t, o = {}) => {          // UI: soft click
+  const c = b.ctx, out = voice(b, t, o, 0);
+  chain(noise(c, t, 0.012), filt(c, 'bandpass', 2600, 2), perc(c, t, 0.6, 0.001, 0.012), out);
+  const s = osc(c, 'sine', 1200, t, 0.03);
+  chain(s, perc(c, t, 0.15, 0.001, 0.03), out);
+  return 0.05;
+};
+SFX.tapBlip = (b, t, o = {}) => {           // UI: cell-like blip
+  const c = b.ctx, out = voice(b, t, o, 0.05), p = o.p || 1;
+  const s = osc(c, 'sine', 660 * p, t, 0.07);
+  sweep(s.frequency, t, 660 * p, 990 * p, 0.04);
+  chain(s, perc(c, t, 0.18, 0.003, 0.07), out);
+  return 0.09;
+};
+SFX.pauseOpen = (b, t, o = {}) => {         // organ window opens, game pauses: muffled whoosh down
+  const c = b.ctx, out = voice(b, t, o, 0.2);
+  const lp = filt(c, 'lowpass', 4000, 1);
+  sweep(lp.frequency, t, 4000, 300, 0.3);
+  chain(noise(c, t, 0.32), lp, perc(c, t, 0.35, 0.02, 0.32), out);
+  const s = osc(c, 'sine', 520, t, 0.25);
+  sweep(s.frequency, t, 520, 260, 0.2);
+  chain(s, perc(c, t, 0.12, 0.005, 0.22), out);
+  return 0.4;
+};
+SFX.pauseClose = (b, t, o = {}) => {        // window closes, game resumes: whoosh up
+  const c = b.ctx, out = voice(b, t, o, 0.2);
+  const lp = filt(c, 'lowpass', 300, 1);
+  sweep(lp.frequency, t, 300, 5000, 0.25);
+  chain(noise(c, t, 0.28), lp, perc(c, t, 0.32, 0.12, 0.28), out);
+  const s = osc(c, 'sine', 260, t, 0.25);
+  sweep(s.frequency, t, 260, 560, 0.2);
+  chain(s, perc(c, t + 0.05, 0.12, 0.01, 0.2), out);
+  return 0.4;
+};
+
+// ---------- music ----------
+// Instruments: play(bus.music-side out, t, midi, dur, vel)
+const INST = {
+  kick(c, out, t, v = 1) {
+    const s = osc(c, 'sine', 150, t, 0.4);
+    sweep(s.frequency, t, 150, 44, 0.12);
+    chain(s, perc(c, t, 0.9 * v, 0.003, 0.38), out);
+    chain(noise(c, t, 0.012), filt(c, 'bandpass', 3000, 0.8), perc(c, t, 0.18 * v, 0.001, 0.012), out);
+  },
+  heartKick(c, out, t, v = 1) {             // softer, rounder kick for the heartbeat pattern
+    const s = osc(c, 'sine', 100, t, 0.3);
+    sweep(s.frequency, t, 100, 45, 0.14);
+    chain(s, filt(c, 'lowpass', 300), perc(c, t, 1.0 * v, 0.005, 0.28), out);
+    const h = osc(c, 'triangle', 220, t, 0.12);
+    sweep(h.frequency, t, 220, 110, 0.1);
+    chain(h, filt(c, 'lowpass', 700), perc(c, t, 0.25 * v, 0.004, 0.1), out);
+  },
+  snare(c, out, t, v = 1) {
+    chain(noise(c, t, 0.18), filt(c, 'bandpass', 1900, 0.9), perc(c, t, 0.5 * v, 0.002, 0.17), out);
+    const s = osc(c, 'triangle', 200, t, 0.1);
+    sweep(s.frequency, t, 200, 120, 0.08);
+    chain(s, perc(c, t, 0.35 * v, 0.002, 0.1), out);
+  },
+  clap(c, out, t, v = 1) {
+    const bp = filt(c, 'bandpass', 1300, 1.5); bp.connect(out);
+    [0, 0.012, 0.024].forEach((dt, i) => chain(noise(c, t + dt, 0.12), perc(c, t + dt, 0.45 * v, 0.001, i === 2 ? 0.14 : 0.012), bp));
+  },
+  hat(c, out, t, v = 1, open) {
+    chain(noise(c, t, open ? 0.22 : 0.05), filt(c, 'highpass', 7500), perc(c, t, 0.22 * v, 0.001, open ? 0.2 : 0.045), out);
+  },
+  shaker(c, out, t, v = 1) {
+    chain(noise(c, t, 0.06), filt(c, 'bandpass', 5500, 1.2), perc(c, t, 0.12 * v, 0.015, 0.06), out);
+  },
+  bass(c, out, t, m, d, v = 1) {
+    const f = mtof(m), lp = filt(c, 'lowpass', 220, 6);
+    lp.frequency.setValueAtTime(220 + 1300 * v, t); lp.frequency.exponentialRampToValueAtTime(200, t + Math.min(d, 0.25));
+    osc(c, 'sawtooth', f, t, d).connect(lp);
+    const sub = osc(c, 'sine', f / 2, t, d), sg = c.createGain(); sg.gain.value = 0.7; chain(sub, sg, lp);
+    chain(lp, adsr(c, t, 0.32 * v, 0.004, Math.max(d - 0.06, 0.01), 0.05), out);
+  },
+  fuzzBass(c, out, t, m, d, v = 1) {
+    const f = mtof(m), lp = filt(c, 'lowpass', 900, 3);
+    lp.frequency.setValueAtTime(1600, t); lp.frequency.exponentialRampToValueAtTime(350, t + d);
+    const s = osc(c, 'sawtooth', f, t, d), s2 = osc(c, 'square', f * 1.005, t, d), mix = c.createGain(); mix.gain.value = 0.5;
+    s.connect(mix); s2.connect(mix);
+    chain(mix, shaper(c, 3.5), lp, adsr(c, t, 0.2 * v, 0.003, Math.max(d - 0.05, 0.01), 0.04), out);
+  },
+  pluck(c, out, t, m, d, v = 1, type = 'square') {
+    const lp = filt(c, 'lowpass', 400, 4);
+    lp.frequency.setValueAtTime(4200, t); lp.frequency.exponentialRampToValueAtTime(500, t + 0.18);
+    osc(c, type, mtof(m), t, d + 0.2).connect(lp);
+    chain(lp, perc(c, t, 0.13 * v, 0.003, Math.max(d, 0.2)), out);
+  },
+  bell(c, out, t, m, d, v = 1) {
+    const f = mtof(m), car = osc(c, 'sine', f, t, d + 1.5), mod = osc(c, 'sine', f * 2, t, d + 1.5), idx = c.createGain();
+    idx.gain.setValueAtTime(f * 1.4, t); idx.gain.exponentialRampToValueAtTime(1, t + 1);
+    chain(mod, idx, car.frequency);
+    chain(car, perc(c, t, 0.12 * v, 0.003, d + 1.4), out);
+  },
+  pad(c, out, t, notes, d, v = 1, bright = 900) {
+    const lp = filt(c, 'lowpass', bright, 0.5);
+    notes.forEach(m => [-9, 9].forEach(cents => { const s = osc(c, 'sawtooth', mtof(m), t, d + 1.2); s.detune.value = cents; s.connect(lp); }));
+    chain(lp, adsr(c, t, 0.045 * v, Math.min(0.8, d * 0.4), Math.max(d - 0.8, 0.1), 1.0), out);
+  },
+  stab(c, out, t, notes, d, v = 1) {
+    const lp = filt(c, 'lowpass', 2200, 2);
+    lp.frequency.setValueAtTime(3000, t); lp.frequency.exponentialRampToValueAtTime(700, t + d);
+    notes.forEach(m => [-6, 6].forEach(cents => { const s = osc(c, 'sawtooth', mtof(m), t, d); s.detune.value = cents; s.connect(lp); }));
+    chain(lp, perc(c, t, 0.07 * v, 0.003, d), out);
+  },
+  chip(c, out, t, m, d, v = 1) {
+    const s = osc(c, 'square', mtof(m), t, d), vib = osc(c, 'sine', 6, t, d), vd = c.createGain();
+    vd.gain.setValueAtTime(0, t); vd.gain.linearRampToValueAtTime(mtof(m) * 0.012, t + Math.min(d, 0.3));
+    chain(vib, vd, s.frequency);
+    chain(s, filt(c, 'lowpass', 5000), adsr(c, t, 0.075 * v, 0.004, Math.max(d * 0.8 - 0.004, 0.01), 0.04), out);
+  },
+  triBass(c, out, t, m, d, v = 1) {
+    chain(osc(c, 'triangle', mtof(m), t, d), adsr(c, t, 0.4 * v, 0.003, Math.max(d * 0.85, 0.01), 0.03), out);
+  },
+  chipNoise(c, out, t, v = 1, long) {
+    chain(noise(c, t, long ? 0.15 : 0.04), filt(c, 'highpass', long ? 1500 : 5000), perc(c, t, (long ? 0.3 : 0.12) * v, 0.001, long ? 0.14 : 0.035), out);
+  },
+  bubble(c, out, t, v = 1) {
+    const f = 300 + R() * 900, s = osc(c, 'sine', f, t, 0.12);
+    sweep(s.frequency, t, f, f * 2.2, 0.06);
+    chain(s, perc(c, t, 0.05 * v, 0.004, 0.1), panner(c, R() * 1.6 - 0.8), out);
+  },
+  siren(c, out, t, m, d, v = 1) {
+    const s = osc(c, 'sawtooth', mtof(m), t, d), lfo = osc(c, 'sine', 5.5, t, d), ld = c.createGain();
+    ld.gain.value = mtof(m) * 0.02; chain(lfo, ld, s.frequency);
+    s.frequency.setValueAtTime(mtof(m - 1), t); s.frequency.linearRampToValueAtTime(mtof(m), t + 0.08);
+    chain(s, filt(c, 'lowpass', 1800, 2), adsr(c, t, 0.05 * v, 0.03, Math.max(d - 0.1, 0.01), 0.15), out);
+  }
+};
+
+// Pattern helpers: 'x' hit, '.' rest, 16 steps per bar.
+const hits = (pat, step) => pat[step % pat.length] !== '.';
+// Note lists as [step, midi, lengthInSteps] per bar.
+
+const TRACKS = {};
+
+// Calm: between waves, menus, the Clinic. A minor 9 colors, bubbles, bells.
+TRACKS.petri = {
+  name: 'Petri Dish', bpm: 84, bars: 8,
+  chords: [[57, 60, 64, 67, 71], [53, 57, 60, 64], [48, 55, 60, 64], [55, 59, 62, 69]],
+  bells: [[0, 76, 4], [4, 79, 4], [8, 83, 4], [12, 79, 4], [0, 77, 6], [6, 76, 2], [8, 72, 8], [0, 76, 4], [4, 79, 4], [8, 84, 6], [14, 83, 2], [0, 81, 8], [8, 79, 4], [12, 74, 4]],
+  step(c, out, t, s, sd) {
+    const bar = Math.floor(s / 16) % 8, st = s % 16, ch = this.chords[Math.floor(bar / 2)];
+    if (st === 0 && bar % 2 === 0) INST.pad(c, out, t, ch, sd * 32, 1.2, 1100);
+    if (st === 0) INST.bass(c, out, t, ch[0] - 12, sd * 10, 0.45);
+    if (st === 10 && bar % 2 === 1) INST.bass(c, out, t, ch[0] - 12, sd * 5, 0.35);
+    if (st === 0 || st === 10) INST.heartKick(c, out, t, 0.45);
+    if (st % 4 === 2) INST.shaker(c, out, t, 0.6);
+    // bell melody: a slow phrase over each pair of bars
+    const half = Math.floor(bar / 2), phrase = [this.bells.slice(0, 4), this.bells.slice(4, 7), this.bells.slice(7, 11), this.bells.slice(11)][half];
+    if (bar % 2 === 0) phrase.forEach(([at, m, len]) => { if (at === st) INST.bell(c, out, t, m, sd * len, 0.9); });
+    if (R() < 0.12) INST.bubble(c, out, t + R() * sd, 1);
+  }
+};
+
+// Main fight. D minor, four on the floor. layers 0..3 follow "intensity":
+// 0 calm (pad, bubbles), 1 fight (+drums, bass), 2 hot (+arp, claps), 3 fever (+fuzz, siren lead),
+// 4 crisis (+extra kicks, octave fuzz, doubled lead, alarm blips, a snare roll and riser into the loop).
+TRACKS.blood = {
+  name: 'Bloodstream', bpm: 124, bars: 8, adaptive: true,
+  chords: [[50, 53, 57], [46, 50, 53], [53, 57, 60], [48, 52, 55]],
+  bassPat: [0, 0, 12, 0, 0, 12, 0, 7, 0, 0, 12, 0, 0, 12, 10, 7],
+  arp: [0, 7, 12, 15, 12, 7, 3, 7],
+  lead: [[0, 74, 6], [6, 72, 2], [8, 69, 4], [12, 65, 4], [0, 70, 8], [8, 69, 4], [12, 65, 4], [0, 72, 6], [6, 74, 2], [8, 77, 8], [0, 76, 4], [4, 72, 4], [8, 67, 8]],
+  step(c, out, t, s, sd, lvl = 1) {
+    const bar = Math.floor(s / 16) % 8, st = s % 16, ch = this.chords[Math.floor(bar / 2)], root = ch[0];
+    if (st === 0 && bar % 2 === 0) INST.pad(c, out, t, ch.map(n => n + 12), sd * 32, lvl >= 3 ? 0.6 : 1, lvl >= 4 ? 2600 : lvl >= 1 ? 1400 : 800);
+    if (lvl === 0) { if (R() < 0.1) INST.bubble(c, out, t, 1); if (st === 0) INST.heartKick(c, out, t, 0.4); return; }
+    if (st % 4 === 0) INST.kick(c, out, t, 1);
+    if (st === 4 || st === 12) INST.snare(c, out, t, 0.8);
+    if (st % 4 === 2) INST.hat(c, out, t, 1, st === 14);
+    else if (lvl >= 2) INST.hat(c, out, t, 0.45);
+    const bassFn = lvl >= 3 ? INST.fuzzBass : INST.bass;
+    if (st % 2 === 0 || lvl >= 2) bassFn(c, out, t, root - 12 + this.bassPat[st], sd * 0.9, st % 4 === 0 ? 1 : 0.75);
+    if (lvl >= 2) {
+      if (st === 12 && bar % 2 === 1) INST.clap(c, out, t, 0.7);
+      if (st % 2 === 0) INST.pluck(c, out, t, root + 12 + this.arp[(st / 2) % 8], sd * 1.6, 0.9, 'sawtooth');
+    }
+    if (lvl >= 3) {
+      const ph = [this.lead.slice(0, 4), this.lead.slice(4, 7), this.lead.slice(7, 10), this.lead.slice(10)][Math.floor(bar / 2)];
+      if (bar % 2 === 0) ph.forEach(([at, m, len]) => { if (at === st) INST.siren(c, out, t, m, sd * len, 1); });
+      if (st === 6 || st === 14) INST.stab(c, out, t, ch.map(n => n + 12), sd * 1.5, 0.8);
+    }
+    if (lvl >= 4) {
+      if (st === 10 || st === 14) INST.kick(c, out, t, 0.75);
+      if (st % 4 === 0) INST.fuzzBass(c, out, t, root + this.bassPat[st], sd * 0.8, 0.6);
+      const ph = [this.lead.slice(0, 4), this.lead.slice(4, 7), this.lead.slice(7, 10), this.lead.slice(10)][Math.floor(bar / 2)];
+      if (bar % 2 === 0) ph.forEach(([at, m, len]) => { if (at === st) INST.siren(c, out, t, m + 12, sd * len, 0.45); });
+      if (st % 8 === 0 && bar < 7) INST.pluck(c, out, t, 81, sd * 0.6, 0.8, 'square');   // alarm blip on the A
+      if (bar === 7 && st >= 8) INST.snare(c, out, t, 0.35 + (st - 8) * 0.07);           // roll back into the loop
+      if (bar === 7 && st === 0) {                                                        // one-bar noise riser
+        const n = noise(c, t, sd * 16), hp = filt(c, 'bandpass', 400, 1.2), g = c.createGain();
+        sweep(hp.frequency, t, 400, 6000, sd * 16);
+        g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(0.25, t + sd * 15.5); g.gain.linearRampToValueAtTime(0.0001, t + sd * 16);
+        chain(n, hp, g, out);
+      }
+    }
+  }
+};
+
+// Late waves, high fatigue. E phrygian, heartbeat kick, fuzz bass, stabs.
+TRACKS.fever = {
+  name: 'Fever', bpm: 140, bars: 4,
+  roots: [40, 41, 40, 43],
+  step(c, out, t, s, sd) {
+    const bar = Math.floor(s / 16) % 4, st = s % 16, r = this.roots[bar];
+    if (st === 0 || st === 8) INST.heartKick(c, out, t, 1);
+    if (st === 8 && bar % 2 === 1) INST.snare(c, out, t, 0.9);
+    if ('x..x..x...x.x...'[st] === 'x') INST.fuzzBass(c, out, t, r, sd * 2, 1);
+    if (st === 0) INST.pad(c, out, t, [r + 24, r + 25, r + 31], sd * 16, 0.6, 1600);
+    if (st === 14 && bar === 3) INST.stab(c, out, t, [r + 24, r + 27, r + 31], sd * 2, 1);
+    if ((st === 6 || st === 14) && bar < 3) INST.stab(c, out, t, [r + 24, r + 25, r + 31], sd * 1, 0.7);
+    if (st % 2 === 0) INST.pluck(c, out, t, r + 36 + [0, 1, 7, 1, 12, 7, 1, 0][(st / 2) % 8], sd, 0.55, 'square');
+  }
+};
+
+// Playful, Plants vs Zombies style: chiptune square lead, triangle bass, noise drums. C major.
+TRACKS.parade = {
+  name: 'Germ Parade', bpm: 132, bars: 8,
+  chords: [48, 53, 55, 48, 45, 50, 55, 48],
+  third: [4, 4, 4, 4, 3, 3, 4, 4],
+  melody: [
+    [[0, 72, 2], [2, 76, 2], [4, 79, 3], [8, 77, 2], [10, 76, 2], [12, 74, 4]],
+    [[0, 72, 2], [3, 69, 1], [4, 72, 4], [10, 74, 2], [12, 77, 4]],
+    [[0, 79, 2], [2, 79, 2], [4, 81, 2], [6, 79, 2], [8, 77, 2], [10, 74, 2], [12, 71, 4]],
+    [[0, 72, 6], [8, 67, 2], [10, 69, 2], [12, 71, 2], [14, 72, 2]],
+    [[0, 76, 2], [2, 72, 2], [4, 69, 3], [8, 72, 2], [10, 76, 2], [12, 81, 4]],
+    [[0, 77, 2], [3, 74, 1], [4, 77, 4], [10, 81, 2], [12, 79, 4]],
+    [[0, 79, 1], [1, 81, 1], [2, 79, 2], [4, 77, 2], [6, 76, 2], [8, 74, 2], [10, 71, 2], [12, 67, 4]],
+    [[0, 72, 4], [4, 76, 2], [6, 79, 2], [8, 84, 4], [14, 72, 2]]
+  ],
+  step(c, out, t, s, sd) {
+    const bar = Math.floor(s / 16) % 8, st = s % 16, r = this.chords[bar];
+    if (st % 8 === 0) INST.triBass(c, out, t, r - 12, sd * 2, 1);
+    if (st % 8 === 4) INST.triBass(c, out, t, r - 5, sd * 2, 0.85);
+    if (st % 8 === 0) INST.chipNoise(c, out, t, 1, false), INST.kick(c, out, t, 0.6);
+    if (st % 8 === 4) INST.chipNoise(c, out, t, 1, true);
+    if (st % 2 === 1) INST.chipNoise(c, out, t, 0.5, false);
+    if (st % 4 === 2) INST.pluck(c, out, t, r + 12 + this.third[bar], sd, 0.6, 'square'), INST.pluck(c, out, t, r + 19, sd, 0.5, 'square');
+    this.melody[bar].forEach(([at, m, len]) => { if (at === st) INST.chip(c, out, t, m, sd * len, 1); });
+  }
+};
+
+// Live player with lookahead scheduling. One track at a time.
+function Player(bus) {
+  this.bus = bus; this.track = null; this.timer = null; this.level = 1;
+}
+Player.prototype.play = function (key) {
+  this.stop();
+  const c = this.bus.ctx, tr = TRACKS[key], out = c.createGain();
+  out.gain.value = 1; out.connect(this.bus.music);
+  const sd = 60 / tr.bpm / 4;
+  let next = c.currentTime + 0.08, s = 0, abs = 0;
+  this.track = key; this.out = out; this.cur = this.level; this.queued = null; this.sd = sd;
+  this.where = () => ({ next, s, abs, sd });
+  const tick = () => {
+    while (next < c.currentTime + 0.2) {
+      // a swell's level change is queued for an exact bar; it lands there together with its crash
+      if (this.queued && abs >= this.queued.at) { this.level = this.queued.level; this.queued = null; }
+      // with quantize on (the game), intensity changes land on the next bar so the music never jumps mid-beat
+      if (!this.quantize || s % 16 === 0) this.cur = this.level;
+      tr.step(c, out, next, s, sd, this.cur);
+      next += sd; s = (s + 1) % (tr.bars * 16); abs++;
+    }
+  };
+  tick();
+  this.timer = setInterval(tick, 25);
+};
+// Wave swell: a riser into the next bar line (or the one after, if the next is too close), a crash and a
+// low hit on the downbeat, and the music steps up to `level` exactly there. Returns seconds until the downbeat.
+Player.prototype.swell = function (level, big) {
+  if (!this.where || !this.out) return 0;
+  const c = this.bus.ctx, w = this.where(), sd = w.sd;
+  let steps = (16 - w.s % 16) % 16, t = w.next + steps * sd;
+  if (t - c.currentTime < 0.9) { steps += 16; t += 16 * sd; }
+  this.queued = { level, at: w.abs + steps };
+  const out = this.out, rs = Math.min(t - c.currentTime - 0.05, big ? 3.8 : 1.9), t0 = t - rs;
+  const n = noise(c, t0, rs), bp = filt(c, 'bandpass', 300, 1.4), g = c.createGain();     // riser
+  sweep(bp.frequency, t0, 300, big ? 7000 : 5000, rs);
+  g.gain.setValueAtTime(0.0001, t0); g.gain.exponentialRampToValueAtTime(big ? 0.32 : 0.22, t - 0.02); g.gain.linearRampToValueAtTime(0.0001, t);
+  chain(n, bp, g, out);
+  if (big) {                                                                              // final wave: a rising tone too
+    const o = osc(c, 'sawtooth', mtof(50), t0, rs), og = c.createGain();
+    o.frequency.setValueAtTime(mtof(50), t0); o.frequency.exponentialRampToValueAtTime(mtof(62), t);
+    og.gain.setValueAtTime(0.0001, t0); og.gain.exponentialRampToValueAtTime(0.05, t - 0.02); og.gain.linearRampToValueAtTime(0.0001, t);
+    chain(o, filt(c, 'lowpass', 1800), og, out);
+  }
+  chain(noise(c, t, 1.6), filt(c, 'highpass', 5000), perc(c, t, big ? 0.28 : 0.2, 0.002, 1.5), out);  // crash
+  INST.kick(c, out, t, 1); INST.heartKick(c, out, t, 0.8);                                // downbeat hit
+  return t - c.currentTime;
+};
+Player.prototype.stop = function () {
+  if (this.timer) clearInterval(this.timer);
+  if (this.out) {
+    const c = this.bus.ctx, g = this.out.gain, o = this.out;
+    g.setValueAtTime(g.value, c.currentTime); g.linearRampToValueAtTime(0.0001, c.currentTime + 0.25);
+    setTimeout(() => o.disconnect(), 400);
+  }
+  this.timer = null; this.track = null; this.out = null;
+};
+
+// Gate: keeps a busy fight from stacking every sound (Alex, 2026-10-08).
+// 1. Cooldown per moment: after a shot plays, further shots inside 100 ms are skipped.
+// 2. Bunching: skipped hits aren't lost; the next one that plays is a touch louder (up to +40%),
+//    so a hail of shots sounds denser without piling up voices.
+// 3. Budget: at most 6 fight sounds in any 250 ms, so everything together stays readable.
+// Moments outside the fight set (storm, organ hit, wave, victory...) only use their cooldown.
+const GATE = {
+  cooldown: { shot: 100, kill: 70, swallow: 120, nk: 100, divide: 150, burst: 250, net: 200, tap: 40, organHit: 400 },
+  fight: { shot: 1, kill: 1, swallow: 1, nk: 1, divide: 1, burst: 1, net: 1 },
+  budget: 6, window: 250
+};
+function Gate(conf) { this.c = conf || GATE; this.last = {}; this.skipped = {}; this.recent = []; this.stats = { asked: 0, played: 0 }; }
+// Returns a volume multiplier (>= 1) if the sound may play now, or 0 if it should be skipped.
+Gate.prototype.ask = function (moment, nowMs) {
+  const c = this.c; this.stats.asked++;
+  if (nowMs - (this.last[moment] || -1e9) < (c.cooldown[moment] || 0)) { this.skipped[moment] = (this.skipped[moment] || 0) + 1; return 0; }
+  if (c.fight[moment]) {
+    this.recent = this.recent.filter(x => nowMs - x < c.window);
+    if (this.recent.length >= c.budget) { this.skipped[moment] = (this.skipped[moment] || 0) + 1; return 0; }
+    this.recent.push(nowMs);
+  }
+  const n = this.skipped[moment] || 0;
+  this.skipped[moment] = 0; this.last[moment] = nowMs; this.stats.played++;
+  return 1 + Math.min(0.4, 0.12 * Math.log2(1 + n));
+};
+
+// Offline: schedule one full loop of a track (for render.js).
+function scheduleLoop(bus, key, t0, level, loops = 1) {
+  const tr = TRACKS[key], sd = 60 / tr.bpm / 4, n = tr.bars * 16 * loops;
+  for (let s = 0; s < n; s++) tr.step(bus.ctx, bus.music, t0 + s * sd, s % (tr.bars * 16), sd, level == null ? 1 : level);
+  return n * sd;
+}
+const loopLength = key => TRACKS[key].bars * 16 * 60 / TRACKS[key].bpm / 4;
+
+G.CytoSound = {
+  makeBus, SFX, TRACKS, HEART, Player, scheduleLoop, loopLength, Gate, GATE,
+  seed(n) { R = n == null ? Math.random : rng(n); }
+};
+})(typeof window !== 'undefined' ? window : globalThis);
+
+</script>
+<script>
+const ICONS = {"neutrophil": "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCA2NCA2NCIgd2lkdGg9IjY0IiBoZWlnaHQ9IjY0Ij48ZGVmcz48cmFkaWFsR3JhZGllbnQgaWQ9Im5ldS1oIj48c3RvcCBvZmZzZXQ9IjAiIHN0b3AtY29sb3I9IiMzRkU2RkYiIHN0b3Atb3BhY2l0eT0iMC41Ii8+PHN0b3Agb2Zmc2V0PSIwLjQyIiBzdG9wLWNvbG9yPSIjM0ZFNkZGIiBzdG9wLW9wYWNpdHk9IjAuMTQiLz48c3RvcCBvZmZzZXQ9IjEiIHN0b3AtY29sb3I9IiMzRkU2RkYiIHN0b3Atb3BhY2l0eT0iMCIvPjwvcmFkaWFsR3JhZGllbnQ+PHJhZGlhbEdyYWRpZW50IGlkPSJuZXUtYiIgY3g9IjAuNDIiIGN5PSIwLjM4IiByPSIwLjciPjxzdG9wIG9mZnNldD0iMCIgc3RvcC1jb2xvcj0iIzlGRjRGRiIgc3RvcC1vcGFjaXR5PSIwLjUiLz48c3RvcCBvZmZzZXQ9IjEiIHN0b3AtY29sb3I9IiMzRkU2RkYiIHN0b3Atb3BhY2l0eT0iMC4xOCIvPjwvcmFkaWFsR3JhZGllbnQ+PC9kZWZzPjxjaXJjbGUgY3g9IjMyIiBjeT0iMzIiIHI9IjI2IiBmaWxsPSJ1cmwoI25ldS1oKSIvPjxjaXJjbGUgY3g9IjMyIiBjeT0iMzIiIHI9IjEzIiBmaWxsPSJ1cmwoI25ldS1iKSIgc3Ryb2tlPSIjN0ZGMEZGIiBzdHJva2Utd2lkdGg9IjEuNiIvPjxwYXRoIGQ9Ik0yNi41IDMwUTMwIDI3IDM0LjUgMjcuNU0zNC41IDI3LjVRMzYuNSAzMiAzNCAzNiIgZmlsbD0ibm9uZSIgc3Ryb2tlPSIjQzhGQUZGIiBzdHJva2Utd2lkdGg9IjIuMiIgc3Ryb2tlLWxpbmVjYXA9InJvdW5kIiBvcGFjaXR5PSIuODUiLz48Y2lyY2xlIGN4PSIyNi41IiBjeT0iMzAiIHI9IjMuNyIgZmlsbD0iI0M4RkFGRiIvPjxjaXJjbGUgY3g9IjM0LjUiIGN5PSIyNy41IiByPSIzLjciIGZpbGw9IiNDOEZBRkYiLz48Y2lyY2xlIGN4PSIzNCIgY3k9IjM2IiByPSIzLjciIGZpbGw9IiNDOEZBRkYiLz48L3N2Zz4K", "macrophage-kill": "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCA2NCA2NCIgd2lkdGg9IjY0IiBoZWlnaHQ9IjY0Ij48ZGVmcz48cmFkaWFsR3JhZGllbnQgaWQ9Im1hY2lsbC1oIj48c3RvcCBvZmZzZXQ9IjAiIHN0b3AtY29sb3I9IiMzRkU2RkYiIHN0b3Atb3BhY2l0eT0iMC40MiIvPjxzdG9wIG9mZnNldD0iMC41IiBzdG9wLWNvbG9yPSIjM0ZFNkZGIiBzdG9wLW9wYWNpdHk9IjAuMTIiLz48c3RvcCBvZmZzZXQ9IjEiIHN0b3AtY29sb3I9IiMzRkU2RkYiIHN0b3Atb3BhY2l0eT0iMCIvPjwvcmFkaWFsR3JhZGllbnQ+PHJhZGlhbEdyYWRpZW50IGlkPSJtYWNpbGwtYiIgY3g9IjAuNDIiIGN5PSIwLjM4IiByPSIwLjciPjxzdG9wIG9mZnNldD0iMCIgc3RvcC1jb2xvcj0iIzlGRjRGRiIgc3RvcC1vcGFjaXR5PSIwLjMyIi8+PHN0b3Agb2Zmc2V0PSIxIiBzdG9wLWNvbG9yPSIjM0ZFNkZGIiBzdG9wLW9wYWNpdHk9IjAuMTYiLz48L3JhZGlhbEdyYWRpZW50PjxyYWRpYWxHcmFkaWVudCBpZD0ibWFjaWxsLWMiPjxzdG9wIG9mZnNldD0iMCIgc3RvcC1jb2xvcj0iI0ZGN0EzRCIgc3RvcC1vcGFjaXR5PSIwLjg1Ii8+PHN0b3Agb2Zmc2V0PSIwLjU1IiBzdG9wLWNvbG9yPSIjRkY3QTNEIiBzdG9wLW9wYWNpdHk9IjAuMzUiLz48c3RvcCBvZmZzZXQ9IjEiIHN0b3AtY29sb3I9IiNGRjdBM0QiIHN0b3Atb3BhY2l0eT0iMCIvPjwvcmFkaWFsR3JhZGllbnQ+PC9kZWZzPjxjaXJjbGUgY3g9IjMyIiBjeT0iMzIiIHI9IjMyIiBmaWxsPSJ1cmwoI21hY2lsbC1oKSIvPjxwYXRoIGQ9Ik01NC4xMSAzMkM1NC4yOSAzMi45OCA1NC41OCAzMy45NCA1NC45NCAzNS4wMkM1NS4zIDM2LjEgNTYuMDMgMzcuMzMgNTYuMjUgMzguNUM1Ni40OCAzOS42NyA1Ni42OSA0MS4wNCA1Ni4yOCA0Mi4wNkM1NS44NyA0My4wNyA1NC44MyA0My45NSA1My44IDQ0LjU5QzUyLjc4IDQ1LjIzIDUxLjI3IDQ1LjUyIDUwLjExIDQ1Ljg5QzQ4Ljk1IDQ2LjI3IDQ3LjgzIDQ2LjUxIDQ2Ljg0IDQ2Ljg0QzQ1Ljg1IDQ3LjE2IDQ1LjAzIDQ3LjU0IDQ0LjE2IDQ3Ljg1QzQzLjI5IDQ4LjE2IDQyLjQ4IDQ4LjQ2IDQxLjY0IDQ4LjY5QzQwLjggNDguOTIgMzkuOTUgNDkuMDYgMzkuMTMgNDkuMkMzOC4zIDQ5LjM1IDM3LjUgNDkuNDIgMzYuNyA0OS41NUMzNS45MSA0OS42OSAzNS4xNSA0OS44MSAzNC4zNyA1MC4wMUMzMy41OSA1MC4yIDMyLjgzIDUwLjQ2IDMyIDUwLjcyQzMxLjE3IDUwLjk5IDMwLjMzIDUxLjM0IDI5LjQyIDUxLjYxQzI4LjUxIDUxLjg5IDI3LjU0IDUyLjE5IDI2LjU0IDUyLjM2QzI1LjU1IDUyLjUzIDI0LjUxIDUyLjYzIDIzLjQ1IDUyLjY0QzIyLjQgNTIuNjQgMjEuMzQgNTIuNTIgMjAuMjIgNTIuNEMxOS4xIDUyLjI4IDE3LjkxIDUyLjE2IDE2LjcyIDUxLjkyQzE1LjUyIDUxLjY3IDE0LjA4IDUxLjUyIDEzLjA1IDUwLjk1QzEyLjAzIDUwLjM3IDEwLjk2IDQ5LjU2IDEwLjU1IDQ4LjQ2QzEwLjE0IDQ3LjM2IDEwLjMgNDUuNzQgMTAuNjEgNDQuMzVDMTAuOTEgNDIuOTYgMTEuODUgNDEuMzggMTIuMzYgNDAuMTRDMTIuODcgMzguOSAxMy40NSAzNy44NiAxMy42OSAzNi45MUMxMy45MyAzNS45NSAxMy44NyAzNS4yMSAxMy43OSAzNC40QzEzLjcyIDMzLjU4IDEzLjQxIDMyLjgyIDEzLjIzIDMyQzEzLjA2IDMxLjE4IDEyLjgxIDMwLjMyIDEyLjcyIDI5LjQ2QzEyLjYzIDI4LjYgMTIuNiAyNy42OSAxMi43IDI2LjgzQzEyLjggMjUuOTYgMTMuMDIgMjUuMDggMTMuMzIgMjQuMjZDMTMuNjMgMjMuNDQgMTQuMDcgMjIuNjYgMTQuNTIgMjEuOTFDMTQuOTggMjEuMTYgMTUuNTUgMjAuNDkgMTYuMDcgMTkuNzdDMTYuNTggMTkuMDUgMTcuMTQgMTguNDMgMTcuNiAxNy42QzE4LjA1IDE2Ljc3IDE4LjQzIDE1LjkxIDE4Ljc5IDE0Ljc4QzE5LjE1IDEzLjY2IDE5LjMyIDEyLjE4IDE5Ljc4IDEwLjg0QzIwLjI0IDkuNDkgMjAuNyA3LjcyIDIxLjUzIDYuNzJDMjIuMzUgNS43MiAyMy41NCA0Ljk0IDI0LjcyIDQuODRDMjUuOSA0Ljc0IDI3LjM4IDUuNDUgMjguNTkgNi4xMUMyOS44MSA2Ljc4IDMwLjk4IDcuOTcgMzIgOC44NUMzMy4wMiA5Ljc0IDMzLjg5IDEwLjY0IDM0LjcxIDExLjQzQzM1LjUzIDEyLjIyIDM2LjI0IDEyLjkzIDM2LjkzIDEzLjYxQzM3LjYxIDE0LjI5IDM4LjIxIDE0Ljk0IDM4LjgzIDE1LjUyQzM5LjQ0IDE2LjA5IDQwIDE2LjYyIDQwLjYyIDE3LjA3QzQxLjI1IDE3LjUyIDQxLjg3IDE3Ljg3IDQyLjU4IDE4LjIxQzQzLjI5IDE4LjU2IDQ0LjA2IDE4LjgxIDQ0Ljg3IDE5LjEzQzQ1LjY4IDE5LjQ1IDQ2LjU4IDE5Ljc0IDQ3LjQzIDIwLjE2QzQ4LjI4IDIwLjU4IDQ5LjE5IDIxLjA0IDQ5Ljk2IDIxLjYzQzUwLjczIDIyLjIyIDUxLjQ4IDIyLjkyIDUyLjA0IDIzLjdDNTIuNiAyNC40NyA1My4wNCAyNS4zOCA1My4zNCAyNi4yOEM1My42NSAyNy4xOCA1My43MyAyOC4xNyA1My44NiAyOS4xMkM1My45OSAzMC4wOCA1My45MyAzMS4wMiA1NC4xMSAzMloiIGZpbGw9InVybCgjbWFjaWxsLWIpIiBzdHJva2U9IiM3RkYwRkYiIHN0cm9rZS13aWR0aD0iMS42IiBzdHJva2UtbGluZWpvaW49InJvdW5kIi8+PGNpcmNsZSBjeD0iMzIiIGN5PSIzMSIgcj0iMTMiIGZpbGw9InVybCgjbWFjaWxsLWMpIi8+PGNpcmNsZSBjeD0iMjAiIGN5PSI0MCIgcj0iMi42IiBmaWxsPSJub25lIiBzdHJva2U9IiNDOEZBRkYiIHN0cm9rZS13aWR0aD0iLjkiIG9wYWNpdHk9Ii42Ii8+PGNpcmNsZSBjeD0iNDMiIGN5PSIzOSIgcj0iMi4xIiBmaWxsPSJub25lIiBzdHJva2U9IiNDOEZBRkYiIHN0cm9rZS13aWR0aD0iLjkiIG9wYWNpdHk9Ii42Ii8+PGNpcmNsZSBjeD0iMzciIGN5PSIxOCIgcj0iMS44IiBmaWxsPSJub25lIiBzdHJva2U9IiNDOEZBRkYiIHN0cm9rZS13aWR0aD0iLjkiIG9wYWNpdHk9Ii42Ii8+PGNpcmNsZSBjeD0iMjEiIGN5PSIyMiIgcj0iMS41IiBmaWxsPSJub25lIiBzdHJva2U9IiNDOEZBRkYiIHN0cm9rZS13aWR0aD0iLjkiIG9wYWNpdHk9Ii42Ii8+PHBhdGggZD0iTTI0LjUgMzAuNUMyNCAyNS41IDMwIDIzLjUgMzQgMjUuNUMzOCAyNy41IDQxIDI2IDQwLjUgMzFDNDAgMzUuNSAzNS41IDM4LjUgMzEuNSAzN0MyOS41IDM2LjMgMzAuNSAzMy41IDI4LjUgMzMuNkMyNi41IDMzLjcgMjQuOCAzMy41IDI0LjUgMzAuNVoiIGZpbGw9IiNGRjdBM0QiIG9wYWNpdHk9Ii45Ii8+PC9zdmc+Cg==", "kill-shard": "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAxNiAxNiIgd2lkdGg9IjE2IiBoZWlnaHQ9IjE2Ij48ZGVmcz48cmFkaWFsR3JhZGllbnQgaWQ9ImtzaC1oIj48c3RvcCBvZmZzZXQ9IjAiIHN0b3AtY29sb3I9IiNGRjNEQ0IiIHN0b3Atb3BhY2l0eT0iMC41Ii8+PHN0b3Agb2Zmc2V0PSIwLjQiIHN0b3AtY29sb3I9IiNGRjNEQ0IiIHN0b3Atb3BhY2l0eT0iMC4xMiIvPjxzdG9wIG9mZnNldD0iMSIgc3RvcC1jb2xvcj0iI0ZGM0RDQiIgc3RvcC1vcGFjaXR5PSIwIi8+PC9yYWRpYWxHcmFkaWVudD48L2RlZnM+PGNpcmNsZSBjeD0iOCIgY3k9IjgiIHI9IjgiIGZpbGw9InVybCgja3NoLWgpIi8+PHBhdGggZD0iTTQgMTAuNUw5LjUgMy41TDEyLjUgMTFaIiBmaWxsPSIjRkYzRENCIiBzdHJva2U9IiNGRkM0RUYiIHN0cm9rZS13aWR0aD0iLjgiIHN0cm9rZS1saW5lam9pbj0icm91bmQiLz48L3N2Zz4K", "spore-hatch": "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCA2NCA2NCIgd2lkdGg9IjY0IiBoZWlnaHQ9IjY0Ij48ZGVmcz48cmFkaWFsR3JhZGllbnQgaWQ9InNwaC1oIj48c3RvcCBvZmZzZXQ9IjAiIHN0b3AtY29sb3I9IiNGRjNEQ0IiIHN0b3Atb3BhY2l0eT0iMC42Ii8+PHN0b3Agb2Zmc2V0PSIwLjQ1IiBzdG9wLWNvbG9yPSIjRkYzRENCIiBzdG9wLW9wYWNpdHk9IjAuMiIvPjxzdG9wIG9mZnNldD0iMSIgc3RvcC1jb2xvcj0iI0ZGM0RDQiIgc3RvcC1vcGFjaXR5PSIwIi8+PC9yYWRpYWxHcmFkaWVudD48cmFkaWFsR3JhZGllbnQgaWQ9InNwby1iIiBjeD0iMC40MiIgY3k9IjAuMzgiIHI9IjAuNyI+PHN0b3Agb2Zmc2V0PSIwIiBzdG9wLWNvbG9yPSIjNUU0RDZFIiBzdG9wLW9wYWNpdHk9IjAuOSIvPjxzdG9wIG9mZnNldD0iMSIgc3RvcC1jb2xvcj0iIzJCMjIzNiIgc3RvcC1vcGFjaXR5PSIwLjkiLz48L3JhZGlhbEdyYWRpZW50PjxyYWRpYWxHcmFkaWVudCBpZD0ic3BoLWYiPjxzdG9wIG9mZnNldD0iMCIgc3RvcC1jb2xvcj0iI0ZGRkZGRiIgc3RvcC1vcGFjaXR5PSIxIi8+PHN0b3Agb2Zmc2V0PSIwLjUiIHN0b3AtY29sb3I9IiNGRkZGRkYiIHN0b3Atb3BhY2l0eT0iMC41Ii8+PHN0b3Agb2Zmc2V0PSIxIiBzdG9wLWNvbG9yPSIjRkZGRkZGIiBzdG9wLW9wYWNpdHk9IjAiLz48L3JhZGlhbEdyYWRpZW50PjwvZGVmcz48Y2lyY2xlIGN4PSIzMiIgY3k9IjMwIiByPSIzMSIgZmlsbD0idXJsKCNzcGgtaCkiLz48cGF0aCBkPSJNNDguNjYgMzMuMzhMNTcuNDggMzUuMTdNNDMuNDkgNDIuNTNMNDkuNTggNDkuMTZNMzMuOTQgNDYuODlMMzQuOTYgNTUuODNNMjMuNjQgNDQuOEwxOS4yMSA1Mi42NE0xNi41NCAzNy4wNkw4LjM1IDQwLjhNMTUuMzQgMjYuNjJMNi41MiAyNC44M00yMC41MSAxNy40N0wxNC40MiAxMC44NE0zMC4wNiAxMy4xMUwyOS4wNCA0LjE3TTQwLjM2IDE1LjJMNDQuNzkgNy4zNk00Ny40NiAyMi45NEw1NS42NSAxOS4yIiBmaWxsPSJub25lIiBzdHJva2U9IiNGRkZGRkYiIHN0cm9rZS13aWR0aD0iMS42IiBzdHJva2UtbGluZWNhcD0icm91bmQiIHN0cm9rZS1saW5lam9pbj0icm91bmQiLz48ZWxsaXBzZSBjeD0iMzIiIGN5PSIzMiIgcng9IjExIiByeT0iMTUiIGZpbGw9InVybCgjc3BvLWIpIiBzdHJva2U9IiM5QThGQjAiIHN0cm9rZS13aWR0aD0iMyIvPjxlbGxpcHNlIGN4PSIzMiIgY3k9IjMyIiByeD0iMTEiIHJ5PSIxNSIgZmlsbD0ibm9uZSIgc3Ryb2tlPSIjRkZDNEVGIiBzdHJva2Utd2lkdGg9Ii44IiBvcGFjaXR5PSIuNyIvPjxjaXJjbGUgY3g9IjI4IiBjeT0iMjUiIHI9IjEuMSIgZmlsbD0iI0M4QkZEOCIvPjxjaXJjbGUgY3g9IjM1IiBjeT0iMjgiIHI9IjEuMSIgZmlsbD0iI0M4QkZEOCIvPjxjaXJjbGUgY3g9IjMwIiBjeT0iMzQiIHI9IjEuMSIgZmlsbD0iI0M4QkZEOCIvPjxjaXJjbGUgY3g9IjM2IiBjeT0iMzgiIHI9IjEuMSIgZmlsbD0iI0M4QkZEOCIvPjxjaXJjbGUgY3g9IjI4IiBjeT0iNDEiIHI9IjEuMSIgZmlsbD0iI0M4QkZEOCIvPjxjaXJjbGUgY3g9IjMzIiBjeT0iNDMiIHI9IjEuMSIgZmlsbD0iI0M4QkZEOCIvPjxwYXRoIGQ9Ik0yMyAyOUwyOSAzM0wzMyAyN0wzNyAzMkw0MiAzMCIgZmlsbD0ibm9uZSIgc3Ryb2tlPSIjRkZGRkZGIiBzdHJva2Utd2lkdGg9IjIuMiIgc3Ryb2tlLWxpbmVqb2luPSJyb3VuZCIvPjxjaXJjbGUgY3g9IjMyIiBjeT0iMzAiIHI9IjYiIGZpbGw9InVybCgjc3BoLWYpIi8+PC9zdmc+Cg==", "neutrophil-net": "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCA2NCA2NCIgd2lkdGg9IjY0IiBoZWlnaHQ9IjY0Ij48ZGVmcz48cmFkaWFsR3JhZGllbnQgaWQ9Im5udC1oIj48c3RvcCBvZmZzZXQ9IjAiIHN0b3AtY29sb3I9IiMzRkU2RkYiIHN0b3Atb3BhY2l0eT0iMC41Ii8+PHN0b3Agb2Zmc2V0PSIwLjQyIiBzdG9wLWNvbG9yPSIjM0ZFNkZGIiBzdG9wLW9wYWNpdHk9IjAuMTQiLz48c3RvcCBvZmZzZXQ9IjEiIHN0b3AtY29sb3I9IiMzRkU2RkYiIHN0b3Atb3BhY2l0eT0iMCIvPjwvcmFkaWFsR3JhZGllbnQ+PHJhZGlhbEdyYWRpZW50IGlkPSJubnQtYiIgY3g9IjAuNDIiIGN5PSIwLjM4IiByPSIwLjciPjxzdG9wIG9mZnNldD0iMCIgc3RvcC1jb2xvcj0iIzlGRjRGRiIgc3RvcC1vcGFjaXR5PSIwLjUiLz48c3RvcCBvZmZzZXQ9IjEiIHN0b3AtY29sb3I9IiMzRkU2RkYiIHN0b3Atb3BhY2l0eT0iMC4xOCIvPjwvcmFkaWFsR3JhZGllbnQ+PC9kZWZzPjxjaXJjbGUgY3g9IjMyIiBjeT0iMzIiIHI9IjI2IiBmaWxsPSJ1cmwoI25udC1oKSIvPjxjbGlwUGF0aCBpZD0ibm50LWMiPjxjaXJjbGUgY3g9IjMyIiBjeT0iMzIiIHI9IjEzIi8+PC9jbGlwUGF0aD48Y2lyY2xlIGN4PSIzMiIgY3k9IjMyIiByPSIxMyIgZmlsbD0idXJsKCNubnQtYikiLz48ZyBjbGlwLXBhdGg9InVybCgjbm50LWMpIiB0cmFuc2Zvcm09InRyYW5zbGF0ZSgzMiAzMikgc2NhbGUoLjYyKSB0cmFuc2xhdGUoLTMyIC0zMikiPjxwYXRoIGQ9Ik0zMiAzMkw0Mi43MSAzMS4zMkw0OS4yNCAzMC45TDU3LjMxIDMwLjM5TTQyLjcxIDMxLjMyUTQwLjY3IDM0LjI1IDQwLjk5IDM3Ljc5TTQ5LjI0IDMwLjlRNDcuMSAzNi4zNiA0OS4wNyA0M001Ny4zMSAzMC4zOVE1Mi41NyAzNy4zNyA1My40MyA0NS44MU0zMiAzMkw0MC45OSAzNy43OUw0OS4wNyA0M0w1My40MyA0NS44MU00MC45OSAzNy43OVEzNi40OCAzOC44NyAzMy4xOSA0MS44Mk00OS4wNyA0M1E0MC41NCA0NS4zNiAzNC4zNCA1MS4zN001My40MyA0NS44MVE0Mi45NSA1MC42NSAzNS40NSA2MC41OE0zMiAzMkwzMy4xOSA0MS44MkwzNC4zNCA1MS4zN0wzNS40NSA2MC41OE0zMy4xOSA0MS44MlEzMC43MiA0MC45NiAyNy45MSA0Mi41NE0zNC4zNCA1MS4zN1EzMC4wNyA0OC4xNSAyNS4yOCA0OS4zM00zNS40NSA2MC41OFEyOC45MiA1Ni40NCAyMS41NiA1OC45NU0zMiAzMkwyNy45MSA0Mi41NEwyNS4yOCA0OS4zM0wyMS41NiA1OC45NU0yNy45MSA0Mi41NFEyNi4zOSAzNy45NyAyMy4zMyAzNS4wM00yNS4yOCA0OS4zM1EyMC41NiA0Mi41OSAxMi43MSAzOC43NE0yMS41NiA1OC45NVExNi41NCA0Ny42NiA3LjMxIDQwLjYzTTMyIDMyTDIzLjMzIDM1LjAzTDEyLjcxIDM4Ljc0TDcuMzEgNDAuNjNNMjMuMzMgMzUuMDNRMjQuMTYgMzIuMDkgMjIuODUgMjkuMTZNMTIuNzEgMzguNzRRMTYuMTcgMzIuNjkgMTUuMzEgMjYuODNNNy4zMSA0MC42M1ExMC4xMSAzMi4zOCA2Ljk0IDI0LjIzTTMyIDMyTDIyLjg1IDI5LjE2TDE1LjMxIDI2LjgzTDYuOTQgMjQuMjNNMjIuODUgMjkuMTZRMjQuNTcgMjYuNTYgMjQuMjYgMjIuNDhNMTUuMzEgMjYuODNRMTkuNzQgMjMuNjcgMjAuODIgMTguMjVNNi45NCAyNC4yM1ExMy4zOSAxOS4yNSAxNC43NiAxMC44TTMyIDMyTDI0LjI2IDIyLjQ4TDIwLjgyIDE4LjI1TDE0Ljc2IDEwLjhNMjQuMjYgMjIuNDhRMjkuNDkgMjIuODEgMzQuMDQgMjAuNjNNMjAuODIgMTguMjVRMjguNTEgMTcuOTQgMzUuMjYgMTMuOE0xNC43NiAxMC44UTI2LjUyIDEwLjg5IDM2Ljc5IDUuMjNNMzIgMzJMMzQuMDQgMjAuNjNMMzUuMjYgMTMuOEwzNi43OSA1LjIzTTM0LjA0IDIwLjYzUTM1LjU0IDIzLjkgMzggMjQuOTZNMzUuMjYgMTMuOFEzOC4zNiAxOC4yMiA0My4xOSAxOC44OE0zNi43OSA1LjIzUTQxLjQ4IDExLjU4IDQ4Ljc2IDEyLjM1TTMyIDMyTDM4IDI0Ljk2TDQzLjE5IDE4Ljg4TDQ4Ljc2IDEyLjM1TTM4IDI0Ljk2UTM5LjM2IDI4LjYgNDIuNzEgMzEuMzJNNDMuMTkgMTguODhRNDQuNTEgMjUuNzUgNDkuMjQgMzAuOU00OC43NiAxMi4zNVE1MC41MSAyMi42NSA1Ny4zMSAzMC4zOSIgZmlsbD0ibm9uZSIgc3Ryb2tlPSIjQzhGQUZGIiBzdHJva2Utd2lkdGg9IjEuMSIgc3Ryb2tlLWxpbmVjYXA9InJvdW5kIiBvcGFjaXR5PSIuOSIvPjxnIGZpbGw9IiNDOEZBRkYiIG9wYWNpdHk9Ii45Ij48Y2lyY2xlIGN4PSI0Mi43MSIgY3k9IjMxLjMyIiByPSIxLjEiLz48Y2lyY2xlIGN4PSI0OS4yNCIgY3k9IjMwLjkiIHI9IjEuMSIvPjxjaXJjbGUgY3g9IjU3LjMxIiBjeT0iMzAuMzkiIHI9IjEuMSIvPjxjaXJjbGUgY3g9IjQwLjk5IiBjeT0iMzcuNzkiIHI9IjEuMSIvPjxjaXJjbGUgY3g9IjQ5LjA3IiBjeT0iNDMiIHI9IjEuMSIvPjxjaXJjbGUgY3g9IjUzLjQzIiBjeT0iNDUuODEiIHI9IjEuMSIvPjxjaXJjbGUgY3g9IjMzLjE5IiBjeT0iNDEuODIiIHI9IjEuMSIvPjxjaXJjbGUgY3g9IjM0LjM0IiBjeT0iNTEuMzciIHI9IjEuMSIvPjxjaXJjbGUgY3g9IjM1LjQ1IiBjeT0iNjAuNTgiIHI9IjEuMSIvPjxjaXJjbGUgY3g9IjI3LjkxIiBjeT0iNDIuNTQiIHI9IjEuMSIvPjxjaXJjbGUgY3g9IjI1LjI4IiBjeT0iNDkuMzMiIHI9IjEuMSIvPjxjaXJjbGUgY3g9IjIxLjU2IiBjeT0iNTguOTUiIHI9IjEuMSIvPjxjaXJjbGUgY3g9IjIzLjMzIiBjeT0iMzUuMDMiIHI9IjEuMSIvPjxjaXJjbGUgY3g9IjEyLjcxIiBjeT0iMzguNzQiIHI9IjEuMSIvPjxjaXJjbGUgY3g9IjcuMzEiIGN5PSI0MC42MyIgcj0iMS4xIi8+PGNpcmNsZSBjeD0iMjIuODUiIGN5PSIyOS4xNiIgcj0iMS4xIi8+PGNpcmNsZSBjeD0iMTUuMzEiIGN5PSIyNi44MyIgcj0iMS4xIi8+PGNpcmNsZSBjeD0iNi45NCIgY3k9IjI0LjIzIiByPSIxLjEiLz48Y2lyY2xlIGN4PSIyNC4yNiIgY3k9IjIyLjQ4IiByPSIxLjEiLz48Y2lyY2xlIGN4PSIyMC44MiIgY3k9IjE4LjI1IiByPSIxLjEiLz48Y2lyY2xlIGN4PSIxNC43NiIgY3k9IjEwLjgiIHI9IjEuMSIvPjxjaXJjbGUgY3g9IjM0LjA0IiBjeT0iMjAuNjMiIHI9IjEuMSIvPjxjaXJjbGUgY3g9IjM1LjI2IiBjeT0iMTMuOCIgcj0iMS4xIi8+PGNpcmNsZSBjeD0iMzYuNzkiIGN5PSI1LjIzIiByPSIxLjEiLz48Y2lyY2xlIGN4PSIzOCIgY3k9IjI0Ljk2IiByPSIxLjEiLz48Y2lyY2xlIGN4PSI0My4xOSIgY3k9IjE4Ljg4IiByPSIxLjEiLz48Y2lyY2xlIGN4PSI0OC43NiIgY3k9IjEyLjM1IiByPSIxLjEiLz48L2c+PC9nPjxjaXJjbGUgY3g9IjMyIiBjeT0iMzIiIHI9IjEzIiBmaWxsPSJub25lIiBzdHJva2U9IiNDOEZBRkYiIHN0cm9rZS13aWR0aD0iMi4yIi8+PGNpcmNsZSBjeD0iMzIiIGN5PSIzMiIgcj0iMTciIGZpbGw9Im5vbmUiIHN0cm9rZT0iIzNGRTZGRiIgc3Ryb2tlLXdpZHRoPSIxIiBzdHJva2UtZGFzaGFycmF5PSIyIDIuNiIgb3BhY2l0eT0iLjgiLz48L3N2Zz4K", "nk-cell": "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCA2NCA2NCIgd2lkdGg9IjY0IiBoZWlnaHQ9IjY0Ij48ZGVmcz48cmFkaWFsR3JhZGllbnQgaWQ9Im5rYy1oIj48c3RvcCBvZmZzZXQ9IjAiIHN0b3AtY29sb3I9IiMzRkU2RkYiIHN0b3Atb3BhY2l0eT0iMC40NSIvPjxzdG9wIG9mZnNldD0iMC40NSIgc3RvcC1jb2xvcj0iIzNGRTZGRiIgc3RvcC1vcGFjaXR5PSIwLjEzIi8+PHN0b3Agb2Zmc2V0PSIxIiBzdG9wLWNvbG9yPSIjM0ZFNkZGIiBzdG9wLW9wYWNpdHk9IjAiLz48L3JhZGlhbEdyYWRpZW50PjxyYWRpYWxHcmFkaWVudCBpZD0ibmtjLWIiIGN4PSIwLjQyIiBjeT0iMC4zOCIgcj0iMC43Ij48c3RvcCBvZmZzZXQ9IjAiIHN0b3AtY29sb3I9IiM5RkY0RkYiIHN0b3Atb3BhY2l0eT0iMC40NSIvPjxzdG9wIG9mZnNldD0iMSIgc3RvcC1jb2xvcj0iIzNGRTZGRiIgc3RvcC1vcGFjaXR5PSIwLjE4Ii8+PC9yYWRpYWxHcmFkaWVudD48L2RlZnM+PGNpcmNsZSBjeD0iMzIiIGN5PSIzMiIgcj0iMjkiIGZpbGw9InVybCgjbmtjLWgpIi8+PHBhdGggZD0iTTQ4LjYzIDM4Ljg5TDUyLjc5IDQwLjYxTTM4Ljg5IDQ4LjYzTDQwLjYxIDUyLjc5TTI1LjExIDQ4LjYzTDIzLjM5IDUyLjc5TTE1LjM3IDM4Ljg5TDExLjIxIDQwLjYxTTE1LjM3IDI1LjExTDExLjIxIDIzLjM5TTI1LjExIDE1LjM3TDIzLjM5IDExLjIxTTM4Ljg5IDE1LjM3TDQwLjYxIDExLjIxTTQ4LjYzIDI1LjExTDUyLjc5IDIzLjM5IiBmaWxsPSJub25lIiBzdHJva2U9IiMzRkU2RkYiIHN0cm9rZS13aWR0aD0iMS44IiBzdHJva2UtbGluZWNhcD0icm91bmQiIHN0cm9rZS1saW5lam9pbj0icm91bmQiLz48Y2lyY2xlIGN4PSIzMiIgY3k9IjMyIiByPSIxNiIgZmlsbD0idXJsKCNua2MtYikiIHN0cm9rZT0iIzdGRjBGRiIgc3Ryb2tlLXdpZHRoPSIxLjgiLz48cGF0aCBkPSJNMjAgMzJDMjAgMjQgMjcgMjEgMzEgMjRDMzQgMjYgMzMgMzAgMzEgMzJDMjkgMzUgMzEgMzkgMjggNDFDMjMgNDMgMjAgMzggMjAgMzJaIiBmaWxsPSIjQzhGQUZGIi8+PGNpcmNsZSBjeD0iMzgiIGN5PSIyNSIgcj0iMS45IiBmaWxsPSIjRkZGRkZGIiBvcGFjaXR5PSIuOTUiLz48Y2lyY2xlIGN4PSI0MiIgY3k9IjMxIiByPSIxLjYiIGZpbGw9IiNGRkZGRkYiIG9wYWNpdHk9Ii45NSIvPjxjaXJjbGUgY3g9IjM5IiBjeT0iMzgiIHI9IjEuOCIgZmlsbD0iI0ZGRkZGRiIgb3BhY2l0eT0iLjk1Ii8+PGNpcmNsZSBjeD0iMzQiIGN5PSI0MiIgcj0iMS40IiBmaWxsPSIjRkZGRkZGIiBvcGFjaXR5PSIuOTUiLz48Y2lyY2xlIGN4PSI0NCIgY3k9IjM3IiByPSIxLjIiIGZpbGw9IiNGRkZGRkYiIG9wYWNpdHk9Ii45NSIvPjxjaXJjbGUgY3g9IjM1IiBjeT0iMjEiIHI9IjEuMiIgZmlsbD0iI0ZGRkZGRiIgb3BhY2l0eT0iLjk1Ii8+PC9zdmc+Cg==", "bacterium-dividing": "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCA2NCA2NCIgd2lkdGg9IjY0IiBoZWlnaHQ9IjY0Ij48ZGVmcz48cmFkaWFsR3JhZGllbnQgaWQ9ImJhZC1oIj48c3RvcCBvZmZzZXQ9IjAiIHN0b3AtY29sb3I9IiNGRjNEQ0IiIHN0b3Atb3BhY2l0eT0iMC41NSIvPjxzdG9wIG9mZnNldD0iMC40IiBzdG9wLWNvbG9yPSIjRkYzRENCIiBzdG9wLW9wYWNpdHk9IjAuMTUiLz48c3RvcCBvZmZzZXQ9IjEiIHN0b3AtY29sb3I9IiNGRjNEQ0IiIHN0b3Atb3BhY2l0eT0iMCIvPjwvcmFkaWFsR3JhZGllbnQ+PHJhZGlhbEdyYWRpZW50IGlkPSJiYWQtYiIgY3g9IjAuNDIiIGN5PSIwLjM4IiByPSIwLjciPjxzdG9wIG9mZnNldD0iMCIgc3RvcC1jb2xvcj0iI0ZGOUJFNSIgc3RvcC1vcGFjaXR5PSIwLjYiLz48c3RvcCBvZmZzZXQ9IjEiIHN0b3AtY29sb3I9IiNGRjNEQ0IiIHN0b3Atb3BhY2l0eT0iMC4yOCIvPjwvcmFkaWFsR3JhZGllbnQ+PC9kZWZzPjxlbGxpcHNlIGN4PSIzMiIgY3k9IjMyIiByeD0iMjgiIHJ5PSIxNyIgZmlsbD0idXJsKCNiYWQtaCkiLz48cmVjdCB4PSIxNC41IiB5PSIyNiIgd2lkdGg9IjE4IiBoZWlnaHQ9IjEyIiByeD0iNi4wIiBmaWxsPSJ1cmwoI2JhZC1iKSIgc3Ryb2tlPSIjRkY3RkREIiBzdHJva2Utd2lkdGg9IjEuNSIvPjxyZWN0IHg9IjMxLjUiIHk9IjI2IiB3aWR0aD0iMTgiIGhlaWdodD0iMTIiIHJ4PSI2LjAiIGZpbGw9InVybCgjYmFkLWIpIiBzdHJva2U9IiNGRjdGREQiIHN0cm9rZS13aWR0aD0iMS41Ii8+PGxpbmUgeDE9IjMyIiB5MT0iMjciIHgyPSIzMiIgeTI9IjM3IiBzdHJva2U9IiNGRkM0RUYiIHN0cm9rZS13aWR0aD0iMiIgc3Ryb2tlLWxpbmVjYXA9InJvdW5kIi8+PHBhdGggZD0iTTE4LjcgMzJxMS42IC0yLjQgMy4yIDB0My4yIDB0My4yIDAiIGZpbGw9Im5vbmUiIHN0cm9rZT0iI0ZGQzRFRiIgc3Ryb2tlLXdpZHRoPSIxLjMiIHN0cm9rZS1saW5lY2FwPSJyb3VuZCIgb3BhY2l0eT0iLjg1Ii8+PHBhdGggZD0iTTM1LjcgMzJxMS42IC0yLjQgMy4yIDB0My4yIDB0My4yIDAiIGZpbGw9Im5vbmUiIHN0cm9rZT0iI0ZGQzRFRiIgc3Ryb2tlLXdpZHRoPSIxLjMiIHN0cm9rZS1saW5lY2FwPSJyb3VuZCIgb3BhY2l0eT0iLjg1Ii8+PC9zdmc+Cg==", "kidneys-damaged": "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCA2NCA0OCIgd2lkdGg9IjY0IiBoZWlnaHQ9IjQ4Ij48ZGVmcz48cmFkaWFsR3JhZGllbnQgaWQ9ImtpZGRhLWIiIGN4PSIwLjQiIGN5PSIwLjM1IiByPSIwLjciPjxzdG9wIG9mZnNldD0iMCIgc3RvcC1jb2xvcj0iI0ZGRTBBNiIgc3RvcC1vcGFjaXR5PSIwLjU1Ii8+PHN0b3Agb2Zmc2V0PSIxIiBzdG9wLWNvbG9yPSIjRkZCMjNGIiBzdG9wLW9wYWNpdHk9IjAuMiIvPjwvcmFkaWFsR3JhZGllbnQ+PHJhZGlhbEdyYWRpZW50IGlkPSJraWRkYS1oIj48c3RvcCBvZmZzZXQ9IjAiIHN0b3AtY29sb3I9IiNGRkIyM0YiIHN0b3Atb3BhY2l0eT0iMC4zIi8+PHN0b3Agb2Zmc2V0PSIwLjUiIHN0b3AtY29sb3I9IiNGRkIyM0YiIHN0b3Atb3BhY2l0eT0iMC4wOTM3NDk5OTk5OTk5OTk5OSIvPjxzdG9wIG9mZnNldD0iMSIgc3RvcC1jb2xvcj0iI0ZGQjIzRiIgc3RvcC1vcGFjaXR5PSIwIi8+PC9yYWRpYWxHcmFkaWVudD48L2RlZnM+PGVsbGlwc2UgY3g9IjMyIiBjeT0iMjQiIHJ4PSIzMiIgcnk9IjI0IiBmaWxsPSJ1cmwoI2tpZGRhLWgpIi8+PHBhdGggZD0iTTI0IDIzQzI4IDMwIDI5IDM4IDI5LjUgNDgiIGZpbGw9Im5vbmUiIHN0cm9rZT0iI0ZGQjIzRiIgc3Ryb2tlLXdpZHRoPSIxLjQiIHN0cm9rZS1saW5lY2FwPSJyb3VuZCIgb3BhY2l0eT0iLjciLz48cGF0aCBkPSJNMjIuNyAyMUMyMi40MSAyMi4wOCAyMi45MyAyMy4xOCAyMy40MiAyNC4yM0MyMy45MSAyNS4yOCAyNS4yIDI2LjMyIDI1LjYzIDI3LjI5QzI2LjA2IDI4LjI2IDI2LjEyIDI5LjIgMjUuOTkgMzAuMDRDMjUuODcgMzAuODggMjUuMzQgMzEuNjcgMjQuODUgMzIuMzRDMjQuMzcgMzMuMDEgMjMuNzQgMzMuNiAyMy4xMSAzNC4wNkMyMi40OSAzNC41MyAyMS44IDM0LjkgMjEuMTEgMzUuMTRDMjAuNDMgMzUuMzggMTkuNyAzNS41IDE5IDM1LjVDMTguMyAzNS41IDE3LjU3IDM1LjM4IDE2Ljg5IDM1LjE0QzE2LjIgMzQuOSAxNS41MSAzNC41MyAxNC44OCAzNC4wNkMxNC4yNCAzMy42IDEzLjYzIDMzLjAxIDEzLjA4IDMyLjM0QzEyLjUzIDMxLjY3IDEyLjAxIDMwLjg4IDExLjU3IDMwLjA0QzExLjEzIDI5LjIgMTAuNzUgMjguMjYgMTAuNDQgMjcuMjlDMTAuMTQgMjYuMzIgOS44OSAyNS4yOCA5Ljc0IDI0LjIzQzkuNTggMjMuMTggOS41IDIyLjA4IDkuNSAyMUM5LjUgMTkuOTIgOS41OCAxOC44MiA5Ljc0IDE3Ljc3QzkuODkgMTYuNzIgMTAuMTQgMTUuNjggMTAuNDQgMTQuNzFDMTAuNzUgMTMuNzQgMTEuMTMgMTIuOCAxMS41NyAxMS45NkMxMi4wMSAxMS4xMiAxMi41MyAxMC4zMyAxMy4wOCA5LjY2QzEzLjYzIDguOTkgMTQuMjQgOC40IDE0Ljg4IDcuOTRDMTUuNTEgNy40NyAxNi4yIDcuMSAxNi44OSA2Ljg2QzE3LjU3IDYuNjIgMTguMyA2LjUgMTkgNi41QzE5LjcgNi41IDIwLjQzIDYuNjIgMjEuMTEgNi44NkMyMS44IDcuMSAyMi40OSA3LjQ3IDIzLjEyIDcuOTRDMjMuNzUgOC40IDI0LjM4IDguOTkgMjQuOTEgOS42NkMyNS40NCAxMC4zMyAyNS45OSAxMS4xMiAyNi4zIDExLjk2QzI2LjYgMTIuOCAyNi45MiAxMy43NCAyNi43MiAxNC43MUMyNi41MiAxNS42OCAyNS43NyAxNi43MiAyNS4xIDE3Ljc3QzI0LjQzIDE4LjgyIDIyLjk4IDE5LjkyIDIyLjcgMjFaIiBmaWxsPSJ1cmwoI2tpZGRhLWIpIiBzdHJva2U9IiNGRkIyM0YiIHN0cm9rZS13aWR0aD0iMi4yIiBzdHJva2UtbGluZWpvaW49InJvdW5kIi8+PHBhdGggZD0iTTE1IDExQzEyIDE4IDEyIDI2IDE1IDMyIiBmaWxsPSJub25lIiBzdHJva2U9IiNGRkIyM0YiIHN0cm9rZS13aWR0aD0iMSIgc3Ryb2tlLWRhc2hhcnJheT0iMS42IDIiIG9wYWNpdHk9Ii42NSIvPjxwYXRoIGQ9Ik0yMi41IDE5LjVRMjAgMjIgMjIuNSAyNS41IiBmaWxsPSJub25lIiBzdHJva2U9IiNGRkIyM0YiIHN0cm9rZS13aWR0aD0iMS42IiBzdHJva2UtbGluZWNhcD0icm91bmQiIG9wYWNpdHk9Ii44NSIvPjxwYXRoIGQ9Ik00MCAyM0MzNiAzMCAzNSAzOCAzNC41IDQ4IiBmaWxsPSJub25lIiBzdHJva2U9IiNGRkIyM0YiIHN0cm9rZS13aWR0aD0iMS40IiBzdHJva2UtbGluZWNhcD0icm91bmQiIG9wYWNpdHk9Ii43Ii8+PHBhdGggZD0iTTU0LjUgMjFDNTQuNSAyMi4wOCA1NC40MiAyMy4xOCA1NC4yNiAyNC4yM0M1NC4xMSAyNS4yOCA1My44NiAyNi4zMiA1My41NiAyNy4yOUM1My4yNSAyOC4yNiA1Mi44NyAyOS4yIDUyLjQzIDMwLjA0QzUxLjk5IDMwLjg4IDUxLjQ3IDMxLjY3IDUwLjkyIDMyLjM0QzUwLjM3IDMzLjAxIDQ5Ljc2IDMzLjYgNDkuMTIgMzQuMDZDNDguNDkgMzQuNTMgNDcuOCAzNC45IDQ3LjExIDM1LjE0QzQ2LjQzIDM1LjM4IDQ1LjcgMzUuNSA0NSAzNS41QzQ0LjMgMzUuNSA0My41NyAzNS4zOCA0Mi44OSAzNS4xNEM0Mi4yIDM0LjkgNDEuNTEgMzQuNTMgNDAuODkgMzQuMDZDNDAuMjYgMzMuNiAzOS42MyAzMy4wMSAzOS4xNSAzMi4zNEMzOC42NiAzMS42NyAzOC4xMyAzMC44OCAzOC4wMSAzMC4wNEMzNy44OCAyOS4yIDM3Ljk0IDI4LjI2IDM4LjM3IDI3LjI5QzM4LjggMjYuMzIgNDAuMDkgMjUuMjggNDAuNTggMjQuMjNDNDEuMDcgMjMuMTggNDEuNTkgMjIuMDggNDEuMyAyMUM0MS4wMiAxOS45MiAzOS41NyAxOC44MiAzOC45IDE3Ljc3QzM4LjIzIDE2LjcyIDM3LjQ4IDE1LjY4IDM3LjI4IDE0LjcxQzM3LjA4IDEzLjc0IDM3LjQgMTIuOCAzNy43IDExLjk2QzM4LjAxIDExLjEyIDM4LjU2IDEwLjMzIDM5LjA5IDkuNjZDMzkuNjIgOC45OSA0MC4yNSA4LjQgNDAuODggNy45NEM0MS41MSA3LjQ3IDQyLjIgNy4xIDQyLjg5IDYuODZDNDMuNTcgNi42MiA0NC4zIDYuNSA0NSA2LjVDNDUuNyA2LjUgNDYuNDMgNi42MiA0Ny4xMSA2Ljg2QzQ3LjggNy4xIDQ4LjQ5IDcuNDcgNDkuMTIgNy45NEM0OS43NiA4LjQgNTAuMzcgOC45OSA1MC45MiA5LjY2QzUxLjQ3IDEwLjMzIDUxLjk5IDExLjEyIDUyLjQzIDExLjk2QzUyLjg3IDEyLjggNTMuMjUgMTMuNzQgNTMuNTYgMTQuNzFDNTMuODYgMTUuNjggNTQuMTEgMTYuNzIgNTQuMjYgMTcuNzdDNTQuNDIgMTguODIgNTQuNSAxOS45MiA1NC41IDIxWiIgZmlsbD0idXJsKCNraWRkYS1iKSIgc3Ryb2tlPSIjRkZCMjNGIiBzdHJva2Utd2lkdGg9IjIuMiIgc3Ryb2tlLWxpbmVqb2luPSJyb3VuZCIvPjxwYXRoIGQ9Ik00OSAxMUM1MiAxOCA1MiAyNiA0OSAzMiIgZmlsbD0ibm9uZSIgc3Ryb2tlPSIjRkZCMjNGIiBzdHJva2Utd2lkdGg9IjEiIHN0cm9rZS1kYXNoYXJyYXk9IjEuNiAyIiBvcGFjaXR5PSIuNjUiLz48cGF0aCBkPSJNNDEuNSAxOS41UTQ0IDIyIDQxLjUgMjUuNSIgZmlsbD0ibm9uZSIgc3Ryb2tlPSIjRkZCMjNGIiBzdHJva2Utd2lkdGg9IjEuNiIgc3Ryb2tlLWxpbmVjYXA9InJvdW5kIiBvcGFjaXR5PSIuODUiLz48cGF0aCBkPSJNMTAuNSAxM0wxNCAxNUwxMyAxOC41TDE2LjUgMjAuNU0xNCAxNUwxNi41IDEyLjUiIGZpbGw9Im5vbmUiIHN0cm9rZT0iIzA0MDUwQSIgc3Ryb2tlLXdpZHRoPSIyLjIiIHN0cm9rZS1saW5lY2FwPSJyb3VuZCIgc3Ryb2tlLWxpbmVqb2luPSJtaXRlciIvPjxwYXRoIGQ9Ik0xMC41IDEzTDE0IDE1TDEzIDE4LjVMMTYuNSAyMC41TTE0IDE1TDE2LjUgMTIuNSIgZmlsbD0ibm9uZSIgc3Ryb2tlPSIjRkZCMjNGIiBzdHJva2Utd2lkdGg9Ii44IiBzdHJva2UtbGluZWNhcD0icm91bmQiIHN0cm9rZS1saW5lam9pbj0icm91bmQiIG9wYWNpdHk9Ii45Ii8+PHBhdGggZD0iTTU0IDI3TDUwLjUgMjZMNTEuNSAyMi41TDQ4IDIxIiBmaWxsPSJub25lIiBzdHJva2U9IiMwNDA1MEEiIHN0cm9rZS13aWR0aD0iMi4yIiBzdHJva2UtbGluZWNhcD0icm91bmQiIHN0cm9rZS1saW5lam9pbj0ibWl0ZXIiLz48cGF0aCBkPSJNNTQgMjdMNTAuNSAyNkw1MS41IDIyLjVMNDggMjEiIGZpbGw9Im5vbmUiIHN0cm9rZT0iI0ZGQjIzRiIgc3Ryb2tlLXdpZHRoPSIuOCIgc3Ryb2tlLWxpbmVjYXA9InJvdW5kIiBzdHJva2UtbGluZWpvaW49InJvdW5kIiBvcGFjaXR5PSIuOSIvPjwvc3ZnPgo=", "lymph-node": "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCA0OCA0OCIgd2lkdGg9IjQ4IiBoZWlnaHQ9IjQ4Ij48cGF0aCBkPSJNMTQgMTBDMjQgNCA0MCAxMCA0MCAyNFMyOCA0NCAxOCA0MCA0IDMwIDkgMjJDMTEgMTkgMTYgMjIgMTggMTlTOSAxMyAxNCAxMFoiIGZpbGw9IiMyRkI4OUEiIGZpbGwtb3BhY2l0eT0iLjE4IiBzdHJva2U9IiMyRkI4OUEiIHN0cm9rZS13aWR0aD0iMi4yIiBzdHJva2UtbGluZWpvaW49InJvdW5kIi8+PGNpcmNsZSBjeD0iMjciIGN5PSIxNiIgcj0iMi42IiBmaWxsPSIjRkZEMjNGIi8+PGNpcmNsZSBjeD0iMzIiIGN5PSIyNSIgcj0iMi42IiBmaWxsPSIjRkZEMjNGIi8+PGNpcmNsZSBjeD0iMjYiIGN5PSIzMiIgcj0iMi42IiBmaWxsPSIjRkZEMjNGIi8+PGNpcmNsZSBjeD0iMjAiIGN5PSIyNiIgcj0iMi42IiBmaWxsPSIjRkZEMjNGIi8+PC9zdmc+Cg==", "organ-failure": "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAxMjggMTI4IiB3aWR0aD0iMTI4IiBoZWlnaHQ9IjEyOCI+PGRlZnM+PHJhZGlhbEdyYWRpZW50IGlkPSJvZmwtaCI+PHN0b3Agb2Zmc2V0PSIwIiBzdG9wLWNvbG9yPSIjRkYzQjRFIiBzdG9wLW9wYWNpdHk9IjAuNDUiLz48c3RvcCBvZmZzZXQ9IjAuNTUiIHN0b3AtY29sb3I9IiNGRjNCNEUiIHN0b3Atb3BhY2l0eT0iMC4xMiIvPjxzdG9wIG9mZnNldD0iMSIgc3RvcC1jb2xvcj0iI0ZGM0I0RSIgc3RvcC1vcGFjaXR5PSIwIi8+PC9yYWRpYWxHcmFkaWVudD48L2RlZnM+PGNpcmNsZSBjeD0iNjQiIGN5PSI2NCIgcj0iNjIiIGZpbGw9InVybCgjb2ZsLWgpIi8+PHBhdGggZD0iTTY0IDEwNEMzOCA4NiAxOCA3MCAxOCA0OEEyMyAyMyAwIDAgMSA2NCAzNkEyMyAyMyAwIDAgMSAxMTAgNDhDMTEwIDcwIDkwIDg2IDY0IDEwNFoiIGZpbGw9IiMyQTA3MTAiIHN0cm9rZT0iI0ZGM0I0RSIgc3Ryb2tlLXdpZHRoPSIzLjUiIHN0cm9rZS1saW5lam9pbj0icm91bmQiLz48cGF0aCBkPSJNNjQgMzZMNTggNTJMNjggNjBMNjAgNzZMNjYgODgiIGZpbGw9Im5vbmUiIHN0cm9rZT0iIzA0MDUwQSIgc3Ryb2tlLXdpZHRoPSI1IiBzdHJva2UtbGluZWpvaW49InJvdW5kIi8+PHBhdGggZD0iTTY0IDM2TDU4IDUyTDY4IDYwTDYwIDc2TDY2IDg4IiBmaWxsPSJub25lIiBzdHJva2U9IiNGRjNEQ0IiIHN0cm9rZS13aWR0aD0iMS42IiBzdHJva2UtbGluZWpvaW49InJvdW5kIiBvcGFjaXR5PSIuOCIvPjxwYXRoIGQ9Ik04IDY2SDM0TDQwIDU0TDQ2IDc2TDUyIDY2SDEyMCIgZmlsbD0ibm9uZSIgc3Ryb2tlPSIjRkZFMUU1IiBzdHJva2Utd2lkdGg9IjIuNiIgc3Ryb2tlLWxpbmVjYXA9InJvdW5kIiBzdHJva2UtbGluZWpvaW49InJvdW5kIi8+PGNpcmNsZSBjeD0iMTIwIiBjeT0iNjYiIHI9IjMiIGZpbGw9IiNGRkUxRTUiLz48L3N2Zz4K", "marker-wave": "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAyNCAyNCIgd2lkdGg9IjI0IiBoZWlnaHQ9IjI0Ij48ZGVmcz48cmFkaWFsR3JhZGllbnQgaWQ9Im1rdy1oIj48c3RvcCBvZmZzZXQ9IjAiIHN0b3AtY29sb3I9IiNGRjNEQ0IiIHN0b3Atb3BhY2l0eT0iMC41Ii8+PHN0b3Agb2Zmc2V0PSIwLjQ1IiBzdG9wLWNvbG9yPSIjRkYzRENCIiBzdG9wLW9wYWNpdHk9IjAuMTIiLz48c3RvcCBvZmZzZXQ9IjEiIHN0b3AtY29sb3I9IiNGRjNEQ0IiIHN0b3Atb3BhY2l0eT0iMCIvPjwvcmFkaWFsR3JhZGllbnQ+PC9kZWZzPjxjaXJjbGUgY3g9IjEyIiBjeT0iMTIiIHI9IjExIiBmaWxsPSJ1cmwoI21rdy1oKSIvPjxjaXJjbGUgY3g9IjEyIiBjeT0iMTIiIHI9IjUuNSIgZmlsbD0iI0ZGM0RDQiIgc3Ryb2tlPSIjRkZDNEVGIiBzdHJva2Utd2lkdGg9IjEiLz48L3N2Zz4K", "star": "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCA0OCA0OCIgd2lkdGg9IjQ4IiBoZWlnaHQ9IjQ4Ij48ZGVmcz48cmFkaWFsR3JhZGllbnQgaWQ9InN0ci1oIj48c3RvcCBvZmZzZXQ9IjAiIHN0b3AtY29sb3I9IiNGRkQyM0YiIHN0b3Atb3BhY2l0eT0iMC4zNSIvPjxzdG9wIG9mZnNldD0iMC41IiBzdG9wLWNvbG9yPSIjRkZEMjNGIiBzdG9wLW9wYWNpdHk9IjAuMSIvPjxzdG9wIG9mZnNldD0iMSIgc3RvcC1jb2xvcj0iI0ZGRDIzRiIgc3RvcC1vcGFjaXR5PSIwIi8+PC9yYWRpYWxHcmFkaWVudD48L2RlZnM+PGNpcmNsZSBjeD0iMjQiIGN5PSIyNCIgcj0iMjIiIGZpbGw9InVybCgjc3RyLWgpIi8+PHBhdGggZD0iTTI0IDVMMjkuNCAxNy42TDQzIDE4LjZMMzIuNiAyNy40TDM1LjggNDAuOEwyNCAzMy42TDEyLjIgNDAuOEwxNS40IDI3LjRMNSAxOC42TDE4LjYgMTcuNloiIGZpbGw9IiNGRkQyM0YiIHN0cm9rZT0iI0ZGRjNCOCIgc3Ryb2tlLXdpZHRoPSIxLjIiIHN0cm9rZS1saW5lam9pbj0icm91bmQiLz48L3N2Zz4K", "body-output": "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCA0OCA0OCIgd2lkdGg9IjQ4IiBoZWlnaHQ9IjQ4Ij48ZGVmcz48cmFkaWFsR3JhZGllbnQgaWQ9ImJvcC1oIj48c3RvcCBvZmZzZXQ9IjAiIHN0b3AtY29sb3I9IiMzRkU2RkYiIHN0b3Atb3BhY2l0eT0iMC4yMiIvPjxzdG9wIG9mZnNldD0iMC41IiBzdG9wLWNvbG9yPSIjM0ZFNkZGIiBzdG9wLW9wYWNpdHk9IjAuMDYiLz48c3RvcCBvZmZzZXQ9IjEiIHN0b3AtY29sb3I9IiMzRkU2RkYiIHN0b3Atb3BhY2l0eT0iMCIvPjwvcmFkaWFsR3JhZGllbnQ+PC9kZWZzPjxjaXJjbGUgY3g9IjI0IiBjeT0iMjQiIHI9IjIyIiBmaWxsPSJ1cmwoI2JvcC1oKSIvPjxwYXRoIGQ9Ik04IDM0QTE3IDE3IDAgMCAxIDQwIDM0IiBmaWxsPSJub25lIiBzdHJva2U9IiM2RTdCOTYiIHN0cm9rZS13aWR0aD0iMyIgc3Ryb2tlLWxpbmVjYXA9InJvdW5kIiBzdHJva2UtbGluZWpvaW49InJvdW5kIi8+PHBhdGggZD0iTTggMzRBMTcgMTcgMCAwIDEgMjcuNSAxNy41IiBmaWxsPSJub25lIiBzdHJva2U9IiMzRkU2RkYiIHN0cm9rZS13aWR0aD0iMyIgc3Ryb2tlLWxpbmVjYXA9InJvdW5kIiBzdHJva2UtbGluZWpvaW49InJvdW5kIi8+PHBhdGggZD0iTTMzLjQgMjIuNEExNyAxNyAwIDAgMSA0MCAzNCIgZmlsbD0ibm9uZSIgc3Ryb2tlPSIjRkY3QTNEIiBzdHJva2Utd2lkdGg9IjMiIHN0cm9rZS1saW5lY2FwPSJyb3VuZCIgc3Ryb2tlLWxpbmVqb2luPSJyb3VuZCIvPjxwYXRoIGQ9Ik0yNCAzNEwzMyAyMCIgZmlsbD0ibm9uZSIgc3Ryb2tlPSIjRERFNkY1IiBzdHJva2Utd2lkdGg9IjIuNCIgc3Ryb2tlLWxpbmVjYXA9InJvdW5kIiBzdHJva2UtbGluZWpvaW49InJvdW5kIi8+PGNpcmNsZSBjeD0iMjQiIGN5PSIzNCIgcj0iMy4yIiBmaWxsPSIjRERFNkY1Ii8+PC9zdmc+Cg==", "pause": "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCA0OCA0OCIgd2lkdGg9IjQ4IiBoZWlnaHQ9IjQ4Ij48cmVjdCB4PSIxNCIgeT0iMTEiIHdpZHRoPSI3IiBoZWlnaHQ9IjI2IiByeD0iMi41IiBmaWxsPSIjRERFNkY1Ii8+PHJlY3QgeD0iMjciIHk9IjExIiB3aWR0aD0iNyIgaGVpZ2h0PSIyNiIgcng9IjIuNSIgZmlsbD0iI0RERTZGNSIvPjwvc3ZnPgo=", "storm": "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCA0OCA0OCIgd2lkdGg9IjQ4IiBoZWlnaHQ9IjQ4Ij48ZGVmcz48cmFkaWFsR3JhZGllbnQgaWQ9InN0bS1oIj48c3RvcCBvZmZzZXQ9IjAiIHN0b3AtY29sb3I9IiNGRjNCNEUiIHN0b3Atb3BhY2l0eT0iMC40NSIvPjxzdG9wIG9mZnNldD0iMC41IiBzdG9wLWNvbG9yPSIjRkYzQjRFIiBzdG9wLW9wYWNpdHk9IjAuMTIiLz48c3RvcCBvZmZzZXQ9IjEiIHN0b3AtY29sb3I9IiNGRjNCNEUiIHN0b3Atb3BhY2l0eT0iMCIvPjwvcmFkaWFsR3JhZGllbnQ+PC9kZWZzPjxjaXJjbGUgY3g9IjI0IiBjeT0iMjQiIHI9IjIzIiBmaWxsPSJ1cmwoI3N0bS1oKSIvPjxwYXRoIGQ9Ik0yNCAzTDI3LjggMTEuMDVMMzUuMzUgNi4zM0wzNC4yIDE1LjE2TDQzLjEgMTUuMjhMMzcuMzYgMjIuMDhMNDQuNzkgMjYuOTlMMzYuMjggMjkuNjFMMzkuODcgMzcuNzVMMzEuMyAzNS4zNkwyOS45MiA0NC4xNUwyNCAzNy41TDE4LjA4IDQ0LjE1TDE2LjcgMzUuMzZMOC4xMyAzNy43NUwxMS43MiAyOS42MUwzLjIxIDI2Ljk5TDEwLjY0IDIyLjA4TDQuOSAxNS4yOEwxMy44IDE1LjE2TDEyLjY1IDYuMzNMMjAuMiAxMS4wNVoiIGZpbGw9IiNGRjNCNEUiIGZpbGwtb3BhY2l0eT0iLjI1IiBzdHJva2U9IiNGRjNCNEUiIHN0cm9rZS13aWR0aD0iMS44IiBzdHJva2UtbGluZWpvaW49InJvdW5kIi8+PHBhdGggZD0iTTI0IDI0bS03IDBhNyA3IDAgMSAxIDcgN2E0IDQgMCAxIDEgLTMgLTUiIGZpbGw9Im5vbmUiIHN0cm9rZT0iI0ZGM0RDQiIgc3Ryb2tlLXdpZHRoPSIyLjYiIHN0cm9rZS1saW5lY2FwPSJyb3VuZCIgc3Ryb2tlLWxpbmVqb2luPSJyb3VuZCIvPjxjaXJjbGUgY3g9IjI0IiBjeT0iMjQiIHI9IjIuNiIgZmlsbD0iI0ZGRkZGRiIvPjwvc3ZnPgo=", "heart-healthy": "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCA2NCA0OCIgd2lkdGg9IjY0IiBoZWlnaHQ9IjQ4Ij48ZGVmcz48cmFkaWFsR3JhZGllbnQgaWQ9ImhlYWhlLWIiIGN4PSIwLjQiIGN5PSIwLjM1IiByPSIwLjciPjxzdG9wIG9mZnNldD0iMCIgc3RvcC1jb2xvcj0iI0I5RkZENiIgc3RvcC1vcGFjaXR5PSIwLjU1Ii8+PHN0b3Agb2Zmc2V0PSIxIiBzdG9wLWNvbG9yPSIjNUNGRkExIiBzdG9wLW9wYWNpdHk9IjAuMiIvPjwvcmFkaWFsR3JhZGllbnQ+PHJhZGlhbEdyYWRpZW50IGlkPSJoZWFoZS1oIj48c3RvcCBvZmZzZXQ9IjAiIHN0b3AtY29sb3I9IiM1Q0ZGQTEiIHN0b3Atb3BhY2l0eT0iMC4zMiIvPjxzdG9wIG9mZnNldD0iMC41IiBzdG9wLWNvbG9yPSIjNUNGRkExIiBzdG9wLW9wYWNpdHk9IjAuMDk5OTk5OTk5OTk5OTk5OTkiLz48c3RvcCBvZmZzZXQ9IjEiIHN0b3AtY29sb3I9IiM1Q0ZGQTEiIHN0b3Atb3BhY2l0eT0iMCIvPjwvcmFkaWFsR3JhZGllbnQ+PC9kZWZzPjxlbGxpcHNlIGN4PSIzMiIgY3k9IjI0IiByeD0iMzIiIHJ5PSIyNCIgZmlsbD0idXJsKCNoZWFoZS1oKSIvPjxwYXRoIGQ9Ik0zNSAxNUMzNSA3IDQwIDMuNSA0NSA0QzQ5LjUgNC41IDUxIDggNTAgMTIuNSIgZmlsbD0ibm9uZSIgc3Ryb2tlPSIjNUNGRkExIiBzdHJva2Utd2lkdGg9IjUuMiIgc3Ryb2tlLWxpbmVjYXA9InJvdW5kIiBzdHJva2UtbGluZWpvaW49InJvdW5kIi8+PHBhdGggZD0iTTM1IDE1QzM1IDcgNDAgMy41IDQ1IDRDNDkuNSA0LjUgNTEgOCA1MCAxMi41IiBmaWxsPSJub25lIiBzdHJva2U9IiMwNDA1MEEiIHN0cm9rZS13aWR0aD0iMi42IiBzdHJva2UtbGluZWNhcD0icm91bmQiIHN0cm9rZS1saW5lam9pbj0icm91bmQiIG9wYWNpdHk9Ii43NSIvPjxwYXRoIGQ9Ik0xOS41IDE1VjUiIGZpbGw9Im5vbmUiIHN0cm9rZT0iIzVDRkZBMSIgc3Ryb2tlLXdpZHRoPSI0LjQiIHN0cm9rZS1saW5lY2FwPSJyb3VuZCIgc3Ryb2tlLWxpbmVqb2luPSJyb3VuZCIvPjxwYXRoIGQ9Ik0xOS41IDE1VjUiIGZpbGw9Im5vbmUiIHN0cm9rZT0iIzA0MDUwQSIgc3Ryb2tlLXdpZHRoPSIxLjgwMDAwMDAwMDAwMDAwMDMiIHN0cm9rZS1saW5lY2FwPSJyb3VuZCIgc3Ryb2tlLWxpbmVqb2luPSJyb3VuZCIgb3BhY2l0eT0iLjc1Ii8+PHBhdGggZD0iTTI4LjUgMTQuNUMyOCAxMCAyNS41IDcuNSAyMi41IDYuNSIgZmlsbD0ibm9uZSIgc3Ryb2tlPSIjNUNGRkExIiBzdHJva2Utd2lkdGg9IjQiIHN0cm9rZS1saW5lY2FwPSJyb3VuZCIgc3Ryb2tlLWxpbmVqb2luPSJyb3VuZCIvPjxwYXRoIGQ9Ik0yOC41IDE0LjVDMjggMTAgMjUuNSA3LjUgMjIuNSA2LjUiIGZpbGw9Im5vbmUiIHN0cm9rZT0iIzA0MDUwQSIgc3Ryb2tlLXdpZHRoPSIxLjQiIHN0cm9rZS1saW5lY2FwPSJyb3VuZCIgc3Ryb2tlLWxpbmVqb2luPSJyb3VuZCIgb3BhY2l0eT0iLjc1Ii8+PHBhdGggZD0iTTEyLjUgMjNDMTMuMjUgMjAuNTggMTQuNTggMTcuMTcgMTYuNSAxNS41QzE4LjQyIDEzLjgzIDIxLjQyIDEzLjE3IDI0IDEzQzI2LjU4IDEyLjgzIDI5LjMzIDE0LjU4IDMyIDE0LjVDMzQuNjcgMTQuNDIgMzcuNDIgMTIuMjUgNDAgMTIuNUM0Mi41OCAxMi43NSA0NS43NSAxNCA0Ny41IDE2QzQ5LjI1IDE4IDUwLjU4IDIxLjY3IDUwLjUgMjQuNUM1MC40MiAyNy4zMyA0OC45MiAzMC40MiA0NyAzM0M0NS4wOCAzNS41OCA0MS45MiAzOCAzOSA0MEMzNi4wOCA0MiAzMi4zMyA0NC4yNSAyOS41IDQ1QzI2LjY3IDQ1Ljc1IDI0LjQyIDQ1Ljc1IDIyIDQ0LjVDMTkuNTggNDMuMjUgMTYuNjcgMzkuOTIgMTUgMzcuNUMxMy4zMyAzNS4wOCAxMi40MiAzMi40MiAxMiAzMEMxMS41OCAyNy41OCAxMS43NSAyNS40MiAxMi41IDIzWiIgZmlsbD0idXJsKCNoZWFoZS1iKSIgc3Ryb2tlPSIjNUNGRkExIiBzdHJva2Utd2lkdGg9IjIuMiIgc3Ryb2tlLWxpbmVqb2luPSJyb3VuZCIvPjxwYXRoIGQ9Ik0zOCAxNEMzNSAyMiAzMS41IDMyIDI1IDQ0IiBmaWxsPSJub25lIiBzdHJva2U9IiM1Q0ZGQTEiIHN0cm9rZS13aWR0aD0iMS4yIiBzdHJva2UtbGluZWNhcD0icm91bmQiIG9wYWNpdHk9Ii43Ii8+PHBhdGggZD0iTTE3IDIxUTE0LjUgMjYgMTYuNSAzMSIgZmlsbD0ibm9uZSIgc3Ryb2tlPSIjNUNGRkExIiBzdHJva2Utd2lkdGg9IjEiIHN0cm9rZS1kYXNoYXJyYXk9IjEuNiAyIiBvcGFjaXR5PSIuNiIvPjwvc3ZnPgo=", "tissue": "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAxMjggMTI4IiB3aWR0aD0iMTI4IiBoZWlnaHQ9IjEyOCI+PHJlY3Qgd2lkdGg9IjEyOCIgaGVpZ2h0PSIxMjgiIGZpbGw9IiMwNDA1MEEiLz48ZWxsaXBzZSBjeD0iMTMuOTkiIGN5PSIxNy4xNCIgcng9IjEzLjc3IiByeT0iMTIuNDYiIHRyYW5zZm9ybT0icm90YXRlKDM4Ljg4IDEzLjk5IDE3LjE0KSIgZmlsbD0iIzA5MEQyMiIgc3Ryb2tlPSIjMTYxRTQ4IiBzdHJva2Utd2lkdGg9IjEuMiIvPjxjaXJjbGUgY3g9IjE0Ljk5IiBjeT0iMTYuMTQiIHI9IjQuMiIgZmlsbD0iIzFGMkE2NiIvPjxlbGxpcHNlIGN4PSIxNDEuOTkiIGN5PSIxNy4xNCIgcng9IjEzLjc3IiByeT0iMTIuNDYiIHRyYW5zZm9ybT0icm90YXRlKDM4Ljg4IDE0MS45OSAxNy4xNCkiIGZpbGw9IiMwOTBEMjIiIHN0cm9rZT0iIzE2MUU0OCIgc3Ryb2tlLXdpZHRoPSIxLjIiLz48Y2lyY2xlIGN4PSIxNDIuOTkiIGN5PSIxNi4xNCIgcj0iNC4yIiBmaWxsPSIjMUYyQTY2Ii8+PGVsbGlwc2UgY3g9IjMzLjc2IiBjeT0iNDkuODUiIHJ4PSIxMy41MiIgcnk9IjEyLjUxIiB0cmFuc2Zvcm09InJvdGF0ZSg0Mi40OSAzMy43NiA0OS44NSkiIGZpbGw9IiMwOTBEMjIiIHN0cm9rZT0iIzE2MUU0OCIgc3Ryb2tlLXdpZHRoPSIxLjIiLz48Y2lyY2xlIGN4PSIzNC43NiIgY3k9IjQ4Ljg1IiByPSI0LjIiIGZpbGw9IiMxRjJBNjYiLz48ZWxsaXBzZSBjeD0iMTMuMDIiIGN5PSI3OS4yMyIgcng9IjEzLjY3IiByeT0iMTEuNjQiIHRyYW5zZm9ybT0icm90YXRlKDE0Mi44OCAxMy4wMiA3OS4yMykiIGZpbGw9IiMwOTBEMjIiIHN0cm9rZT0iIzE2MUU0OCIgc3Ryb2tlLXdpZHRoPSIxLjIiLz48Y2lyY2xlIGN4PSIxNC4wMiIgY3k9Ijc4LjIzIiByPSI0LjIiIGZpbGw9IiMxRjJBNjYiLz48ZWxsaXBzZSBjeD0iMTQxLjAyIiBjeT0iNzkuMjMiIHJ4PSIxMy42NyIgcnk9IjExLjY0IiB0cmFuc2Zvcm09InJvdGF0ZSgxNDIuODggMTQxLjAyIDc5LjIzKSIgZmlsbD0iIzA5MEQyMiIgc3Ryb2tlPSIjMTYxRTQ4IiBzdHJva2Utd2lkdGg9IjEuMiIvPjxjaXJjbGUgY3g9IjE0Mi4wMiIgY3k9Ijc4LjIzIiByPSI0LjIiIGZpbGw9IiMxRjJBNjYiLz48ZWxsaXBzZSBjeD0iMzAuMzkiIGN5PSIxMTAuNCIgcng9IjEyLjU4IiByeT0iMTMuNSIgdHJhbnNmb3JtPSJyb3RhdGUoMTMyLjk2IDMwLjM5IDExMC40KSIgZmlsbD0iIzA5MEQyMiIgc3Ryb2tlPSIjMTYxRTQ4IiBzdHJva2Utd2lkdGg9IjEuMiIvPjxjaXJjbGUgY3g9IjMxLjM5IiBjeT0iMTA5LjQiIHI9IjQuMiIgZmlsbD0iIzFGMkE2NiIvPjxlbGxpcHNlIGN4PSI1MC4yNSIgY3k9IjE2LjciIHJ4PSIxMi41NyIgcnk9IjEyLjE2IiB0cmFuc2Zvcm09InJvdGF0ZSg4OS41NiA1MC4yNSAxNi43KSIgZmlsbD0iIzA5MEQyMiIgc3Ryb2tlPSIjMTYxRTQ4IiBzdHJva2Utd2lkdGg9IjEuMiIvPjxjaXJjbGUgY3g9IjUxLjI1IiBjeT0iMTUuNyIgcj0iNC4yIiBmaWxsPSIjMUYyQTY2Ii8+PGVsbGlwc2UgY3g9IjYxLjY5IiBjeT0iNTAuNzEiIHJ4PSIxMy4yNCIgcnk9IjExLjgxIiB0cmFuc2Zvcm09InJvdGF0ZSgxNDcuMTUgNjEuNjkgNTAuNzEpIiBmaWxsPSIjMDkwRDIyIiBzdHJva2U9IiMxNjFFNDgiIHN0cm9rZS13aWR0aD0iMS4yIi8+PGNpcmNsZSBjeD0iNjIuNjkiIGN5PSI0OS43MSIgcj0iNC4yIiBmaWxsPSIjMUYyQTY2Ii8+PGVsbGlwc2UgY3g9IjQ1Ljc1IiBjeT0iODIuNTciIHJ4PSIxMy40MSIgcnk9IjEyLjYiIHRyYW5zZm9ybT0icm90YXRlKDYxLjczIDQ1Ljc1IDgyLjU3KSIgZmlsbD0iIzA5MEQyMiIgc3Ryb2tlPSIjMTYxRTQ4IiBzdHJva2Utd2lkdGg9IjEuMiIvPjxjaXJjbGUgY3g9IjQ2Ljc1IiBjeT0iODEuNTciIHI9IjQuMiIgZmlsbD0iIzFGMkE2NiIvPjxlbGxpcHNlIGN4PSI2My45MSIgY3k9IjExMC4xMiIgcng9IjEyLjU3IiByeT0iMTMuMjMiIHRyYW5zZm9ybT0icm90YXRlKDQyLjI4IDYzLjkxIDExMC4xMikiIGZpbGw9IiMwOTBEMjIiIHN0cm9rZT0iIzE2MUU0OCIgc3Ryb2tlLXdpZHRoPSIxLjIiLz48Y2lyY2xlIGN4PSI2NC45MSIgY3k9IjEwOS4xMiIgcj0iNC4yIiBmaWxsPSIjMUYyQTY2Ii8+PGVsbGlwc2UgY3g9IjgxLjY4IiBjeT0iMTQuMjUiIHJ4PSIxNC40NCIgcnk9IjEzLjI5IiB0cmFuc2Zvcm09InJvdGF0ZSgxMzUuODYgODEuNjggMTQuMjUpIiBmaWxsPSIjMDkwRDIyIiBzdHJva2U9IiMxNjFFNDgiIHN0cm9rZS13aWR0aD0iMS4yIi8+PGNpcmNsZSBjeD0iODIuNjgiIGN5PSIxMy4yNSIgcj0iNC4yIiBmaWxsPSIjMUYyQTY2Ii8+PGVsbGlwc2UgY3g9IjgxLjY4IiBjeT0iMTQyLjI1IiByeD0iMTQuNDQiIHJ5PSIxMy4yOSIgdHJhbnNmb3JtPSJyb3RhdGUoMTM1Ljg2IDgxLjY4IDE0Mi4yNSkiIGZpbGw9IiMwOTBEMjIiIHN0cm9rZT0iIzE2MUU0OCIgc3Ryb2tlLXdpZHRoPSIxLjIiLz48Y2lyY2xlIGN4PSI4Mi42OCIgY3k9IjE0MS4yNSIgcj0iNC4yIiBmaWxsPSIjMUYyQTY2Ii8+PGVsbGlwc2UgY3g9Ijk3LjU4IiBjeT0iNDguNDgiIHJ4PSIxMy45NiIgcnk9IjExLjc0IiB0cmFuc2Zvcm09InJvdGF0ZSg4NS43NCA5Ny41OCA0OC40OCkiIGZpbGw9IiMwOTBEMjIiIHN0cm9rZT0iIzE2MUU0OCIgc3Ryb2tlLXdpZHRoPSIxLjIiLz48Y2lyY2xlIGN4PSI5OC41OCIgY3k9IjQ3LjQ4IiByPSI0LjIiIGZpbGw9IiMxRjJBNjYiLz48ZWxsaXBzZSBjeD0iODEuOTYiIGN5PSI3OC4yMSIgcng9IjE0LjM1IiByeT0iMTMuMjgiIHRyYW5zZm9ybT0icm90YXRlKDczLjczIDgxLjk2IDc4LjIxKSIgZmlsbD0iIzA5MEQyMiIgc3Ryb2tlPSIjMTYxRTQ4IiBzdHJva2Utd2lkdGg9IjEuMiIvPjxjaXJjbGUgY3g9IjgyLjk2IiBjeT0iNzcuMjEiIHI9IjQuMiIgZmlsbD0iIzFGMkE2NiIvPjxlbGxpcHNlIGN4PSI5NS4xOSIgY3k9IjExMS43MSIgcng9IjEzLjI3IiByeT0iMTMuNDkiIHRyYW5zZm9ybT0icm90YXRlKDY5LjU5IDk1LjE5IDExMS43MSkiIGZpbGw9IiMwOTBEMjIiIHN0cm9rZT0iIzE2MUU0OCIgc3Ryb2tlLXdpZHRoPSIxLjIiLz48Y2lyY2xlIGN4PSI5Ni4xOSIgY3k9IjExMC43MSIgcj0iNC4yIiBmaWxsPSIjMUYyQTY2Ii8+PGVsbGlwc2UgY3g9IjEwOS4xNiIgY3k9IjEzLjU2IiByeD0iMTMuOTQiIHJ5PSIxMy40OSIgdHJhbnNmb3JtPSJyb3RhdGUoODkuMjggMTA5LjE2IDEzLjU2KSIgZmlsbD0iIzA5MEQyMiIgc3Ryb2tlPSIjMTYxRTQ4IiBzdHJva2Utd2lkdGg9IjEuMiIvPjxjaXJjbGUgY3g9IjExMC4xNiIgY3k9IjEyLjU2IiByPSI0LjIiIGZpbGw9IiMxRjJBNjYiLz48ZWxsaXBzZSBjeD0iMTA5LjE2IiBjeT0iMTQxLjU2IiByeD0iMTMuOTQiIHJ5PSIxMy40OSIgdHJhbnNmb3JtPSJyb3RhdGUoODkuMjggMTA5LjE2IDE0MS41NikiIGZpbGw9IiMwOTBEMjIiIHN0cm9rZT0iIzE2MUU0OCIgc3Ryb2tlLXdpZHRoPSIxLjIiLz48Y2lyY2xlIGN4PSIxMTAuMTYiIGN5PSIxNDAuNTYiIHI9IjQuMiIgZmlsbD0iIzFGMkE2NiIvPjxlbGxpcHNlIGN4PSItMC4wNSIgY3k9IjQ4LjMiIHJ4PSIxNCIgcnk9IjExLjk0IiB0cmFuc2Zvcm09InJvdGF0ZSgxMDkuNiAtMC4wNSA0OC4zKSIgZmlsbD0iIzA5MEQyMiIgc3Ryb2tlPSIjMTYxRTQ4IiBzdHJva2Utd2lkdGg9IjEuMiIvPjxjaXJjbGUgY3g9IjAuOTUiIGN5PSI0Ny4zIiByPSI0LjIiIGZpbGw9IiMxRjJBNjYiLz48ZWxsaXBzZSBjeD0iMTI3Ljk1IiBjeT0iNDguMyIgcng9IjE0IiByeT0iMTEuOTQiIHRyYW5zZm9ybT0icm90YXRlKDEwOS42IDEyNy45NSA0OC4zKSIgZmlsbD0iIzA5MEQyMiIgc3Ryb2tlPSIjMTYxRTQ4IiBzdHJva2Utd2lkdGg9IjEuMiIvPjxjaXJjbGUgY3g9IjEyOC45NSIgY3k9IjQ3LjMiIHI9IjQuMiIgZmlsbD0iIzFGMkE2NiIvPjxlbGxpcHNlIGN4PSItMTUuNjYiIGN5PSI4MC43NCIgcng9IjEyLjg2IiByeT0iMTEuODQiIHRyYW5zZm9ybT0icm90YXRlKDYyLjY4IC0xNS42NiA4MC43NCkiIGZpbGw9IiMwOTBEMjIiIHN0cm9rZT0iIzE2MUU0OCIgc3Ryb2tlLXdpZHRoPSIxLjIiLz48Y2lyY2xlIGN4PSItMTQuNjYiIGN5PSI3OS43NCIgcj0iNC4yIiBmaWxsPSIjMUYyQTY2Ii8+PGVsbGlwc2UgY3g9IjExMi4zNCIgY3k9IjgwLjc0IiByeD0iMTIuODYiIHJ5PSIxMS44NCIgdHJhbnNmb3JtPSJyb3RhdGUoNjIuNjggMTEyLjM0IDgwLjc0KSIgZmlsbD0iIzA5MEQyMiIgc3Ryb2tlPSIjMTYxRTQ4IiBzdHJva2Utd2lkdGg9IjEuMiIvPjxjaXJjbGUgY3g9IjExMy4zNCIgY3k9Ijc5Ljc0IiByPSI0LjIiIGZpbGw9IiMxRjJBNjYiLz48ZWxsaXBzZSBjeD0iMi41NiIgY3k9IjExMS4wOCIgcng9IjEzLjY5IiByeT0iMTIuMTEiIHRyYW5zZm9ybT0icm90YXRlKDE4LjU5IDIuNTYgMTExLjA4KSIgZmlsbD0iIzA5MEQyMiIgc3Ryb2tlPSIjMTYxRTQ4IiBzdHJva2Utd2lkdGg9IjEuMiIvPjxjaXJjbGUgY3g9IjMuNTYiIGN5PSIxMTAuMDgiIHI9IjQuMiIgZmlsbD0iIzFGMkE2NiIvPjxlbGxpcHNlIGN4PSIxMzAuNTYiIGN5PSIxMTEuMDgiIHJ4PSIxMy42OSIgcnk9IjEyLjExIiB0cmFuc2Zvcm09InJvdGF0ZSgxOC41OSAxMzAuNTYgMTExLjA4KSIgZmlsbD0iIzA5MEQyMiIgc3Ryb2tlPSIjMTYxRTQ4IiBzdHJva2Utd2lkdGg9IjEuMiIvPjxjaXJjbGUgY3g9IjEzMS41NiIgY3k9IjExMC4wOCIgcj0iNC4yIiBmaWxsPSIjMUYyQTY2Ii8+PC9zdmc+Cg==", "vessel-blood": "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAxMjggNjQiIHdpZHRoPSIxMjgiIGhlaWdodD0iNjQiPjxyZWN0IHdpZHRoPSIxMjgiIGhlaWdodD0iNjQiIGZpbGw9IiMwNDA1MEEiLz48cmVjdCB5PSIxNSIgd2lkdGg9IjEyOCIgaGVpZ2h0PSIzNCIgZmlsbD0iI0MyMzM0RiIgb3BhY2l0eT0iLjA3Ii8+PGVsbGlwc2UgY3g9IjE2IiBjeT0iMTAuNSIgcng9IjEzIiByeT0iMyIgZmlsbD0iI0MyMzM0RiIgb3BhY2l0eT0iLjM1Ii8+PGVsbGlwc2UgY3g9IjE4IiBjeT0iMTAuNSIgcng9IjMiIHJ5PSIxLjQiIGZpbGw9IiNDMjMzNEYiIG9wYWNpdHk9Ii44Ii8+PGVsbGlwc2UgY3g9IjE2IiBjeT0iNTMuNSIgcng9IjEzIiByeT0iMyIgZmlsbD0iI0MyMzM0RiIgb3BhY2l0eT0iLjM1Ii8+PGVsbGlwc2UgY3g9IjE4IiBjeT0iNTMuNSIgcng9IjMiIHJ5PSIxLjQiIGZpbGw9IiNDMjMzNEYiIG9wYWNpdHk9Ii44Ii8+PGVsbGlwc2UgY3g9IjQ4IiBjeT0iMTAuNSIgcng9IjEzIiByeT0iMyIgZmlsbD0iI0MyMzM0RiIgb3BhY2l0eT0iLjM1Ii8+PGVsbGlwc2UgY3g9IjUwIiBjeT0iMTAuNSIgcng9IjMiIHJ5PSIxLjQiIGZpbGw9IiNDMjMzNEYiIG9wYWNpdHk9Ii44Ii8+PGVsbGlwc2UgY3g9IjQ4IiBjeT0iNTMuNSIgcng9IjEzIiByeT0iMyIgZmlsbD0iI0MyMzM0RiIgb3BhY2l0eT0iLjM1Ii8+PGVsbGlwc2UgY3g9IjUwIiBjeT0iNTMuNSIgcng9IjMiIHJ5PSIxLjQiIGZpbGw9IiNDMjMzNEYiIG9wYWNpdHk9Ii44Ii8+PGVsbGlwc2UgY3g9IjgwIiBjeT0iMTAuNSIgcng9IjEzIiByeT0iMyIgZmlsbD0iI0MyMzM0RiIgb3BhY2l0eT0iLjM1Ii8+PGVsbGlwc2UgY3g9IjgyIiBjeT0iMTAuNSIgcng9IjMiIHJ5PSIxLjQiIGZpbGw9IiNDMjMzNEYiIG9wYWNpdHk9Ii44Ii8+PGVsbGlwc2UgY3g9IjgwIiBjeT0iNTMuNSIgcng9IjEzIiByeT0iMyIgZmlsbD0iI0MyMzM0RiIgb3BhY2l0eT0iLjM1Ii8+PGVsbGlwc2UgY3g9IjgyIiBjeT0iNTMuNSIgcng9IjMiIHJ5PSIxLjQiIGZpbGw9IiNDMjMzNEYiIG9wYWNpdHk9Ii44Ii8+PGVsbGlwc2UgY3g9IjExMiIgY3k9IjEwLjUiIHJ4PSIxMyIgcnk9IjMiIGZpbGw9IiNDMjMzNEYiIG9wYWNpdHk9Ii4zNSIvPjxlbGxpcHNlIGN4PSIxMTQiIGN5PSIxMC41IiByeD0iMyIgcnk9IjEuNCIgZmlsbD0iI0MyMzM0RiIgb3BhY2l0eT0iLjgiLz48ZWxsaXBzZSBjeD0iMTEyIiBjeT0iNTMuNSIgcng9IjEzIiByeT0iMyIgZmlsbD0iI0MyMzM0RiIgb3BhY2l0eT0iLjM1Ii8+PGVsbGlwc2UgY3g9IjExNCIgY3k9IjUzLjUiIHJ4PSIzIiByeT0iMS40IiBmaWxsPSIjQzIzMzRGIiBvcGFjaXR5PSIuOCIvPjxwYXRoIGQ9Ik0wIDZIMTI4TTAgNThIMTI4IiBzdHJva2U9IiNDMjMzNEYiIHN0cm9rZS13aWR0aD0iMiIgb3BhY2l0eT0iLjkiLz48cGF0aCBkPSJNMCAxNUgxMjhNMCA0OUgxMjgiIHN0cm9rZT0iI0MyMzM0RiIgc3Ryb2tlLXdpZHRoPSIxIiBvcGFjaXR5PSIuNDUiLz48ZWxsaXBzZSBjeD0iMTQiIGN5PSIyNiIgcng9IjYiIHJ5PSI0IiBmaWxsPSJub25lIiBzdHJva2U9IiNFMDU2NkYiIHN0cm9rZS13aWR0aD0iMS42IiBvcGFjaXR5PSIuNDUiLz48ZWxsaXBzZSBjeD0iNDQiIGN5PSIzOCIgcng9IjYiIHJ5PSI0IiBmaWxsPSJub25lIiBzdHJva2U9IiNFMDU2NkYiIHN0cm9rZS13aWR0aD0iMS42IiBvcGFjaXR5PSIuNDUiLz48ZWxsaXBzZSBjeD0iNzAiIGN5PSIyNCIgcng9IjYiIHJ5PSI0IiBmaWxsPSJub25lIiBzdHJva2U9IiNFMDU2NkYiIHN0cm9rZS13aWR0aD0iMS42IiBvcGFjaXR5PSIuNDUiLz48ZWxsaXBzZSBjeD0iMTAwIiBjeT0iMzYiIHJ4PSI2IiByeT0iNCIgZmlsbD0ibm9uZSIgc3Ryb2tlPSIjRTA1NjZGIiBzdHJva2Utd2lkdGg9IjEuNiIgb3BhY2l0eT0iLjQ1Ii8+PGVsbGlwc2UgY3g9IjEyMiIgY3k9IjI4IiByeD0iNiIgcnk9IjQiIGZpbGw9Im5vbmUiIHN0cm9rZT0iI0UwNTY2RiIgc3Ryb2tlLXdpZHRoPSIxLjYiIG9wYWNpdHk9Ii40NSIvPjwvc3ZnPgo=", "fatigue-feverish": "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCA0OCA0OCIgd2lkdGg9IjQ4IiBoZWlnaHQ9IjQ4Ij48ZGVmcz48cmFkaWFsR3JhZGllbnQgaWQ9ImZmdi1oIj48c3RvcCBvZmZzZXQ9IjAiIHN0b3AtY29sb3I9IiNGRjdBM0QiIHN0b3Atb3BhY2l0eT0iMC4zMiIvPjxzdG9wIG9mZnNldD0iMC41IiBzdG9wLWNvbG9yPSIjRkY3QTNEIiBzdG9wLW9wYWNpdHk9IjAuMDkiLz48c3RvcCBvZmZzZXQ9IjEiIHN0b3AtY29sb3I9IiNGRjdBM0QiIHN0b3Atb3BhY2l0eT0iMCIvPjwvcmFkaWFsR3JhZGllbnQ+PC9kZWZzPjxjaXJjbGUgY3g9IjI0IiBjeT0iMjQiIHI9IjIzIiBmaWxsPSJ1cmwoI2Zmdi1oKSIvPjxwYXRoIGQ9Ik0xNyAzMFYxMGE0IDQgMCAwIDEgOCAwdjIwIiBmaWxsPSJub25lIiBzdHJva2U9IiNEREU2RjUiIHN0cm9rZS13aWR0aD0iMi40IiBzdHJva2UtbGluZWNhcD0icm91bmQiIHN0cm9rZS1saW5lam9pbj0icm91bmQiLz48Y2lyY2xlIGN4PSIyMSIgY3k9IjM1IiByPSI3IiBmaWxsPSIjRkY3QTNEIi8+PHJlY3QgeD0iMTkiIHk9IjEzIiB3aWR0aD0iNCIgaGVpZ2h0PSIyMSIgcng9IjIiIGZpbGw9IiNGRjdBM0QiLz48cGF0aCBkPSJNMzEgMTJxMyAzIDAgNnQwIDZNMzcgMTBxMyAzIDAgNnQwIDYiIGZpbGw9Im5vbmUiIHN0cm9rZT0iI0ZGN0EzRCIgc3Ryb2tlLXdpZHRoPSIyIiBzdHJva2UtbGluZWNhcD0icm91bmQiIHN0cm9rZS1saW5lam9pbj0icm91bmQiLz48L3N2Zz4K", "bacterium": "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCA2NCA2NCIgd2lkdGg9IjY0IiBoZWlnaHQ9IjY0Ij48ZGVmcz48cmFkaWFsR3JhZGllbnQgaWQ9ImJhYy1oIj48c3RvcCBvZmZzZXQ9IjAiIHN0b3AtY29sb3I9IiNGRjNEQ0IiIHN0b3Atb3BhY2l0eT0iMC41NSIvPjxzdG9wIG9mZnNldD0iMC40IiBzdG9wLWNvbG9yPSIjRkYzRENCIiBzdG9wLW9wYWNpdHk9IjAuMTUiLz48c3RvcCBvZmZzZXQ9IjEiIHN0b3AtY29sb3I9IiNGRjNEQ0IiIHN0b3Atb3BhY2l0eT0iMCIvPjwvcmFkaWFsR3JhZGllbnQ+PHJhZGlhbEdyYWRpZW50IGlkPSJiYWMtYiIgY3g9IjAuNDIiIGN5PSIwLjM4IiByPSIwLjciPjxzdG9wIG9mZnNldD0iMCIgc3RvcC1jb2xvcj0iI0ZGOUJFNSIgc3RvcC1vcGFjaXR5PSIwLjYiLz48c3RvcCBvZmZzZXQ9IjEiIHN0b3AtY29sb3I9IiNGRjNEQ0IiIHN0b3Atb3BhY2l0eT0iMC4yOCIvPjwvcmFkaWFsR3JhZGllbnQ+PC9kZWZzPjxlbGxpcHNlIGN4PSIzMiIgY3k9IjMyIiByeD0iMjQiIHJ5PSIxNyIgZmlsbD0idXJsKCNiYWMtaCkiLz48cmVjdCB4PSIyMCIgeT0iMjYiIHdpZHRoPSIyNCIgaGVpZ2h0PSIxMiIgcng9IjYuMCIgZmlsbD0idXJsKCNiYWMtYikiIHN0cm9rZT0iI0ZGN0ZERCIgc3Ryb2tlLXdpZHRoPSIxLjUiLz48cGF0aCBkPSJNMjQuOCAzMnEyLjQgLTIuNCA0LjggMHQ0LjggMHQ0LjggMCIgZmlsbD0ibm9uZSIgc3Ryb2tlPSIjRkZDNEVGIiBzdHJva2Utd2lkdGg9IjEuMyIgc3Ryb2tlLWxpbmVjYXA9InJvdW5kIiBvcGFjaXR5PSIuODUiLz48L3N2Zz4K"};
+const MUSIC = [
+  { id: 'petri', name: 'Petri Dish', when: 'Calm. Between waves, menus, the Clinic between maps.' },
+  { id: 'blood', name: 'Bloodstream', when: 'The main fight. It changes with the fight: pick how heated it is. Crisis is the new top level.', adaptive: true },
+  { id: 'fever', name: 'Fever', when: 'Tense. Late waves, or when fatigue runs high.' },
+  { id: 'parade', name: 'Germ Parade', when: 'Playful 8-bit, closer to Plants vs Zombies.' }
+];
+const GROUPS = [
+  { title: 'Cells fighting', note: 'These fire constantly in a match, so each has a Swarm button that plays it 14 times at once with random pitch, like a crowded fight.', items: [
+    { id: 'shot', name: 'Neutrophil shot', when: 'Every shot a neutrophil fires.', icon: 'neutrophil', swarm: 1, vars: [['pew', 'Pew', 'shotPew'], ['spit', 'Spit', 'shotSpit']] },
+    { id: 'swallow', name: 'Macrophage swallow', when: 'A macrophage eats a germ.', icon: 'macrophage-kill', swarm: 1, vars: [['gulp', 'Gulp', 'gulp'], ['slurp', 'Slurp', 'slurp']] },
+    { id: 'kill', name: 'Germ dies', when: 'The small pops on every kill.', icon: 'kill-shard', germ: 1, swarm: 1, vars: [['pop', 'Pop', 'pop'], ['crunch', 'Crunch', 'crunch']] },
+    { id: 'burst', name: 'Big burst', when: 'Spores hatching together, a Strep chain breaking, a pile of kills at once.', icon: 'spore-hatch', germ: 1, vars: [['pops', 'Pops', 'burstPops'], ['tight', 'Tight', 'burstTight']] },
+    { id: 'net', name: 'Net traps', when: 'A Net cell pens germs in.', icon: 'neutrophil-net', vars: [['snap', 'Snap', 'netSnap'], ['cinch', 'Cinch', 'netCinch']] },
+    { id: 'nk', name: 'NK cell strike', when: 'An NK cell kills an infected cell.', icon: 'nk-cell', swarm: 1, vars: [['zap', 'Zap', 'zap']] }
+  ] },
+  { title: 'Germs', items: [
+    { id: 'divide', name: 'Germ divides', when: 'Plays with the blink before a germ splits, so you hear it coming.', icon: 'bacterium-dividing', germ: 1, swarm: 1, vars: [['blink', 'Blink only', 'blink'], ['squelch', 'Squelch', 'divideSquelch'], ['bubble', 'Bubble', 'divideBubble']] }
+  ] },
+  { title: 'Cytokine storm', custom: 'storm' },
+  { title: 'Body', note: 'Clinical and cold, like a hospital monitor.', custom: 'heart', items: [
+    { id: 'organ', name: 'Organ loses a bar', when: 'Any organ drops one of its four bars. Short flatlines here; the long one is kept for Host failure.', icon: 'kidneys-damaged', vars: [['flat-short', 'Beep and flatline', 'flatShort'], ['flat-blip', 'Short flatline', 'flatBlip'], ['flat-alarm', 'Alarm and flatline', 'flatAlarm'], ['monitor', 'Monitor', 'organMonitor'], ['crack', 'Crack', 'organCrack']] },
+    { id: 'host', name: 'Host failure', when: 'The first organ hits zero. Match lost.', icon: 'organ-failure', vars: [['flatline', 'Flatline', 'flatline'], ['shutdown', 'Power down', 'shutdown']] }
+  ] },
+  { title: 'Match and menus', items: [
+    { id: 'wave', name: 'Wave incoming', when: 'A new wave enters at the wound.', icon: 'marker-wave', germ: 1, vars: [['drums', 'Drums and horn', 'waveDrums'], ['stabs', 'Alarm stabs', 'waveStabs']] },
+    { id: 'victory', name: 'Victory', when: 'The last wave is cleared.', icon: 'star', vars: [['fanfare', 'Fanfare', 'victoryArp'], ['bells', 'Bells', 'victoryBells']] },
+  ] }
+];
+const NAMES = {};
+GROUPS.forEach(g => (g.items || []).forEach(it => it.vars.forEach(([k, label]) => NAMES[it.id + ':' + k] = it.name + ': ' + label)));
+MUSIC.forEach(m => NAMES['music:' + m.id] = 'Music: ' + m.name);
+NAMES['storm:blast'] = 'Cytokine storm'; NAMES['heart:beat'] = 'Heartbeat';
+NAMES['music:blood-adaptive'] = 'Music: Bloodstream changing with the fight';
+
+// ---------- audio ----------
+const S = CytoSound.SFX;
+let ctx = null, bus = null, player = null, vol = 0.8;
+function audio() {
+  if (!ctx) {
+    try { if (navigator.audioSession) navigator.audioSession.type = 'playback'; } catch (e) {}
+    const AC = window.AudioContext || window.webkitAudioContext;
+    ctx = new AC({ latencyHint: 'interactive' });
+    bus = CytoSound.makeBus(ctx); bus.master.gain.value = vol;
+    player = new CytoSound.Player(bus);
+    const b = ctx.createBuffer(1, 1, 22050), s = ctx.createBufferSource(); s.buffer = b; s.connect(ctx.destination); s.start(0);
+    ctx.onstatechange = showState;
+  }
+  if (ctx.state !== 'running') ctx.resume().then(showState, () => {});
+  showState();
+  return ctx;
+}
+function showState() {
+  const el = document.getElementById('state'), on = ctx && ctx.state === 'running';
+  el.textContent = on ? 'Sound on' : 'Sound off until you tap'; el.classList.toggle('on', !!on);
+}
+const now = () => audio().currentTime + 0.02;
+const R = Math.random;
+function flash(btn) { btn.classList.add('flash'); setTimeout(() => btn.classList.remove('flash'), 200); }
+
+// ---------- picks (stars) ----------
+let picks = new Set(), db = null, ref = null, writing = Promise.resolve();
+try { picks = new Set(JSON.parse(localStorage.getItem('cyto-sound-picks') || '[]')); } catch (e) {}
+function savePicks() {
+  try { localStorage.setItem('cyto-sound-picks', JSON.stringify([...picks])); } catch (e) {}
+  if (ref) { const ids = [...picks]; writing = writing.then(() => ref.set({ ids, names: ids.map(i => NAMES[i] || i), updated: new Date().toISOString() })).catch(() => {}); }
+  renderPicks();
+}
+function renderPicks() {
+  document.querySelectorAll('.star').forEach(b => b.setAttribute('aria-pressed', picks.has(b.dataset.id)));
+  const ul = document.getElementById('picklist'); ul.textContent = '';
+  if (!picks.size) { const li = document.createElement('li'); li.className = 'none'; li.textContent = 'Nothing starred yet.'; ul.appendChild(li); }
+  [...picks].forEach(id => { const li = document.createElement('li'); li.textContent = NAMES[id] || id; ul.appendChild(li); });
+}
+function star(id, label) {
+  const b = document.createElement('button'); b.type = 'button'; b.className = 'star'; b.dataset.id = id;
+  b.setAttribute('aria-label', 'Star ' + (NAMES[id] || label)); b.setAttribute('aria-pressed', 'false'); b.textContent = '★';
+  b.onclick = () => { picks.has(id) ? picks.delete(id) : picks.add(id); savePicks(); };
+  return b;
+}
+(async () => {
+  try {
+    if (!window.claude || !window.claude.use) return;
+    db = await window.claude.use('db'); if (!db) return;
+    ref = db.doc('picks/favorites');
+    ref.onSnapshot(snap => {
+      if (snap.exists) { picks = new Set((snap.data().ids) || []); renderPicks(); }
+      else if (picks.size) savePicks();
+    }, () => {});
+  } catch (e) {}
+})();
+
+// ---------- builders ----------
+const h = (tag, cls, text) => { const e = document.createElement(tag); if (cls) e.className = cls; if (text != null) e.textContent = text; return e; };
+function icon(name) { const i = h('img'); i.alt = ''; i.src = ICONS[name] || ''; return i; }
+function card(it) {
+  const c = h('div', 'card' + (it.germ ? ' germ' : '')), body = h('div', 'body');
+  c.append(icon(it.icon), body);
+  body.append(h('h3', '', it.name), h('p', 'when', it.when));
+  return { c, body };
+}
+function solo(b) { b.classList.add('solo'); b.textContent = '★ Star'; return b; }
+function pickBtn(id, label, onplay) {
+  const wrap = h('span', 'pick'), b = h('button', 'play', label); b.type = 'button';
+  b.onclick = () => { onplay(); flash(b); };
+  wrap.append(b, star(id, label));
+  return wrap;
+}
+
+// Music
+let musicBtn = null;
+const fight = { timer: null };
+function stopMusic() {
+  if (player) player.stop();
+  if (fight.timer) clearInterval(fight.timer), fight.timer = null;
+  document.querySelectorAll('#musiccards .play.on').forEach(b => b.classList.remove('on'));
+  document.querySelectorAll('#musiccards .card.live').forEach(b => b.classList.remove('live'));
+}
+function playMusic(id, btn, cardEl) {
+  audio();
+  const was = btn.classList.contains('on');
+  stopMusic();
+  if (was) return;
+  player.play(id); btn.classList.add('on'); cardEl.classList.add('live');
+}
+const chosen = {};   // card id -> selected variant fn, used by Swarm and the fake fight
+function fakeFight(btn, cardEl) {
+  audio();
+  const was = btn.classList.contains('on');
+  stopMusic();
+  if (was) return;
+  player.level = 2; setSeg(2); player.play('blood'); btn.classList.add('on'); cardEl.classList.add('live');
+  // About 40 game events a second, like a busy wave. With bunching on, they go through the same gate the game uses.
+  const table = [['shot', 0.5], ['kill', 0.22], ['swallow', 0.12], ['divide', 0.07], ['nk', 0.06], ['burst', 0.03]];
+  const gate = new CytoSound.Gate(); let t0 = performance.now(), asked = 0, played = 0;
+  const stat = document.getElementById('fightstat');
+  fight.timer = setInterval(() => {
+    let n = Math.floor(R() * 5);
+    while (n--) {
+      let r = R(), id = 'shot';
+      for (const [k, w] of table) { if ((r -= w) < 0) { id = k; break; } }
+      const at = performance.now() + R() * 100;
+      asked++;
+      const boost = bunching ? gate.ask(id, at) : 1;
+      if (!boost) continue;
+      played++;
+      const fn = chosen[id] || { shot: 'shotPew', kill: 'pop', swallow: 'gulp', divide: 'blink', nk: 'zap', burst: 'burstTight' }[id];
+      S[fn](bus, ctx.currentTime + 0.02 + (at - performance.now()) / 1000, { p: 0.9 + R() * 0.2, pan: R() * 1.6 - 0.8, v: (0.6 + R() * 0.25) * boost });
+    }
+    const secs = Math.max(1, (performance.now() - t0) / 1000);
+    stat.textContent = 'Each second: ' + Math.round(asked / secs) + ' things happen, ' + Math.round(played / secs) + ' make a sound.';
+  }, 50);
+}
+let bunching = true;
+let segBtns = [];
+function setSeg(lvl) { segBtns.forEach((b, i) => b.setAttribute('aria-pressed', i === lvl)); if (player) player.level = lvl; }
+{
+  const box = document.getElementById('musiccards');
+  { // fake fight
+    const c = h('div', 'card feature'), body = h('div', 'body');
+    c.append(icon('neutrophil'), body);
+    body.append(h('h3', '', 'Hear it all together'), h('p', 'when', 'Bloodstream with your chosen effects firing like a busy wave. Change the picks below and come back.'));
+    const b = h('button', 'play', 'Fake fight'); b.type = 'button'; b.append(eq());
+    b.onclick = () => fakeFight(b, c);
+    const tg = h('button', 'swarm', 'Bunching: on'); tg.type = 'button'; tg.setAttribute('aria-pressed', 'true');
+    tg.onclick = () => { bunching = !bunching; tg.textContent = 'Bunching: ' + (bunching ? 'on' : 'off'); tg.setAttribute('aria-pressed', bunching); };
+    const row = h('div', 'row'); row.append(b, tg); body.append(row);
+    const st = h('p', 'when'); st.id = 'fightstat'; st.textContent = 'Bunching skips repeats of the same sound for a moment and caps how many play at once. Turn it off to compare.';
+    body.append(st);
+    box.append(c);
+  }
+  MUSIC.forEach(m => {
+    const c = h('div', 'card'), body = h('div', 'body');
+    const vis = h('div'); vis.style.cssText = 'width:48px;height:48px;display:grid;place-items:center';
+    vis.append(icon({ petri: 'tissue', blood: 'vessel-blood', fever: 'fatigue-feverish', parade: 'bacterium' }[m.id]));
+    c.append(vis, body);
+    if (m.id === 'parade') c.classList.add('germ');
+    body.append(h('h3', '', m.name), h('p', 'when', m.when));
+    const row = h('div', 'row'), wrap = h('span', 'pick'), b = h('button', 'play', 'Play'); b.type = 'button'; b.append(eq());
+    b.onclick = () => playMusic(m.id, b, c);
+    wrap.append(b, star('music:' + m.id, m.name)); row.append(wrap); body.append(row);
+    if (m.adaptive) {
+      const seg = h('div', 'seg heat');
+      ['Calm', 'Fight', 'Hot', 'Fever', 'Crisis'].forEach((label, i) => {
+        const s = h('button', '', label); s.type = 'button'; s.dataset.k = label.toLowerCase();
+        s.onclick = () => { setSeg(i); if (!b.classList.contains('on')) playMusic('blood', b, c); };
+        seg.append(s); segBtns.push(s);
+      });
+      const row2 = h('div', 'row'); row2.append(seg, solo(star('music:blood-adaptive', 'changes with the fight')));
+      // Wave swell, the way the game does it: riser into the next bar, crash, one level up for 8 bars, then back.
+      const wv = h('button', 'swarm', 'Wave arrives'); wv.type = 'button';
+      let back = null;
+      wv.onclick = () => {
+        if (!b.classList.contains('on')) playMusic('blood', b, c);
+        const base = segBtns.findIndex(x => x.getAttribute('aria-pressed') === 'true'), up = Math.min(3, Math.max(base, 0) + 1);
+        const lead = player.swell(up, false);
+        clearTimeout(back);
+        back = setTimeout(() => { if (player.track === 'blood') player.level = Math.max(base, 0); }, (lead + 8 * 16 * player.sd) * 1000);
+      };
+      const row3 = h('div', 'row'); row3.append(wv, h('span', 'when', 'Hear the swell when a new wave comes in.'));
+      body.append(row2, row3);
+    }
+    box.append(c);
+  });
+  setSeg(1);
+}
+function eq() { const e = h('span', 'eq'); e.setAttribute('aria-hidden', 'true'); e.append(h('i'), h('i'), h('i')); return e; }
+
+// Sound effect groups
+const groupsEl = document.getElementById('groups');
+GROUPS.forEach(g => {
+  const sec = h('section'), head = h('div', 'sechead'); head.append(h('h2', '', g.title));
+  if (g.note) head.append(h('p', '', g.note));
+  const cards = h('div', 'cards'); sec.append(head, cards); groupsEl.append(sec);
+  if (g.custom === 'storm') cards.append(stormCard());
+  if (g.custom === 'heart') cards.append(heartCard());
+  (g.items || []).forEach(it => {
+    const { c, body } = card(it), row = h('div', 'row');
+    chosen[it.id] = it.vars[0][2];
+    it.vars.forEach(([k, label, fn], i) => {
+      const p = pickBtn(it.id + ':' + k, label, () => {
+        S[fn](bus || (audio(), bus), now());
+        chosen[it.id] = fn;
+        row.querySelectorAll('.pick').forEach(x => x.classList.toggle('sel', x === p));
+      });
+      if (i === 0 && it.vars.length > 1) p.classList.add('sel');
+      row.append(p);
+    });
+    if (it.swarm) {
+      const sw = h('button', 'swarm', 'Swarm ×14'); sw.type = 'button';
+      sw.setAttribute('aria-label', 'Play the selected ' + it.name + ' 14 times at once');
+      sw.onclick = () => {
+        audio(); const t = now(), fn = chosen[it.id];
+        for (let i = 0; i < 14; i++) S[fn](bus, t + Math.pow(R(), 1.3) * 1.6, { p: 0.82 + R() * 0.36, pan: R() * 1.6 - 0.8, v: 0.5 + R() * 0.4 });
+      };
+      row.append(sw);
+    }
+    body.append(row); cards.append(c);
+  });
+});
+
+// Cytokine storm: hold 5 s, release to fire, let go early to cancel.
+function stormCard() {
+  const c = h('div', 'card'), wrap = h('div', 'storm'), body = h('div', 'body');
+  c.style.gridTemplateColumns = '1fr';
+  const btn = h('button', 'hold'); btn.type = 'button'; btn.setAttribute('aria-label', 'Hold to charge the cytokine storm');
+  const face = h('span'); face.append(icon('storm'), document.createTextNode('Hold')); btn.append(face);
+  body.append(h('h3', '', 'Cytokine storm'),
+    h('p', 'when', 'Works like the game: press and hold for 5 seconds while it charges, then let go to fire. Let go early and it fizzles out.'));
+  const row = h('div', 'row');
+  row.append(pickBtn('storm:blast', 'Charge and fire', () => {
+    audio(); const ch = S.stormCharge(bus, now()); setTimeout(() => ch.fire(ctx.currentTime + 0.02), 5300);
+  }));
+  body.append(row); wrap.append(btn, body); c.append(wrap);
+  let charge = null, t0 = 0, raf = 0;
+  const label = face.lastChild;
+  function draw() {
+    const p = Math.min(1, (performance.now() - t0) / 5000);
+    btn.style.setProperty('--p', p);
+    btn.classList.toggle('risky', p >= 0.4 && p < 0.8); btn.classList.toggle('lethal', p >= 0.8);
+    btn.classList.toggle('ready', p >= 1);
+    label.textContent = p >= 1 ? 'Let go' : 'Charging';
+    raf = requestAnimationFrame(draw);
+  }
+  btn.addEventListener('pointerdown', e => {
+    e.preventDefault(); audio();
+    try { btn.setPointerCapture(e.pointerId); } catch (_) {}
+    charge = S.stormCharge(bus, now()); t0 = performance.now(); draw();
+  });
+  const end = () => {
+    if (!charge) return;
+    cancelAnimationFrame(raf);
+    const held = (performance.now() - t0) / 1000;
+    held >= 5 ? charge.fire(ctx.currentTime + 0.01) : charge.cancel(ctx.currentTime + 0.01);
+    charge = null; label.textContent = held >= 5 ? 'Fired' : 'Hold';
+    btn.style.setProperty('--p', 0); btn.classList.remove('risky', 'lethal', 'ready');
+    setTimeout(() => { if (!charge) label.textContent = 'Hold'; }, 1500);
+  };
+  btn.addEventListener('pointerup', end); btn.addEventListener('pointercancel', end);
+  btn.addEventListener('contextmenu', e => e.preventDefault());
+  return c;
+}
+
+// Heartbeat: one looping beat per fatigue state. No numbers, only the feel.
+let heart = { timer: null, k: null, next: 0, n: 0 };
+function stopHeart() { if (heart.timer) clearInterval(heart.timer); heart = { timer: null, k: null, next: 0, n: 0 }; document.querySelectorAll('#heartseg button').forEach(b => b.setAttribute('aria-pressed', 'false')); document.getElementById('heartcard').classList.remove('live'); }
+function heartCard() {
+  const it = { name: 'Heartbeat', when: 'Under the fatigue meter: the beat speeds up and hardens as the body tires. Tap a state to loop it, tap again to stop.', icon: 'heart-healthy' };
+  const { c, body } = card(it); c.id = 'heartcard';
+  const seg = h('div', 'seg heat'); seg.id = 'heartseg';
+  const keys = Object.keys(CytoSound.HEART);
+  keys.forEach((k, i) => {
+    const b = h('button', '', CytoSound.HEART[k].label); b.type = 'button'; b.dataset.k = k; b.setAttribute('aria-pressed', 'false');
+    b.onclick = () => {
+      audio();
+      if (heart.k === k) return stopHeart();
+      stopHeart(); heart.k = k; heart.next = now(); b.setAttribute('aria-pressed', 'true'); c.classList.add('live');
+      const hs = CytoSound.HEART[k], hard = i / (keys.length - 1);
+      heart.timer = setInterval(() => {
+        while (heart.next < ctx.currentTime + 0.3) {
+          S.heartbeat(bus, heart.next, { hard });
+          heart.n++;
+          heart.next += hs.gap * (hs.skip && heart.n % 3 === 0 ? 1.6 : 1) * (1 + (R() - 0.5) * 0.04);
+        }
+      }, 50);
+    };
+    seg.append(b);
+  });
+  const row = h('div', 'row'); row.append(seg, solo(star('heart:beat', 'Heartbeat')));
+  body.append(row);
+  return c;
+}
+
+// Global controls
+document.getElementById('vol').addEventListener('input', e => { vol = +e.target.value; if (bus) bus.master.gain.setTargetAtTime(vol, ctx.currentTime, 0.02); });
+document.getElementById('stopall').onclick = () => {
+  stopMusic(); stopHeart();
+  if (bus) {   // cut ringing one-shots: fade the old mixer out and build a fresh one
+    const old = bus; old.master.gain.setTargetAtTime(0, ctx.currentTime, 0.03); setTimeout(() => old.master.disconnect(), 300);
+    bus = CytoSound.makeBus(ctx); bus.master.gain.value = vol;
+    const lvl = player.level; player = new CytoSound.Player(bus); player.level = lvl;
+  }
+};
+// First touch anywhere unlocks audio on iPhone.
+['pointerdown', 'touchend', 'keydown'].forEach(ev => document.addEventListener(ev, () => audio(), { once: true, capture: true }));
+document.addEventListener('visibilitychange', () => { if (document.hidden) { stopMusic(); stopHeart(); } });
+renderPicks();
+</script>

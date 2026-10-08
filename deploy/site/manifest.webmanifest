@@ -1,0 +1,17 @@
+{
+  "name": "Cytostorm",
+  "short_name": "Cytostorm",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#04050A",
+  "theme_color": "#04050A",
+  "icons": [
+    {
+      "src": "/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png"
+    }
+  ]
+}

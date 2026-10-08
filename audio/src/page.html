@@ -1,0 +1,479 @@
+<title>Cytostorm Sound Lab</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Instrument+Sans:wdth,wght@75..100,400..700&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+/* Layout: one phone-width column of sound cards on the game's black, glowing-cell palette.
+   Single dark theme on purpose, same tokens as the Cytostorm hub. */
+:root {
+  color-scheme: dark;
+  --void: #04050A; --panel: #0A0D18; --panel2: #10152A; --line: #1E2540;
+  --ink: #DDE6F5; --dim: #7A86A0; --cell: #3FE6FF; --germ: #FF3DCB; --gold: #FFD23F;
+  --risky: #FF9A3C; --lethal: #FF4057;
+  --display: "Instrument Sans", "Helvetica Neue", Arial, sans-serif;
+  --mono: "IBM Plex Mono", ui-monospace, Menlo, monospace;
+}
+* { box-sizing: border-box; }
+html { background: var(--void); }
+body {
+  margin: 0; color: var(--ink); font: 16px/1.45 var(--display);
+  background: radial-gradient(120% 50% at 50% -10%, rgba(63,230,255,.10), transparent 60%), var(--void);
+  padding-inline: 16px; padding-block: 0 48px;
+  -webkit-tap-highlight-color: transparent;
+}
+main { max-width: 620px; margin: 0 auto; display: grid; gap: 28px; }
+header { display: grid; gap: 8px; padding-top: 28px; }
+.kicker { font: 500 12px var(--mono); letter-spacing: .18em; text-transform: uppercase; color: var(--dim); margin: 0; }
+h1 { font: 700 44px/1 var(--display); font-stretch: 85%; margin: 0; letter-spacing: -.01em; text-wrap: balance; }
+h1 span { color: var(--cell); text-shadow: 0 0 18px rgba(63,230,255,.45); }
+h2 { font: 650 22px/1.2 var(--display); font-stretch: 90%; margin: 0; text-wrap: balance; }
+p { margin: 0; color: var(--dim); text-wrap: pretty; max-width: 62ch; }
+p b { color: var(--ink); font-weight: 600; }
+
+.bar {
+  position: sticky; top: env(safe-area-inset-top, 0px); z-index: 5;
+  display: flex; flex-wrap: wrap; align-items: center; gap: 10px 14px;
+  padding: 10px 12px; margin-inline: -4px; border: 1px solid var(--line); border-radius: 14px;
+  background: rgba(10,13,24,.92); backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px);
+}
+.bar label { font: 500 12px var(--mono); letter-spacing: .1em; text-transform: uppercase; color: var(--dim); display: flex; align-items: center; gap: 8px; flex: 1 1 180px; min-width: 0; }
+.bar input[type=range] { flex: 1; min-width: 0; accent-color: var(--cell); }
+.state { font: 500 12px var(--mono); color: var(--dim); }
+.state.on { color: var(--cell); }
+
+section { display: grid; gap: 12px; }
+.sechead { display: grid; gap: 4px; }
+.cards { display: grid; gap: 10px; }
+.card {
+  display: grid; grid-template-columns: 48px 1fr; gap: 10px 14px; align-items: start;
+  padding: 14px; background: var(--panel); border: 1px solid var(--line); border-radius: 14px;
+}
+.card.live { border-color: var(--cell); background: var(--panel2); }
+.card img { width: 48px; height: 48px; filter: drop-shadow(0 0 8px rgba(63,230,255,.3)); }
+.card.germ img { filter: drop-shadow(0 0 8px rgba(255,61,203,.35)); }
+.card .body { display: grid; gap: 8px; min-width: 0; }
+.card h3 { font: 650 18px/1.2 var(--display); margin: 0; }
+.card .when { font-size: 14px; }
+.row { display: flex; flex-wrap: wrap; gap: 8px; }
+
+button { font: inherit; color: inherit; cursor: pointer; touch-action: manipulation; }
+button:focus-visible, input:focus-visible { outline: 2px solid var(--cell); outline-offset: 2px; }
+.play {
+  display: inline-flex; align-items: center; gap: 8px; min-height: 40px;
+  padding: 0 14px; border-radius: 999px; border: 1px solid var(--line); background: var(--panel2);
+  font: 600 15px var(--display);
+}
+.play::before { content: ""; width: 0; height: 0; border-left: 9px solid var(--cell); border-top: 6px solid transparent; border-bottom: 6px solid transparent; }
+.play.on { border-color: var(--cell); box-shadow: 0 0 14px rgba(63,230,255,.25); }
+.play.on::before { border: 0; width: 9px; height: 10px; background: var(--cell); }
+.play.flash { border-color: var(--cell); }
+.play.sm { min-height: 34px; padding: 0 12px; font-size: 14px; }
+.swarm { font: 500 13px var(--mono); letter-spacing: .04em; min-height: 40px; padding: 0 12px; border-radius: 999px; border: 1px dashed var(--line); background: none; color: var(--dim); }
+.swarm:active { color: var(--cell); border-color: var(--cell); }
+.pick { display: inline-flex; align-items: center; }
+.pick .play { border-radius: 999px 0 0 999px; border-right: 0; }
+.star { min-height: 40px; min-width: 40px; border-radius: 0 999px 999px 0; border: 1px solid var(--line); background: var(--panel2); color: var(--dim); font-size: 17px; line-height: 1; }
+.star[aria-pressed=true] { color: var(--gold); text-shadow: 0 0 10px rgba(255,210,63,.6); }
+.pick.sel .play { border-color: rgba(63,230,255,.55); }
+.pick.sel .star { border-color: rgba(63,230,255,.55); }
+
+.seg { display: flex; flex-wrap: wrap; gap: 6px; }
+.seg button { min-height: 36px; padding: 0 12px; border-radius: 999px; border: 1px solid var(--line); background: none; color: var(--dim); font: 600 14px var(--display); }
+.seg button[aria-pressed=true] { color: var(--void); background: var(--cell); border-color: var(--cell); }
+.seg.heat button[data-k=feverish][aria-pressed=true], .seg.heat button[data-k=hot][aria-pressed=true] { background: var(--risky); border-color: var(--risky); }
+.seg.heat button[data-k=exhausted][aria-pressed=true], .seg.heat button[data-k=overload][aria-pressed=true], .seg.heat button[data-k=fever][aria-pressed=true], .seg.heat button[data-k=crisis][aria-pressed=true] { background: var(--lethal); border-color: var(--lethal); }
+
+.eq { display: inline-flex; gap: 2px; height: 12px; align-items: end; margin-left: 4px; }
+.eq i { width: 3px; background: var(--cell); height: 30%; }
+.on .eq i { animation: eq .5s ease-in-out infinite alternate; }
+.eq i:nth-child(2) { animation-delay: -.2s !important; } .eq i:nth-child(3) { animation-delay: -.35s !important; }
+@keyframes eq { to { height: 100%; } }
+
+.storm { display: grid; grid-template-columns: auto 1fr; gap: 16px; align-items: center; }
+.hold {
+  --p: 0; --c: var(--cell);
+  width: 112px; height: 112px; border-radius: 50%; border: 0; padding: 8px;
+  background: conic-gradient(var(--c) calc(var(--p) * 1turn), var(--line) 0);
+  user-select: none; -webkit-user-select: none; -webkit-touch-callout: none; touch-action: none;
+}
+.hold span {
+  display: grid; place-items: center; width: 100%; height: 100%; border-radius: 50%; background: var(--panel2);
+  font: 700 15px/1.1 var(--display); text-align: center; text-transform: uppercase; letter-spacing: .06em;
+}
+.hold img { width: 40px; height: 40px; display: block; margin: 0 auto 2px; }
+.hold.risky { --c: var(--risky); } .hold.lethal { --c: var(--lethal); }
+.hold.ready span { box-shadow: inset 0 0 24px rgba(255,64,87,.6); }
+
+.feature { border-color: rgba(255,61,203,.45); background: linear-gradient(160deg, rgba(255,61,203,.08), transparent 55%), var(--panel); }
+#groups { display: grid; gap: 28px; }
+.star.solo { border-radius: 999px; padding: 0 14px; font: 600 14px var(--display); }
+.picks { padding: 14px; border: 1px solid var(--line); border-radius: 14px; display: grid; gap: 8px; }
+.picks ul { margin: 0; padding-left: 18px; color: var(--ink); font-size: 15px; }
+.picks .none { color: var(--dim); }
+.tip { font-size: 14px; border-left: 2px solid var(--gold); padding-left: 10px; }
+@media (max-width: 420px) { h1 { font-size: 38px; } .storm { grid-template-columns: 1fr; justify-items: center; } }
+@media (prefers-reduced-motion: reduce) { .on .eq i { animation: none; height: 80%; } }
+</style>
+
+<main>
+  <header>
+    <p class="kicker">Cytostorm · Sound lab · Draft 1</p>
+    <h1>What does a <span>fight</span> sound like?</h1>
+    <p>The game is silent right now. These are first drafts of music and sound effects, all made from scratch with code, so there is nothing licensed in here and they are yours. Tap anything to hear it and <b>star the ones you like</b>; I can see your stars.</p>
+    <p class="tip">No sound on iPhone? Flip the silent switch off and turn the volume up.</p>
+  </header>
+
+  <div class="bar" role="region" aria-label="Playback">
+    <label for="vol">Volume <input id="vol" type="range" min="0" max="1" step="0.01" value="0.8"></label>
+    <button class="play sm" id="stopall" type="button">Stop all</button>
+    <span class="state" id="state">Sound off until you tap</span>
+  </div>
+
+  <section id="music">
+    <div class="sechead">
+      <h2>Music</h2>
+      <p>Four loops. Each one repeats forever until you stop it.</p>
+    </div>
+    <div class="cards" id="musiccards"></div>
+  </section>
+
+  <div id="groups"></div>
+
+  <section id="picks">
+    <div class="sechead"><h2>Your stars</h2></div>
+    <div class="picks"><ul id="picklist"></ul><p id="picknote">Stars save as you tap them. Tell me in the thread when you're done and I'll wire your favorites into the game.</p></div>
+  </section>
+</main>
+
+<script>
+/*ENGINE*/
+</script>
+<script>
+const ICONS = /*ICONS*/{};
+const MUSIC = [
+  { id: 'petri', name: 'Petri Dish', when: 'Calm. Between waves, menus, the Clinic between maps.' },
+  { id: 'blood', name: 'Bloodstream', when: 'The main fight. It changes with the fight: pick how heated it is. Crisis is the new top level.', adaptive: true },
+  { id: 'fever', name: 'Fever', when: 'Tense. Late waves, or when fatigue runs high.' },
+  { id: 'parade', name: 'Germ Parade', when: 'Playful 8-bit, closer to Plants vs Zombies.' }
+];
+const GROUPS = [
+  { title: 'Cells fighting', note: 'These fire constantly in a match, so each has a Swarm button that plays it 14 times at once with random pitch, like a crowded fight.', items: [
+    { id: 'shot', name: 'Neutrophil shot', when: 'Every shot a neutrophil fires.', icon: 'neutrophil', swarm: 1, vars: [['pew', 'Pew', 'shotPew'], ['spit', 'Spit', 'shotSpit']] },
+    { id: 'swallow', name: 'Macrophage swallow', when: 'A macrophage eats a germ.', icon: 'macrophage-kill', swarm: 1, vars: [['gulp', 'Gulp', 'gulp'], ['slurp', 'Slurp', 'slurp']] },
+    { id: 'kill', name: 'Germ dies', when: 'The small pops on every kill.', icon: 'kill-shard', germ: 1, swarm: 1, vars: [['pop', 'Pop', 'pop'], ['crunch', 'Crunch', 'crunch']] },
+    { id: 'burst', name: 'Big burst', when: 'Spores hatching together, a Strep chain breaking, a pile of kills at once.', icon: 'spore-hatch', germ: 1, vars: [['pops', 'Pops', 'burstPops'], ['tight', 'Tight', 'burstTight']] },
+    { id: 'net', name: 'Net traps', when: 'A Net cell pens germs in.', icon: 'neutrophil-net', vars: [['snap', 'Snap', 'netSnap'], ['cinch', 'Cinch', 'netCinch']] },
+    { id: 'nk', name: 'NK cell strike', when: 'An NK cell kills an infected cell.', icon: 'nk-cell', swarm: 1, vars: [['zap', 'Zap', 'zap']] }
+  ] },
+  { title: 'Germs', items: [
+    { id: 'divide', name: 'Germ divides', when: 'Plays with the blink before a germ splits, so you hear it coming.', icon: 'bacterium-dividing', germ: 1, swarm: 1, vars: [['blink', 'Blink only', 'blink'], ['squelch', 'Squelch', 'divideSquelch'], ['bubble', 'Bubble', 'divideBubble']] }
+  ] },
+  { title: 'Cytokine storm', custom: 'storm' },
+  { title: 'Body', note: 'Clinical and cold, like a hospital monitor.', custom: 'heart', items: [
+    { id: 'organ', name: 'Organ loses a bar', when: 'Any organ drops one of its four bars. Short flatlines here; the long one is kept for Host failure.', icon: 'kidneys-damaged', vars: [['flat-short', 'Beep and flatline', 'flatShort'], ['flat-blip', 'Short flatline', 'flatBlip'], ['flat-alarm', 'Alarm and flatline', 'flatAlarm'], ['monitor', 'Monitor', 'organMonitor'], ['crack', 'Crack', 'organCrack']] },
+    { id: 'host', name: 'Host failure', when: 'The first organ hits zero. Match lost.', icon: 'organ-failure', vars: [['flatline', 'Flatline', 'flatline'], ['shutdown', 'Power down', 'shutdown']] }
+  ] },
+  { title: 'Match and menus', items: [
+    { id: 'wave', name: 'Wave incoming', when: 'A new wave enters at the wound.', icon: 'marker-wave', germ: 1, vars: [['drums', 'Drums and horn', 'waveDrums'], ['stabs', 'Alarm stabs', 'waveStabs']] },
+    { id: 'victory', name: 'Victory', when: 'The last wave is cleared.', icon: 'star', vars: [['fanfare', 'Fanfare', 'victoryArp'], ['bells', 'Bells', 'victoryBells']] },
+  ] }
+];
+const NAMES = {};
+GROUPS.forEach(g => (g.items || []).forEach(it => it.vars.forEach(([k, label]) => NAMES[it.id + ':' + k] = it.name + ': ' + label)));
+MUSIC.forEach(m => NAMES['music:' + m.id] = 'Music: ' + m.name);
+NAMES['storm:blast'] = 'Cytokine storm'; NAMES['heart:beat'] = 'Heartbeat';
+NAMES['music:blood-adaptive'] = 'Music: Bloodstream changing with the fight';
+
+// ---------- audio ----------
+const S = CytoSound.SFX;
+let ctx = null, bus = null, player = null, vol = 0.8;
+function audio() {
+  if (!ctx) {
+    try { if (navigator.audioSession) navigator.audioSession.type = 'playback'; } catch (e) {}
+    const AC = window.AudioContext || window.webkitAudioContext;
+    ctx = new AC({ latencyHint: 'interactive' });
+    bus = CytoSound.makeBus(ctx); bus.master.gain.value = vol;
+    player = new CytoSound.Player(bus);
+    const b = ctx.createBuffer(1, 1, 22050), s = ctx.createBufferSource(); s.buffer = b; s.connect(ctx.destination); s.start(0);
+    ctx.onstatechange = showState;
+  }
+  if (ctx.state !== 'running') ctx.resume().then(showState, () => {});
+  showState();
+  return ctx;
+}
+function showState() {
+  const el = document.getElementById('state'), on = ctx && ctx.state === 'running';
+  el.textContent = on ? 'Sound on' : 'Sound off until you tap'; el.classList.toggle('on', !!on);
+}
+const now = () => audio().currentTime + 0.02;
+const R = Math.random;
+function flash(btn) { btn.classList.add('flash'); setTimeout(() => btn.classList.remove('flash'), 200); }
+
+// ---------- picks (stars) ----------
+let picks = new Set(), db = null, ref = null, writing = Promise.resolve();
+try { picks = new Set(JSON.parse(localStorage.getItem('cyto-sound-picks') || '[]')); } catch (e) {}
+function savePicks() {
+  try { localStorage.setItem('cyto-sound-picks', JSON.stringify([...picks])); } catch (e) {}
+  if (ref) { const ids = [...picks]; writing = writing.then(() => ref.set({ ids, names: ids.map(i => NAMES[i] || i), updated: new Date().toISOString() })).catch(() => {}); }
+  renderPicks();
+}
+function renderPicks() {
+  document.querySelectorAll('.star').forEach(b => b.setAttribute('aria-pressed', picks.has(b.dataset.id)));
+  const ul = document.getElementById('picklist'); ul.textContent = '';
+  if (!picks.size) { const li = document.createElement('li'); li.className = 'none'; li.textContent = 'Nothing starred yet.'; ul.appendChild(li); }
+  [...picks].forEach(id => { const li = document.createElement('li'); li.textContent = NAMES[id] || id; ul.appendChild(li); });
+}
+function star(id, label) {
+  const b = document.createElement('button'); b.type = 'button'; b.className = 'star'; b.dataset.id = id;
+  b.setAttribute('aria-label', 'Star ' + (NAMES[id] || label)); b.setAttribute('aria-pressed', 'false'); b.textContent = '★';
+  b.onclick = () => { picks.has(id) ? picks.delete(id) : picks.add(id); savePicks(); };
+  return b;
+}
+(async () => {
+  try {
+    if (!window.claude || !window.claude.use) return;
+    db = await window.claude.use('db'); if (!db) return;
+    ref = db.doc('picks/favorites');
+    ref.onSnapshot(snap => {
+      if (snap.exists) { picks = new Set((snap.data().ids) || []); renderPicks(); }
+      else if (picks.size) savePicks();
+    }, () => {});
+  } catch (e) {}
+})();
+
+// ---------- builders ----------
+const h = (tag, cls, text) => { const e = document.createElement(tag); if (cls) e.className = cls; if (text != null) e.textContent = text; return e; };
+function icon(name) { const i = h('img'); i.alt = ''; i.src = ICONS[name] || ''; return i; }
+function card(it) {
+  const c = h('div', 'card' + (it.germ ? ' germ' : '')), body = h('div', 'body');
+  c.append(icon(it.icon), body);
+  body.append(h('h3', '', it.name), h('p', 'when', it.when));
+  return { c, body };
+}
+function solo(b) { b.classList.add('solo'); b.textContent = '★ Star'; return b; }
+function pickBtn(id, label, onplay) {
+  const wrap = h('span', 'pick'), b = h('button', 'play', label); b.type = 'button';
+  b.onclick = () => { onplay(); flash(b); };
+  wrap.append(b, star(id, label));
+  return wrap;
+}
+
+// Music
+let musicBtn = null;
+const fight = { timer: null };
+function stopMusic() {
+  if (player) player.stop();
+  if (fight.timer) clearInterval(fight.timer), fight.timer = null;
+  document.querySelectorAll('#musiccards .play.on').forEach(b => b.classList.remove('on'));
+  document.querySelectorAll('#musiccards .card.live').forEach(b => b.classList.remove('live'));
+}
+function playMusic(id, btn, cardEl) {
+  audio();
+  const was = btn.classList.contains('on');
+  stopMusic();
+  if (was) return;
+  player.play(id); btn.classList.add('on'); cardEl.classList.add('live');
+}
+const chosen = {};   // card id -> selected variant fn, used by Swarm and the fake fight
+function fakeFight(btn, cardEl) {
+  audio();
+  const was = btn.classList.contains('on');
+  stopMusic();
+  if (was) return;
+  player.level = 2; setSeg(2); player.play('blood'); btn.classList.add('on'); cardEl.classList.add('live');
+  // About 40 game events a second, like a busy wave. With bunching on, they go through the same gate the game uses.
+  const table = [['shot', 0.5], ['kill', 0.22], ['swallow', 0.12], ['divide', 0.07], ['nk', 0.06], ['burst', 0.03]];
+  const gate = new CytoSound.Gate(); let t0 = performance.now(), asked = 0, played = 0;
+  const stat = document.getElementById('fightstat');
+  fight.timer = setInterval(() => {
+    let n = Math.floor(R() * 5);
+    while (n--) {
+      let r = R(), id = 'shot';
+      for (const [k, w] of table) { if ((r -= w) < 0) { id = k; break; } }
+      const at = performance.now() + R() * 100;
+      asked++;
+      const boost = bunching ? gate.ask(id, at) : 1;
+      if (!boost) continue;
+      played++;
+      const fn = chosen[id] || { shot: 'shotPew', kill: 'pop', swallow: 'gulp', divide: 'blink', nk: 'zap', burst: 'burstTight' }[id];
+      S[fn](bus, ctx.currentTime + 0.02 + (at - performance.now()) / 1000, { p: 0.9 + R() * 0.2, pan: R() * 1.6 - 0.8, v: (0.6 + R() * 0.25) * boost });
+    }
+    const secs = Math.max(1, (performance.now() - t0) / 1000);
+    stat.textContent = 'Each second: ' + Math.round(asked / secs) + ' things happen, ' + Math.round(played / secs) + ' make a sound.';
+  }, 50);
+}
+let bunching = true;
+let segBtns = [];
+function setSeg(lvl) { segBtns.forEach((b, i) => b.setAttribute('aria-pressed', i === lvl)); if (player) player.level = lvl; }
+{
+  const box = document.getElementById('musiccards');
+  { // fake fight
+    const c = h('div', 'card feature'), body = h('div', 'body');
+    c.append(icon('neutrophil'), body);
+    body.append(h('h3', '', 'Hear it all together'), h('p', 'when', 'Bloodstream with your chosen effects firing like a busy wave. Change the picks below and come back.'));
+    const b = h('button', 'play', 'Fake fight'); b.type = 'button'; b.append(eq());
+    b.onclick = () => fakeFight(b, c);
+    const tg = h('button', 'swarm', 'Bunching: on'); tg.type = 'button'; tg.setAttribute('aria-pressed', 'true');
+    tg.onclick = () => { bunching = !bunching; tg.textContent = 'Bunching: ' + (bunching ? 'on' : 'off'); tg.setAttribute('aria-pressed', bunching); };
+    const row = h('div', 'row'); row.append(b, tg); body.append(row);
+    const st = h('p', 'when'); st.id = 'fightstat'; st.textContent = 'Bunching skips repeats of the same sound for a moment and caps how many play at once. Turn it off to compare.';
+    body.append(st);
+    box.append(c);
+  }
+  MUSIC.forEach(m => {
+    const c = h('div', 'card'), body = h('div', 'body');
+    const vis = h('div'); vis.style.cssText = 'width:48px;height:48px;display:grid;place-items:center';
+    vis.append(icon({ petri: 'tissue', blood: 'vessel-blood', fever: 'fatigue-feverish', parade: 'bacterium' }[m.id]));
+    c.append(vis, body);
+    if (m.id === 'parade') c.classList.add('germ');
+    body.append(h('h3', '', m.name), h('p', 'when', m.when));
+    const row = h('div', 'row'), wrap = h('span', 'pick'), b = h('button', 'play', 'Play'); b.type = 'button'; b.append(eq());
+    b.onclick = () => playMusic(m.id, b, c);
+    wrap.append(b, star('music:' + m.id, m.name)); row.append(wrap); body.append(row);
+    if (m.adaptive) {
+      const seg = h('div', 'seg heat');
+      ['Calm', 'Fight', 'Hot', 'Fever', 'Crisis'].forEach((label, i) => {
+        const s = h('button', '', label); s.type = 'button'; s.dataset.k = label.toLowerCase();
+        s.onclick = () => { setSeg(i); if (!b.classList.contains('on')) playMusic('blood', b, c); };
+        seg.append(s); segBtns.push(s);
+      });
+      const row2 = h('div', 'row'); row2.append(seg, solo(star('music:blood-adaptive', 'changes with the fight')));
+      // Wave swell, the way the game does it: riser into the next bar, crash, one level up for 8 bars, then back.
+      const wv = h('button', 'swarm', 'Wave arrives'); wv.type = 'button';
+      let back = null;
+      wv.onclick = () => {
+        if (!b.classList.contains('on')) playMusic('blood', b, c);
+        const base = segBtns.findIndex(x => x.getAttribute('aria-pressed') === 'true'), up = Math.min(3, Math.max(base, 0) + 1);
+        const lead = player.swell(up, false);
+        clearTimeout(back);
+        back = setTimeout(() => { if (player.track === 'blood') player.level = Math.max(base, 0); }, (lead + 8 * 16 * player.sd) * 1000);
+      };
+      const row3 = h('div', 'row'); row3.append(wv, h('span', 'when', 'Hear the swell when a new wave comes in.'));
+      body.append(row2, row3);
+    }
+    box.append(c);
+  });
+  setSeg(1);
+}
+function eq() { const e = h('span', 'eq'); e.setAttribute('aria-hidden', 'true'); e.append(h('i'), h('i'), h('i')); return e; }
+
+// Sound effect groups
+const groupsEl = document.getElementById('groups');
+GROUPS.forEach(g => {
+  const sec = h('section'), head = h('div', 'sechead'); head.append(h('h2', '', g.title));
+  if (g.note) head.append(h('p', '', g.note));
+  const cards = h('div', 'cards'); sec.append(head, cards); groupsEl.append(sec);
+  if (g.custom === 'storm') cards.append(stormCard());
+  if (g.custom === 'heart') cards.append(heartCard());
+  (g.items || []).forEach(it => {
+    const { c, body } = card(it), row = h('div', 'row');
+    chosen[it.id] = it.vars[0][2];
+    it.vars.forEach(([k, label, fn], i) => {
+      const p = pickBtn(it.id + ':' + k, label, () => {
+        S[fn](bus || (audio(), bus), now());
+        chosen[it.id] = fn;
+        row.querySelectorAll('.pick').forEach(x => x.classList.toggle('sel', x === p));
+      });
+      if (i === 0 && it.vars.length > 1) p.classList.add('sel');
+      row.append(p);
+    });
+    if (it.swarm) {
+      const sw = h('button', 'swarm', 'Swarm ×14'); sw.type = 'button';
+      sw.setAttribute('aria-label', 'Play the selected ' + it.name + ' 14 times at once');
+      sw.onclick = () => {
+        audio(); const t = now(), fn = chosen[it.id];
+        for (let i = 0; i < 14; i++) S[fn](bus, t + Math.pow(R(), 1.3) * 1.6, { p: 0.82 + R() * 0.36, pan: R() * 1.6 - 0.8, v: 0.5 + R() * 0.4 });
+      };
+      row.append(sw);
+    }
+    body.append(row); cards.append(c);
+  });
+});
+
+// Cytokine storm: hold 5 s, release to fire, let go early to cancel.
+function stormCard() {
+  const c = h('div', 'card'), wrap = h('div', 'storm'), body = h('div', 'body');
+  c.style.gridTemplateColumns = '1fr';
+  const btn = h('button', 'hold'); btn.type = 'button'; btn.setAttribute('aria-label', 'Hold to charge the cytokine storm');
+  const face = h('span'); face.append(icon('storm'), document.createTextNode('Hold')); btn.append(face);
+  body.append(h('h3', '', 'Cytokine storm'),
+    h('p', 'when', 'Works like the game: press and hold for 5 seconds while it charges, then let go to fire. Let go early and it fizzles out.'));
+  const row = h('div', 'row');
+  row.append(pickBtn('storm:blast', 'Charge and fire', () => {
+    audio(); const ch = S.stormCharge(bus, now()); setTimeout(() => ch.fire(ctx.currentTime + 0.02), 5300);
+  }));
+  body.append(row); wrap.append(btn, body); c.append(wrap);
+  let charge = null, t0 = 0, raf = 0;
+  const label = face.lastChild;
+  function draw() {
+    const p = Math.min(1, (performance.now() - t0) / 5000);
+    btn.style.setProperty('--p', p);
+    btn.classList.toggle('risky', p >= 0.4 && p < 0.8); btn.classList.toggle('lethal', p >= 0.8);
+    btn.classList.toggle('ready', p >= 1);
+    label.textContent = p >= 1 ? 'Let go' : 'Charging';
+    raf = requestAnimationFrame(draw);
+  }
+  btn.addEventListener('pointerdown', e => {
+    e.preventDefault(); audio();
+    try { btn.setPointerCapture(e.pointerId); } catch (_) {}
+    charge = S.stormCharge(bus, now()); t0 = performance.now(); draw();
+  });
+  const end = () => {
+    if (!charge) return;
+    cancelAnimationFrame(raf);
+    const held = (performance.now() - t0) / 1000;
+    held >= 5 ? charge.fire(ctx.currentTime + 0.01) : charge.cancel(ctx.currentTime + 0.01);
+    charge = null; label.textContent = held >= 5 ? 'Fired' : 'Hold';
+    btn.style.setProperty('--p', 0); btn.classList.remove('risky', 'lethal', 'ready');
+    setTimeout(() => { if (!charge) label.textContent = 'Hold'; }, 1500);
+  };
+  btn.addEventListener('pointerup', end); btn.addEventListener('pointercancel', end);
+  btn.addEventListener('contextmenu', e => e.preventDefault());
+  return c;
+}
+
+// Heartbeat: one looping beat per fatigue state. No numbers, only the feel.
+let heart = { timer: null, k: null, next: 0, n: 0 };
+function stopHeart() { if (heart.timer) clearInterval(heart.timer); heart = { timer: null, k: null, next: 0, n: 0 }; document.querySelectorAll('#heartseg button').forEach(b => b.setAttribute('aria-pressed', 'false')); document.getElementById('heartcard').classList.remove('live'); }
+function heartCard() {
+  const it = { name: 'Heartbeat', when: 'Under the fatigue meter: the beat speeds up and hardens as the body tires. Tap a state to loop it, tap again to stop.', icon: 'heart-healthy' };
+  const { c, body } = card(it); c.id = 'heartcard';
+  const seg = h('div', 'seg heat'); seg.id = 'heartseg';
+  const keys = Object.keys(CytoSound.HEART);
+  keys.forEach((k, i) => {
+    const b = h('button', '', CytoSound.HEART[k].label); b.type = 'button'; b.dataset.k = k; b.setAttribute('aria-pressed', 'false');
+    b.onclick = () => {
+      audio();
+      if (heart.k === k) return stopHeart();
+      stopHeart(); heart.k = k; heart.next = now(); b.setAttribute('aria-pressed', 'true'); c.classList.add('live');
+      const hs = CytoSound.HEART[k], hard = i / (keys.length - 1);
+      heart.timer = setInterval(() => {
+        while (heart.next < ctx.currentTime + 0.3) {
+          S.heartbeat(bus, heart.next, { hard });
+          heart.n++;
+          heart.next += hs.gap * (hs.skip && heart.n % 3 === 0 ? 1.6 : 1) * (1 + (R() - 0.5) * 0.04);
+        }
+      }, 50);
+    };
+    seg.append(b);
+  });
+  const row = h('div', 'row'); row.append(seg, solo(star('heart:beat', 'Heartbeat')));
+  body.append(row);
+  return c;
+}
+
+// Global controls
+document.getElementById('vol').addEventListener('input', e => { vol = +e.target.value; if (bus) bus.master.gain.setTargetAtTime(vol, ctx.currentTime, 0.02); });
+document.getElementById('stopall').onclick = () => {
+  stopMusic(); stopHeart();
+  if (bus) {   // cut ringing one-shots: fade the old mixer out and build a fresh one
+    const old = bus; old.master.gain.setTargetAtTime(0, ctx.currentTime, 0.03); setTimeout(() => old.master.disconnect(), 300);
+    bus = CytoSound.makeBus(ctx); bus.master.gain.value = vol;
+    const lvl = player.level; player = new CytoSound.Player(bus); player.level = lvl;
+  }
+};
+// First touch anywhere unlocks audio on iPhone.
+['pointerdown', 'touchend', 'keydown'].forEach(ev => document.addEventListener(ev, () => audio(), { once: true, capture: true }));
+document.addEventListener('visibilitychange', () => { if (document.hidden) { stopMusic(); stopHeart(); } });
+renderPicks();
+</script>

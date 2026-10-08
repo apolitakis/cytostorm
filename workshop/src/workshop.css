@@ -1,0 +1,63 @@
+/* workshop: toxin bar, panel controls, start-screen combos */
+#app { transition: margin .15s; }
+.toxrow #toxVal { flex: none; min-width: 5.4em; text-align: right; font: 600 11.5px var(--display); color: var(--slime); }
+.toxbar { flex: 1; min-width: 40px; height: 6px; border-radius: 3px; background: var(--panel2); position: relative; overflow: hidden; }
+.toxbar i { position: absolute; left: 0; top: 0; bottom: 0; width: 0; background: var(--slime); box-shadow: 0 0 6px var(--slime); }
+.toxbar b { position: absolute; top: 0; bottom: 0; width: 1px; background: rgba(221,230,245,.4); }
+.toxrow.max .toxbar i { animation: pulse .6s ease-in-out infinite alternate; }
+.toxrow.max #toxVal { color: var(--damage); }
+@keyframes pulse { to { opacity: .45; } }
+#devBtn.on { border-color: var(--gold); color: var(--gold); }
+#dev .ghead { display: flex; gap: 6px; align-items: center; }
+#dev .ghead > span { font: 500 12px var(--mono); text-transform: uppercase; letter-spacing: .08em; color: var(--dim); margin-right: auto; }
+#dev .ghead button, #dev .chips button, #dev .srow button { background: var(--panel2); border: 1px solid var(--line); border-radius: 8px; padding: 4px 9px; font-size: 12px; }
+#dev .chips { display: flex; flex-wrap: wrap; gap: 5px; }
+#dev .chips button[aria-pressed="true"] { border-color: var(--cell); color: var(--cell); }
+#dev small.note, #dev label small { color: var(--dim); font-size: 11px; line-height: 1.3; }
+#dev label small { display: block; }
+#dev .srow { display: grid; grid-template-columns: 26px 1fr auto auto; grid-template-areas: "i t v b" "i r r r"; gap: 0 8px; align-items: center; padding: 3px 0; }
+#dev .srow img { grid-area: i; width: 26px; height: 26px; }
+#dev .srow .st2 { grid-area: t; min-width: 0; display: grid; }
+#dev .srow .st2 small { color: var(--dim); font-size: 11px; line-height: 1.25; }
+#dev .srow output { grid-area: v; font: 500 11.5px var(--mono); color: var(--dim); text-align: right; display: grid; }
+#dev .srow output.on { color: var(--gold); }
+#dev .srow output::after { content: attr(data-n); color: var(--germ); font-size: 10.5px; }
+#dev .srow button { grid-area: b; min-width: 34px; }
+#dev .srow input { grid-area: r; width: 100%; accent-color: var(--gold); margin: 2px 0; }
+#dev .grp > input[type="range"] { width: 100%; accent-color: var(--gold); margin: 0 0 4px; }
+#dev output.changed { color: var(--gold); }
+#dev label.row output { font: 500 12px var(--mono); }
+#dev input[type="checkbox"] { width: 18px; height: 18px; accent-color: var(--cell); }
+#dev .readout { display: grid; grid-template-columns: auto 1fr; gap: 2px 10px; font-size: 12px; }
+#dev .readout span { color: var(--dim); }
+#dev .readout b { font: 500 12px var(--mono); font-variant-numeric: tabular-nums; }
+#wsJson { width: 100%; min-height: 70px; background: var(--panel2); color: var(--ink); border: 1px solid var(--line); border-radius: 8px; font: 11px var(--mono); box-sizing: border-box; -webkit-user-select: text; user-select: text; }
+.combos { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 6px; }
+.combo { display: grid; gap: 2px; align-content: start; text-align: left; background: var(--panel2); border: 1px solid var(--line); border-radius: 10px; padding: 8px 10px; }
+.combo .ci { display: flex; gap: 3px; min-height: 18px; }
+.combo .ci img { width: 18px; height: 18px; }
+.combo b { font-size: 13.5px; }
+.combo small { color: var(--dim); font-size: 11.5px; line-height: 1.3; }
+.mbox { max-width: 560px; }
+/* Wide screens: the Workshop panel docks beside the game */
+@media (min-width: 1100px) { body.ws-open #app { margin-right: 380px; } #dev { width: 380px; } }
+/* Phones: the panel is a bottom sheet so the map stays in view */
+@media (max-width: 700px) { #dev { top: auto; left: 0; width: 100%; height: 58%; border-left: 0; border-top: 1px solid var(--line); border-radius: 16px 16px 0 0; } body.ws-open #app { height: 50%; } body.ws-open #legend, body.ws-open #bar, body.ws-open #banner { display: none; } #dev { height: 50%; } }
+/* v3's heart meter spans the left column; the toxin row sits under the fatigue line */
+.output #toxRow { grid-column: 2; }
+#heart { grid-row: 1 / span 4; }
+
+/* v3's own debug spawn sliders duplicate the Workshop's antigen rates, so the Sandbox hides them */
+#dev .grp:has(#spawnRates) { display: none; }
+
+/* organ health buttons */
+.devbtns .mini { align-self: center; font-size: 11px; color: var(--dim); margin-left: 4px; }
+
+/* Toxin strip under the main game's organ button (no separate toxin bar) */
+.bodybtn { flex-wrap: wrap; row-gap: 2px; }
+.bodybtn .btox { display: block; flex-basis: 100%; height: 3px; border-radius: 2px; background: var(--line); overflow: hidden; }
+.bodybtn .btox b { display: block; height: 100%; width: 0; background: var(--slime); }
+.bodybtn .btox b.over { background: #C4E03A; box-shadow: 0 0 4px var(--slime); }
+.ocard.tox .ost { color: var(--slime); }
+.orgbtns { flex-wrap: wrap; }
+.ocard.tox { grid-template-columns: 1fr; }
