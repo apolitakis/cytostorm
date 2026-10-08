@@ -1009,7 +1009,7 @@ ${breach}${now}${heal}${hb.length ? `<li class="dim">Hurt by ${hb.join(', ')} in
     return [...out];
   }
   // Levels the bots say are still off (too hard or too easy); playable, just not tuned
-  const ROUGH = new Set(['pool', 'flu', 'lungs', 'foot']);
+  const ROUGH = new Set([]); // levels flagged "not balanced yet"; none since V22 (second vessel): idle and random lose everywhere, several bot styles win each level
   function showStart() {
     const lv = LEVELS[levelKey];
     openModal('start', `

@@ -846,7 +846,7 @@ const ART = {
 // Needs the art kit's global ART (prototype/assets/assets.js), loaded.
 // ---------------------------------------------------------------------------
 const CYT = (function () {
-  const U = 400, V = 300, VES = 34;
+  const U = 400, V = 300, VES = 34, FVES = 16; // FVES: the thinner second vessel on the far edge (v3 FAR_VESSEL)
   const PAL = ART.palette;
   const FONT = '"Instrument Sans", "Helvetica Neue", Arial, sans-serif', MONO = '"IBM Plex Mono", ui-monospace, Menlo, monospace';
   const BLINK = 0.6, BLINK_WARN = 0.7; // same as the game (sim.js)
@@ -1101,6 +1101,11 @@ const CYT = (function () {
           const tw = 96 * R.k * 0.6, th = VES * 1.25 * R.k;
           for (let x = 0; x < U * R.k; x += tw) g.drawImage(vb, x, -VES * 0.15 * R.k, tw + 0.5, th);
           g.restore();
+          // the thinner second vessel down the far edge, as in v3
+          g.save(); g.translate(x0 + (V - FVES * 1.1) * R.k, y0 + U * R.k); g.rotate(-Math.PI / 2);
+          const fh = FVES * 1.25 * R.k;
+          for (let x = 0; x < U * R.k; x += tw) g.drawImage(vb, x, -FVES * 0.15 * R.k, tw + 0.5, fh);
+          g.restore();
         }
       }
       if (bg.wound) {
@@ -1109,7 +1114,7 @@ const CYT = (function () {
       }
       if (bg.dividers) {
         g.strokeStyle = 'rgba(221,230,245,0.16)'; g.lineWidth = 1.5; g.setLineDash([6, 6]);
-        for (const du of bg.dividers) { const [a, b] = P(du, VES), [cx, cy] = P(du, V); g.beginPath(); g.moveTo(a, b); g.lineTo(cx, cy); g.stroke(); }
+        for (const du of bg.dividers) { const [a, b] = P(du, VES), [cx, cy] = P(du, V - FVES); g.beginPath(); g.moveTo(a, b); g.lineTo(cx, cy); g.stroke(); }
         g.setLineDash([]);
       }
       ctx = saved;
@@ -1118,9 +1123,9 @@ const CYT = (function () {
     }
     ctx.drawImage(c, 0, 0, R.w, R.h);
   }
-  // Screen rect of the stage band u0..u1 (below the vessel)
+  // Screen rect of the stage band u0..u1 (between the two vessels)
   function zoneRect(u0, u1) {
-    const [x0, y0] = P(u0, VES), [x1, y1] = P(u1, V);
+    const [x0, y0] = P(u0, VES), [x1, y1] = P(u1, V - FVES);
     return [Math.min(x0, x1), Math.min(y0, y1), Math.abs(x1 - x0), Math.abs(y1 - y0)];
   }
   const ZICON = { Wound: 'sector-wound', Tissue: 'sector-tissue', 'Lymph node': 'sector-lymph' };
@@ -1585,7 +1590,7 @@ const CYT = (function () {
     ctx.globalCompositeOperation = 'source-over';
   }
   const api = {
-    U, V, VES, PAL, BLINK, BLINK_WARN, COLORS, FONT, MONO, pen, penR,
+    U, V, VES, FVES, PAL, BLINK, BLINK_WARN, COLORS, FONT, MONO, pen, penR,
     clamp, lerp, lerp2, ease, seg, noise, rng, path, drift,
     P, ang, spr, icon, glow, blinkGlow, ringFx, burst, dots,
     ent, divide, gulp, shot, volley, alive, scene, drawEnt,
@@ -1619,8 +1624,11 @@ const CYT_KIT = (function () {
     return out;
   }
   // Cells coming out of the blood vessel at time t0 and settling at (u, v); wander after
+  // A new cell comes out of a blood vessel and heads to (u, v). As in v3, macrophages use the near vessel and
+  // other cells come out of either one, half from the thin far vessel (o.side 'near' | 'far' forces one).
   function recruit(art, t0, u, v, o = {}) {
-    const keys = [[t0, u + (o.du || 0), A.VES - 4], [t0 + (o.travel || 0.8), u, v]];
+    const far = o.side ? o.side === 'far' : !art.startsWith('macrophage') && (Math.sin(t0 * 12.9898 + u * 78.233 + v * 37.719) * 43758.5453 % 1 + 1) % 1 < 0.5;
+    const keys = [[t0, u + (o.du || 0), far ? A.V - A.FVES + 4 : A.VES - 4], [t0 + (o.travel || 0.8), u, v]];
     if (o.then) for (const k of o.then) keys.push(k);
     return A.ent({ art, r: o.r || 6, t0, t1: o.t1 || 1e9, arrive: A.COLORS[o.kind || 'neut'], die: o.die || 'puff', rot: o.rot != null ? o.rot : null,
       pos: A.path(keys, o.wob == null ? 4 : o.wob, o.seed || t0 * 13 + u), layer: o.layer || 2, art2: o.art2 });
@@ -1730,7 +1738,7 @@ CYT_CLIPS.divide = {
 // ---- 3. Production cards ----
 CYT_CLIPS.cards = {
   id: 'cards', title: 'Choose what each zone makes', dur: 15.6,
-  cap: [[0, 'Each zone has a production card. Tap one to choose which cells you make there.'], [2.8, 'Drag a slider to share out the mix. Tap 100% to make only that cell, or 0% to stop making it.'], [4.3, 'Tap Save under a loadout slot to keep this mix. Tap the slot to use it in any zone, even next match.'], [5.9, 'Apply to all zones copies this mix to the other two. Each keeps its own stance.'], [7.8, 'New cells come out of the blood vessel beside their zone and fight there.'], [11.2, 'Neutrophils are your gunners. Three hits kill a Staph.']],
+  cap: [[0, 'Each zone has a production card. Tap one to choose which cells you make there.'], [2.8, 'Drag a slider to share out the mix. Tap 100% to make only that cell, or 0% to stop making it.'], [4.3, 'Tap Save under a loadout slot to keep this mix. Tap the slot to use it in any zone, even next match.'], [5.9, 'Apply to all zones copies this mix to the other two. Each keeps its own stance.'], [7.8, 'New cells come out of the blood vessels on both edges of their zone. Macrophages always use the wide one.'], [11.2, 'Neutrophils are your gunners. Three hits kill a Staph.']],
   hud: { bottom: true },
   bg: { wound: [55, 215], woundSize: 0.6, dividers: [133.3, 266.7], lymph: [345, 175] },
   saveAt: 4.9, applyAt: 6.2,
@@ -2349,7 +2357,7 @@ CYT_CLIPS.stormRisk = {
       }
       // the net neutrophil runs to the thickest crowd and bursts into a pen
       st.burstT = 5.9; st.netC = [cu - 4, cv]; st.penR = 44;
-      st.net = A.ent({ art: 'neutrophil-net', r: 7, rot: 'vel', t0: 4.5, t1: st.burstT, arrive: A.COLORS.net, die: null, layer: 2, pos: A.path([[4.5, 300, A.VES - 4], [st.burstT, st.netC[0], st.netC[1]]], 2, 4) });
+      st.net = A.ent({ art: 'neutrophil-net', r: 7, rot: 'vel', t0: 4.5, t1: st.burstT, arrive: A.COLORS.net, die: null, layer: 2, pos: A.path([[4.5, 300, A.V - A.FVES + 4], [st.burstT, st.netC[0], st.netC[1]]], 2, 4) });
       const kill = [], survive = [];
       for (const f of st.flu) if (f.t0 > 1 && f.die === 'pop') { const [u, v] = f.pos(st.burstT); (Math.hypot(u - st.netC[0], v - st.netC[1]) < st.penR ? kill : survive).push(f); }
       for (const f of kill) { f.t1 = st.burstT + 0.05 + r() * 0.2; const p = f.pos; const at = st.burstT; f.pos = t => (t < at ? p(t) : p(at)); }
@@ -2508,7 +2516,7 @@ CYT_CLIPS.stormRisk = {
       for (let i = 0; i < 5; i++) st.neuts.push(K.recruit('neutrophil', 6.4 + i * 0.15, 100 + i * 25, 230 + (i % 2) * 30, { r: 6, wob: 7 }));
       // neutrophils ignore the infected macrophage; the NK cell comes in from the vessel and pops it
       st.pop = 8.3;
-      st.nk = A.ent({ art: 'nk-cell', r: 10, rot: t => t * 0.5, t0: 6.6, arrive: A.COLORS.nk, layer: 2, pos: t => { const [u, v] = mac.pos(Math.min(t, st.pop)), p = A.ease(A.seg(t, 6.6, st.pop)); return [A.lerp(u + 50, u + 14, p) + 3 * A.noise(3, t), A.lerp(A.VES - 4, v - 6, p) + 3 * A.noise(4, t)]; } });
+      st.nk = A.ent({ art: 'nk-cell', r: 10, rot: t => t * 0.5, t0: 6.6, arrive: A.COLORS.nk, layer: 2, pos: t => { const [u, v] = mac.pos(Math.min(t, st.pop)), p = A.ease(A.seg(t, 6.6, st.pop)); return [A.lerp(u + 50, u + 14, p) + 3 * A.noise(3, t), A.lerp(A.V - A.FVES + 4, v - 6, p) + 3 * A.noise(4, t)]; } });
       mac.t1 = st.pop; mac.die = 'lilac';
       // a fresh macrophage arrives, the zone flips to Support, and tuned shots finish the TB
       st.mac2 = K.recruit('macrophage-offense', 9.8, 230, 175, { r: 17, kind: 'mac', wob: 1.5, travel: 0.8 });
@@ -4114,8 +4122,8 @@ const UNIT_NAMES = { neut: 'Neutrophils', net: 'Net neutrophils', nk: 'NK cells'
 const LEVELS = {
   papercut: {
     name: 'Papercut', blurb: 'Staph spills out of a small cut. Learn the basics.', duration: 240, units: ['neut', 'mac'],
-    waves: [{ t: 0, staph: 60 }, { t: 45, staph: 60 }, { t: 100, staph: 120 }, { t: 160, staph: 90 }, { t: 200, staph: 160, final: true }],
-    stream: { start: 0.8, end: 2.0, clump: 4, kinds: [{ k: 'staph', w: 1 }] }, toxins: [130],
+    waves: [{ t: 0, staph: 72 }, { t: 45, staph: 72 }, { t: 100, staph: 144 }, { t: 160, staph: 108 }, { t: 200, staph: 192, final: true }],
+    stream: { start: 0.96, end: 2.4, clump: 4, kinds: [{ k: 'staph', w: 1 }] }, toxins: [130], // waves x1.2 (2026-10-08): with the second vessel, doing nothing won at x1
   },
   hospital: {
     name: 'Hospital visit', blurb: 'MRSA shrugs off plain shots and slips out of macrophages. Only Support rings kill it.', duration: 300, units: ['neut', 'mac'],
@@ -4129,8 +4137,8 @@ const LEVELS = {
   },
   flu: {
     name: 'Flu season', blurb: 'Influenza swarms in by the dozen and splits in the Tissue. Net neutrophils wipe out whole clusters.', duration: 300, units: ['neut', 'net', 'mac'],
-    waves: [{ t: 0, staph: 80 }, { t: 35, flu: 104 }, { t: 90, flu: 128, staph: 64 }, { t: 150, flu: 160 }, { t: 210, staph: 112, flu: 104 }, { t: 250, flu: 208, staph: 80, final: true }],
-    stream: { start: 0.96, end: 2.24, clump: 4, kinds: [{ k: 'staph', w: 1 }] }, toxins: [120, 220], // waves x1.6 (2026-10-07): with breach clocks, doing nothing won at x1
+    waves: [{ t: 0, staph: 96 }, { t: 35, flu: 125 }, { t: 90, flu: 154, staph: 77 }, { t: 150, flu: 192 }, { t: 210, staph: 134, flu: 125 }, { t: 250, flu: 250, staph: 96, final: true }],
+    stream: { start: 1.152, end: 2.688, clump: 4, kinds: [{ k: 'staph', w: 1 }] }, toxins: [120, 220], // waves x1.6 (2026-10-07, breach clocks), then x1.2 (2026-10-08, second vessel): doing nothing won before each
   },
   soil: {
     name: 'Soil cut', blurb: 'Clostridium spores sit harmless, then hatch all at once. Rest before the hatch, push hard on it.', duration: 300, units: ['neut', 'net', 'mac'],
@@ -4139,8 +4147,8 @@ const LEVELS = {
   },
   foot: {
     name: "Athlete's foot", blurb: 'Fungus grows threads toward the Lymph node and germs ride them like a highway. Shots pass through the threads. Nets cut them; macrophages chew them slowly.', duration: 300, units: ['neut', 'net', 'mac'],
-    waves: [{ t: 0, staph: 50 }, { t: 30, yeast: 5 }, { t: 80, staph: 60, yeast: 4 }, { t: 140, yeast: 8, staph: 40 }, { t: 200, staph: 70 }, { t: 240, yeast: 8, staph: 80, final: true }],
-    stream: { start: 0.5, end: 1.3, clump: 4, kinds: [{ k: 'staph', w: 1 }, { k: 'yeast', w: 0.04, from: 60 }] }, toxins: [110, 210],
+    waves: [{ t: 0, staph: 60 }, { t: 30, yeast: 6 }, { t: 80, staph: 72, yeast: 5 }, { t: 140, yeast: 10, staph: 48 }, { t: 200, staph: 84 }, { t: 240, yeast: 10, staph: 96, final: true }],
+    stream: { start: 0.6, end: 1.56, clump: 4, kinds: [{ k: 'staph', w: 1 }, { k: 'yeast', w: 0.04, from: 60 }] }, toxins: [110, 210], // waves x1.2 (2026-10-08): with the second vessel, a random player won 1 in 6
   },
   lungs: {
     name: 'Lungs', blurb: 'Tuberculosis turns any macrophage that swallows it into a TB factory. Only NK cells can kill an infected macrophage. Offense is a trap here.', duration: 300, units: ['neut', 'net', 'nk', 'mac'],
@@ -4149,8 +4157,8 @@ const LEVELS = {
   },
   throat: {
     name: 'Sore throat', blurb: 'Strep chains sprint for the Lymph node, and Toxic-shock Staph makes you tire twice as fast.', duration: 300, units: ['neut', 'net', 'mac'],
-    waves: [{ t: 0, staph: 50 }, { t: 40, strep: 5 }, { t: 90, toxic: 30, staph: 40 }, { t: 140, strep: 8 }, { t: 200, toxic: 35, strep: 6 }, { t: 250, strep: 12, staph: 100, toxic: 30, final: true }],
-    stream: { start: 0.7, end: 1.7, clump: 4, kinds: [{ k: 'staph', w: 1 }, { k: 'toxic', w: 0.1, from: 80 }] }, toxins: [110, 210],
+    waves: [{ t: 0, staph: 60 }, { t: 40, strep: 6 }, { t: 90, toxic: 36, staph: 48 }, { t: 140, strep: 10 }, { t: 200, toxic: 42, strep: 7 }, { t: 250, strep: 14, staph: 120, toxic: 36, final: true }],
+    stream: { start: 0.84, end: 2.04, clump: 4, kinds: [{ k: 'staph', w: 1 }, { k: 'toxic', w: 0.1, from: 80 }] }, toxins: [110, 210], // waves x1.2 (2026-10-08): with the second vessel, doing nothing won at x1
   },
   coldsore: {
     name: 'Cold sore', blurb: 'Herpes hides inside your own neutrophils and bursts out later. NK cells find and pop infected cells.', duration: 300, units: ['neut', 'net', 'nk', 'mac'],
@@ -4192,6 +4200,8 @@ function mulberry32(a) {
 
 // Map: three zones of 300 along the flow; the blood vessel is a strip along v < VESSEL.
 const L = 900, WIDTH = 460, ZONE = 300, VESSEL = 44;
+// Second, thinner vessel on the far edge (Alex, 2026-10-08): half of new cells enter there, so the fight no longer drifts away from the left vessel
+const FAR_VESSEL = 20;
 const ZONES = ['Wound', 'Tissue', 'Lymph node'];
 const zoneOf = u => (u < ZONE ? 0 : u < 2 * ZONE ? 1 : 2);
 const WOUND = { u: 70, v: 270 };
@@ -4440,7 +4450,10 @@ class Game {
     if (!start) {
       c.u = u != null ? u : home * ZONE + 20 + r() * (ZONE - 40);
       c.v = v != null ? v : VESSEL * 0.5;
-      if (v == null) c.vv = 60 + r() * 40; // pushed out of the vessel into the tissue
+      if (v == null) {
+        c.vv = 60 + r() * 40; // pushed out of the vessel into the tissue
+        if (type !== 'mac' && r() < 0.5) { c.v = WIDTH - FAR_VESSEL * 0.5; c.vv = -c.vv; } // or out of the far vessel
+      }
     }
     this.cells.push(c);
     if (!start) this.tick('made.' + type);
@@ -4919,7 +4932,7 @@ class Game {
     const F = CONFIG.fungus;
     dir *= 0.9; // drift back toward the Lymph node (downstream)
     let u = tip.u + Math.cos(dir) * F.seg, v = tip.v + Math.sin(dir) * F.seg;
-    if (v < VESSEL + 10 || v > WIDTH - 10) { dir = -dir; v = Math.max(VESSEL + 10, Math.min(WIDTH - 10, tip.v + Math.sin(dir) * F.seg)); }
+    if (v < VESSEL + 10 || v > WIDTH - FAR_VESSEL - 10) { dir = -dir; v = Math.max(VESSEL + 10, Math.min(WIDTH - FAR_VESSEL - 10, tip.v + Math.sin(dir) * F.seg)); }
     u = Math.max(6, Math.min(L - 20, u));
     return this.addHypha(f, tip, u, v, dir);
   }
@@ -5059,7 +5072,7 @@ class Game {
       a.u += a.vu * dt; a.v += a.vv * dt;
       a.u = Math.max(4, Math.min(L - 6, a.u));
       if (a.v < VESSEL + 6) { a.v = VESSEL + 6; a.vv = Math.abs(a.vv) * 0.3; }
-      if (a.v > WIDTH - 6) { a.v = WIDTH - 6; a.vv = -Math.abs(a.vv) * 0.3; }
+      if (a.v > WIDTH - FAR_VESSEL - 6) { a.v = WIDTH - FAR_VESSEL - 6; a.vv = -Math.abs(a.vv) * 0.3; }
       a.rot += dt * (K.chain ? 0 : 0.3);
       if (K.chain) a.rot = a.prev ? Math.atan2(a.prev.v - a.v, a.prev.u - a.u) : Math.atan2(a.vv, a.vu);
       // flu splits once when it reaches the Tissue
@@ -5173,7 +5186,7 @@ class Game {
   }
 }
 
-// (node export removed) = { BLINK, BLINK_WARN, ORGAN_KEYS, ORGAN_NAMES, Game, DEFAULTS, CONFIG, LEVELS, LEVEL_ORDER, KINDS, UNIT_NAMES, HINTS, mergeConfig, mulberry32, zoneOf, L, WIDTH, ZONE, VESSEL, WOUND, NODE, ZONES };
+// (node export removed) = { BLINK, BLINK_WARN, ORGAN_KEYS, ORGAN_NAMES, Game, DEFAULTS, CONFIG, LEVELS, LEVEL_ORDER, KINDS, UNIT_NAMES, HINTS, mergeConfig, mulberry32, zoneOf, L, WIDTH, ZONE, VESSEL, FAR_VESSEL, WOUND, NODE, ZONES };
 
 </script>
 <script>
@@ -5257,8 +5270,8 @@ const SPAWNABLE = [
   { k: 'virus', size: 6, about: 'Herpes. Hides in neutrophils. NK cells pop them.' },
   { k: 'measles', size: 4, about: 'Workshop only. Hijacks macrophages: they go dark, then burst into more Measles. NK cells pop them.' },
   { k: 'worm', size: 1, about: 'The Tapeworm boss.' },
-  { k: 'hep', size: 6, about: 'Hepatitis. Swims for the blood vessel. Each leak hurts the liver. Nets catch the swarm.' },
-  { k: 'ecoli', size: 4, about: 'E. coli. Swims for the vessel and hurts the kidneys. Shooting it dumps toxin: swallow it.' },
+  { k: 'hep', size: 6, about: 'Hepatitis. Swims for the left blood vessel. Each leak hurts the liver. Nets catch the swarm.' },
+  { k: 'ecoli', size: 4, about: 'E. coli. Swims for the left blood vessel and hurts the kidneys. Shooting it dumps toxin: swallow it.' },
   { k: 'yeast', size: 3, about: 'Candida. Settles and grows threads germs ride to the Lymph node. Nets cut them.' },
 ];
 const FRIENDLY = ['neut', 'net', 'nk', 'mac'];
@@ -5300,7 +5313,7 @@ class Workshop {
     else if (k === 'hep' || k === 'ecoli') {
       // leakers start on the far side of a zone from the vessel and have to cross that zone's cells
       const z = this.dev.leakZone === 'random' || this.dev.leakZone == null ? Math.floor(r() * 3) : +this.dev.leakZone;
-      const lu = z * ZONE + ZONE * (0.25 + r() * 0.5), lv = WIDTH - 24;
+      const lu = z * ZONE + ZONE * (0.25 + r() * 0.5), lv = WIDTH - (typeof FAR_VESSEL === 'number' ? FAR_VESSEL : 0) - 12; // just inside the far vessel's wall
       for (let i = 0; i < s.size; i++) this.spawnLeaker(k, lu + (r() - 0.5) * 30, lv - r() * 20);
     }
     else for (let i = 0; i < s.size; i++) g.spawnAg(k, cu + (r() - 0.5) * 24, cv + (r() - 0.5) * 24, k === 'spore' ? { hatchAt: g.t + C.spore.hatch } : null);
@@ -5551,7 +5564,7 @@ const COMBOS = {
   fever:    { name: 'Fever gamble', blurb: 'Fever slows division is on. Run hot to slow the Staph, but your cells suffer.', rates: R({ staph: 8, toxic: 0.5 }), dev: { feverDivision: true }, output: 0.8 },
   measles:  { name: 'Measles', blurb: 'A virus that hijacks macrophages. Offense feeds it. NK cells are the answer.', rates: R({ measles: 1.2, staph: 3 }), mix: { neut: 0.6, mac: 0.25, nk: 0.15 } },
   fungus:   { name: 'Fungus highway', blurb: 'Candida grows threads that carry Staph to the Lymph node. No Nets yet: add some to cut them.', rates: R({ yeast: 3, staph: 3 }), mix: { neut: 0.85, mac: 0.15 } },
-  jaundice: { name: 'Jaundice', blurb: 'A Hepatitis stream crosses the Tissue for the blood vessel. Every leak costs the liver part of a bar, and a hurt liver makes new cells slower. Nets catch swarms.', rates: R({ hep: 7, staph: 2 }), dev: { organs: true, leakZone: '1' }, mix: { neut: 0.55, mac: 0.45 } },
+  jaundice: { name: 'Jaundice', blurb: 'A Hepatitis stream crosses the Tissue for the left blood vessel. Every leak costs the liver part of a bar, and a hurt liver makes new cells slower. Nets catch swarms.', rates: R({ hep: 7, staph: 2 }), dev: { organs: true, leakZone: '1' }, mix: { neut: 0.55, mac: 0.45 } },
   badWater: { name: 'Bad water', blurb: 'E. coli plus Staph at high Body output. Leaks hurt the kidneys. With Toxin load on, shooting E. coli dumps toxin: swallow it.', rates: R({ ecoli: 5, staph: 4 }), dev: { organs: true, leakZone: 'random' }, output: 0.85, mix: { neut: 0.55, mac: 0.45 } },
   empty:    { name: 'Running on empty', blurb: 'Liver and kidneys start at 2 of 4 bars and fatigue at 60. Toxin clears slowly. Can you stay calm enough to recover?', rates: R({ staph: 4, ecoli: 1 }), dev: { organs: true }, organs: { liver: 0.5, kidney: 0.5 }, fatigue: 60 },
   clean:    { name: 'Kill clean', blurb: 'Toxin load on and lots of Pseudomonas. Can swallowing keep up?', rates: R({ pseudo: 1.5, staph: 5 }), mix: { neut: 0.4, mac: 0.6 } },
@@ -5665,7 +5678,7 @@ const COMBOS = {
       const z = +b.dataset.pz, zn = game && game.zones[z];
       if (!zn || !cssW) { b.hidden = true; return; }
       // the sector's on-screen rect, clipped to the stage; the button sits in its visible bottom-right corner
-      const [x0, y0] = P(z * ZONE, 0), [x1, y1] = P((z + 1) * ZONE, WIDTH);
+      const [x0, y0] = P(z * ZONE, 0), [x1, y1] = P((z + 1) * ZONE, WIDTH - FAR_VESSEL);
       const L = Math.max(0, vox + x0 * vs * SX), T = Math.max(0, voy + y0 * vs), R = Math.min(cssW, vox + x1 * vs * SX), B = Math.min(cssH, voy + y1 * vs);
       const sx = R - 26, sy = B - 26, vis = R - L > 60 && B - T > 60;
       b.hidden = !vis || !!(game && game.result);
@@ -5804,6 +5817,12 @@ const COMBOS = {
     if (portrait) { g.translate(VESSEL * 1.1, 0); g.rotate(Math.PI / 2); }
     for (let x = 0; x < L; x += sw) g.drawImage(vb, x, -VESSEL * 0.15, sw + 0.5, sh);
     g.restore();
+    // the thinner second vessel on the far edge
+    const fh = FAR_VESSEL * 1.25;
+    g.save();
+    if (portrait) { g.translate(WIDTH - FAR_VESSEL * 1.1, L); g.rotate(-Math.PI / 2); } else { g.translate(0, WIDTH - FAR_VESSEL * 1.1); }
+    for (let x = 0; x < L; x += sw) g.drawImage(vb, x, -FAR_VESSEL * 0.15, sw + 0.5, fh);
+    g.restore();
     const [wx, wy] = P(WOUND.u, WOUND.v);
     g.save(); g.translate(wx, wy); g.scale(1 / SX, 1); if (portrait) g.rotate(Math.PI / 2);
     g.globalAlpha = 0.9; g.drawImage(img.wound, -70, -35, 140, 70);
@@ -5814,7 +5833,7 @@ const COMBOS = {
     g.fillStyle = gr; g.fillRect(0, 0, VW, VH);
     g.strokeStyle = 'rgba(221,230,245,0.16)'; g.lineWidth = 1.5 / scale; g.setLineDash([6 / scale, 6 / scale]);
     for (let z = 1; z < 3; z++) {
-      const [x0, y0] = P(z * ZONE, VESSEL), [x1, y1] = P(z * ZONE, WIDTH);
+      const [x0, y0] = P(z * ZONE, VESSEL), [x1, y1] = P(z * ZONE, WIDTH - FAR_VESSEL);
       g.beginPath(); g.moveTo(x0, y0); g.lineTo(x1, y1); g.stroke();
     }
     g.setLineDash([]);
@@ -6166,7 +6185,7 @@ const COMBOS = {
     }
   }
   function zoneRect(z) {
-    const [x0, y0] = P(z * ZONE, VESSEL), [x1, y1] = P((z + 1) * ZONE, WIDTH);
+    const [x0, y0] = P(z * ZONE, VESSEL), [x1, y1] = P((z + 1) * ZONE, WIDTH - FAR_VESSEL);
     return [Math.min(x0, x1), Math.min(y0, y1), Math.abs(x1 - x0), Math.abs(y1 - y0)];
   }
   const FONT = '"Instrument Sans", "Helvetica Neue", Arial, sans-serif', MONO = '"IBM Plex Mono", ui-monospace, Menlo, monospace';
@@ -6588,7 +6607,7 @@ const COMBOS = {
     else if (tx && tx.state === 'coming') { cls = 'alarm'; html = `<b>Toxin burst in ${Math.ceil(tx.at - g.t)} s.</b> It will kill every cell in the Wound.`; }
     else if (g.tier >= 2) { cls = 'bad'; html = g.tier >= 3 ? `<b>Exhausted.</b> Support rings shrink, and past 100 your organs take damage. Turn the body output down to let your body recover.` : `<b>Feverish.</b> Shots spray and neutrophils die sooner. Turn the body output down to let your body recover.`; }
     else if (dev.toxinLoad && !dev.toxinSimple && ws.tox.load >= 50) { cls = 'bad'; html = `<b>Toxins are piling up.</b> Your tired liver and kidneys can't keep up, and it's adding fatigue. Rest to clear it, or swallow instead of shooting.`; }
-    else if (leakers.length && !g.zones[2].count) { html = leakers.some(a => a.leak === 'liver') ? `<b>Hepatitis is swimming for the blood vessel.</b> Each one that gets in adds ${Math.round(CONFIG.lymph.leak * 100)}% to the liver's breach clock. Nets catch the swarm in the zone it crosses.` : `<b>E. coli is swimming for the blood vessel.</b> Each one that gets in adds ${Math.round(CONFIG.lymph.leak * 100)}% to the kidneys' breach clock.${dev.toxinLoad ? ' Shooting it dumps toxin: Offense macrophages swallow it clean.' : ' It takes 2 hits, or one swallow.'}`; }
+    else if (leakers.length && !g.zones[2].count) { html = leakers.some(a => a.leak === 'liver') ? `<b>Hepatitis is swimming for the left blood vessel.</b> Each one that gets in adds ${Math.round(CONFIG.lymph.leak * 100)}% to the liver's breach clock. Nets catch the swarm in the zone it crosses.` : `<b>E. coli is swimming for the left blood vessel.</b> Each one that gets in adds ${Math.round(CONFIG.lymph.leak * 100)}% to the kidneys' breach clock.${dev.toxinLoad ? ' Shooting it dumps toxin: Offense macrophages swallow it clean.' : ' It takes 2 hits, or one swallow.'}`; }
     else if (g.zones[2].count > 0) { const hit = ORGANS.filter(o => g.inNode[o.k]).map(o => o.name.toLowerCase()); cls = 'bad'; html = `<b>Antigens in the Lymph node.</b> They're filling the ${hit.join(' and ')} clock${hit.length > 1 ? 's' : ''}; a full clock costs that organ a bar.`; }
     else if (sporeNext) html = `<b>Spores hatch in ${Math.ceil(sporeNext.t - g.t)} s.</b> Rest now, push body output right before they crack.`;
     else if (infected) { cls = 'bad'; html = `<b>${infected} infected neutrophil${infected > 1 ? 's' : ''}.</b> They burst into Herpes. NK cells pop them first.`; }
@@ -6670,7 +6689,7 @@ ${breach}${now}${heal}${hb.length ? `<li class="dim">Hurt by ${hb.join(', ')} in
     return [...out];
   }
   // Levels the bots say are still off (too hard or too easy); playable, just not tuned
-  const ROUGH = new Set(['pool', 'flu', 'lungs', 'foot']);
+  const ROUGH = new Set([]); // levels flagged "not balanced yet"; none since V22 (second vessel): idle and random lose everywhere, several bot styles win each level
   // workshop: the start screen picks a Sandbox combo or a real level
   const comboIcons = c => Object.keys(c.rates).filter(k => c.rates[k] > 0).slice(0, 6).map(k => `<img data-art="${ANTIGEN[k].art}" alt="" title="${esc(kindName(k))}">`).join('');
   function showStart() {
@@ -6758,7 +6777,7 @@ ${breach}${now}${heal}${hb.length ? `<li class="dim">Hurt by ${hb.join(', ')} in
       unit('yeast', 'Candida (fungus)', `The creeper. Settles after ${C.fungus.settle} s and grows threads (hyphae) toward the Lymph node.`, ['Germs on a thread ride it ' + C.fungus.highway + '× faster. Threads in the Lymph node fill its timer.', '<b>Shots pass through threads.</b> Net neutrophils cut them, and everything past the cut withers. Offense macrophages chew the tips slowly.', 'Loose yeast can be shot or swallowed. Thread tips bud new yeast.']),
       unit('herpes', 'Herpes', 'The sleeper. Hides inside your neutrophils.', [`Infected neutrophils flicker lilac and burst into ${C.herpes.burst} after ${C.herpes.incubate} s. NK cells pop them first.`]),
       unit('pollen', 'Measles (workshop only)', 'The hijacker. Swims to the nearest macrophage and takes it over.', [`The macrophage goes dark (no ring, no eating) for ${WS.measles.incubate} s, then bursts into ${WS.measles.burst} more. Swallowing one infects the macrophage too.`, 'NK cells pop hijacked macrophages before they burst. One hit kills Measles itself.']),
-      unit('hepatitis', 'Hepatitis (workshop only)', 'The liver leaker. Fast swarms of 6, one hit kills.', [`Swims for the blood vessel. Each one that gets in adds ${Math.round(CONFIG.lymph.leak * 100)}% to the liver's breach clock. Net neutrophils catch the swarm.`]),
+      unit('hepatitis', 'Hepatitis (workshop only)', 'The liver leaker. Fast swarms of 6, one hit kills.', [`Swims for the left blood vessel. Each one that gets in adds ${Math.round(CONFIG.lymph.leak * 100)}% to the liver's breach clock. Net neutrophils catch the swarm.`]),
       unit('e-coli', 'E. coli (workshop only)', 'The kidney leaker. Takes 2 hits and divides.', [`Each one that reaches the blood adds ${Math.round(CONFIG.lymph.leak * 100)}% to the kidneys' breach clock. ${dev.toxinLoad ? 'Shooting it dumps extra toxin; <b>swallowing it is the clean answer</b>.' : 'Swallowing it is the quickest answer.'}`]),
       unit('tapeworm-head', 'Tapeworm', 'The boss. Crawls from the Wound to the Lymph node.', [`Too big to swallow. Tuned shots hit ${C.worm.tunedDamage}× harder. Each broken segment becomes a small fast worm.`]),
       unit('toxin-burst', 'Toxin burst', 'Scripted. The Wound flashes red, then every one of your cells in the Wound dies.', ['Antigens are unharmed. Your body has to rebuild.']),

@@ -765,7 +765,7 @@ const ART = {
 // Needs the art kit's global ART (prototype/assets/assets.js), loaded.
 // ---------------------------------------------------------------------------
 const CYT = (function () {
-  const U = 400, V = 300, VES = 34;
+  const U = 400, V = 300, VES = 34, FVES = 16; // FVES: the thinner second vessel on the far edge (v3 FAR_VESSEL)
   const PAL = ART.palette;
   const FONT = '"Instrument Sans", "Helvetica Neue", Arial, sans-serif', MONO = '"IBM Plex Mono", ui-monospace, Menlo, monospace';
   const BLINK = 0.6, BLINK_WARN = 0.7; // same as the game (sim.js)
@@ -1020,6 +1020,11 @@ const CYT = (function () {
           const tw = 96 * R.k * 0.6, th = VES * 1.25 * R.k;
           for (let x = 0; x < U * R.k; x += tw) g.drawImage(vb, x, -VES * 0.15 * R.k, tw + 0.5, th);
           g.restore();
+          // the thinner second vessel down the far edge, as in v3
+          g.save(); g.translate(x0 + (V - FVES * 1.1) * R.k, y0 + U * R.k); g.rotate(-Math.PI / 2);
+          const fh = FVES * 1.25 * R.k;
+          for (let x = 0; x < U * R.k; x += tw) g.drawImage(vb, x, -FVES * 0.15 * R.k, tw + 0.5, fh);
+          g.restore();
         }
       }
       if (bg.wound) {
@@ -1028,7 +1033,7 @@ const CYT = (function () {
       }
       if (bg.dividers) {
         g.strokeStyle = 'rgba(221,230,245,0.16)'; g.lineWidth = 1.5; g.setLineDash([6, 6]);
-        for (const du of bg.dividers) { const [a, b] = P(du, VES), [cx, cy] = P(du, V); g.beginPath(); g.moveTo(a, b); g.lineTo(cx, cy); g.stroke(); }
+        for (const du of bg.dividers) { const [a, b] = P(du, VES), [cx, cy] = P(du, V - FVES); g.beginPath(); g.moveTo(a, b); g.lineTo(cx, cy); g.stroke(); }
         g.setLineDash([]);
       }
       ctx = saved;
@@ -1037,9 +1042,9 @@ const CYT = (function () {
     }
     ctx.drawImage(c, 0, 0, R.w, R.h);
   }
-  // Screen rect of the stage band u0..u1 (below the vessel)
+  // Screen rect of the stage band u0..u1 (between the two vessels)
   function zoneRect(u0, u1) {
-    const [x0, y0] = P(u0, VES), [x1, y1] = P(u1, V);
+    const [x0, y0] = P(u0, VES), [x1, y1] = P(u1, V - FVES);
     return [Math.min(x0, x1), Math.min(y0, y1), Math.abs(x1 - x0), Math.abs(y1 - y0)];
   }
   const ZICON = { Wound: 'sector-wound', Tissue: 'sector-tissue', 'Lymph node': 'sector-lymph' };
@@ -1504,7 +1509,7 @@ const CYT = (function () {
     ctx.globalCompositeOperation = 'source-over';
   }
   const api = {
-    U, V, VES, PAL, BLINK, BLINK_WARN, COLORS, FONT, MONO, pen, penR,
+    U, V, VES, FVES, PAL, BLINK, BLINK_WARN, COLORS, FONT, MONO, pen, penR,
     clamp, lerp, lerp2, ease, seg, noise, rng, path, drift,
     P, ang, spr, icon, glow, blinkGlow, ringFx, burst, dots,
     ent, divide, gulp, shot, volley, alive, scene, drawEnt,
@@ -1538,8 +1543,11 @@ const CYT_KIT = (function () {
     return out;
   }
   // Cells coming out of the blood vessel at time t0 and settling at (u, v); wander after
+  // A new cell comes out of a blood vessel and heads to (u, v). As in v3, macrophages use the near vessel and
+  // other cells come out of either one, half from the thin far vessel (o.side 'near' | 'far' forces one).
   function recruit(art, t0, u, v, o = {}) {
-    const keys = [[t0, u + (o.du || 0), A.VES - 4], [t0 + (o.travel || 0.8), u, v]];
+    const far = o.side ? o.side === 'far' : !art.startsWith('macrophage') && (Math.sin(t0 * 12.9898 + u * 78.233 + v * 37.719) * 43758.5453 % 1 + 1) % 1 < 0.5;
+    const keys = [[t0, u + (o.du || 0), far ? A.V - A.FVES + 4 : A.VES - 4], [t0 + (o.travel || 0.8), u, v]];
     if (o.then) for (const k of o.then) keys.push(k);
     return A.ent({ art, r: o.r || 6, t0, t1: o.t1 || 1e9, arrive: A.COLORS[o.kind || 'neut'], die: o.die || 'puff', rot: o.rot != null ? o.rot : null,
       pos: A.path(keys, o.wob == null ? 4 : o.wob, o.seed || t0 * 13 + u), layer: o.layer || 2, art2: o.art2 });
@@ -1649,7 +1657,7 @@ CYT_CLIPS.divide = {
 // ---- 3. Production cards ----
 CYT_CLIPS.cards = {
   id: 'cards', title: 'Choose what each zone makes', dur: 15.6,
-  cap: [[0, 'Each zone has a production card. Tap one to choose which cells you make there.'], [2.8, 'Drag a slider to share out the mix. Tap 100% to make only that cell, or 0% to stop making it.'], [4.3, 'Tap Save under a loadout slot to keep this mix. Tap the slot to use it in any zone, even next match.'], [5.9, 'Apply to all zones copies this mix to the other two. Each keeps its own stance.'], [7.8, 'New cells come out of the blood vessel beside their zone and fight there.'], [11.2, 'Neutrophils are your gunners. Three hits kill a Staph.']],
+  cap: [[0, 'Each zone has a production card. Tap one to choose which cells you make there.'], [2.8, 'Drag a slider to share out the mix. Tap 100% to make only that cell, or 0% to stop making it.'], [4.3, 'Tap Save under a loadout slot to keep this mix. Tap the slot to use it in any zone, even next match.'], [5.9, 'Apply to all zones copies this mix to the other two. Each keeps its own stance.'], [7.8, 'New cells come out of the blood vessels on both edges of their zone. Macrophages always use the wide one.'], [11.2, 'Neutrophils are your gunners. Three hits kill a Staph.']],
   hud: { bottom: true },
   bg: { wound: [55, 215], woundSize: 0.6, dividers: [133.3, 266.7], lymph: [345, 175] },
   saveAt: 4.9, applyAt: 6.2,
@@ -2268,7 +2276,7 @@ CYT_CLIPS.stormRisk = {
       }
       // the net neutrophil runs to the thickest crowd and bursts into a pen
       st.burstT = 5.9; st.netC = [cu - 4, cv]; st.penR = 44;
-      st.net = A.ent({ art: 'neutrophil-net', r: 7, rot: 'vel', t0: 4.5, t1: st.burstT, arrive: A.COLORS.net, die: null, layer: 2, pos: A.path([[4.5, 300, A.VES - 4], [st.burstT, st.netC[0], st.netC[1]]], 2, 4) });
+      st.net = A.ent({ art: 'neutrophil-net', r: 7, rot: 'vel', t0: 4.5, t1: st.burstT, arrive: A.COLORS.net, die: null, layer: 2, pos: A.path([[4.5, 300, A.V - A.FVES + 4], [st.burstT, st.netC[0], st.netC[1]]], 2, 4) });
       const kill = [], survive = [];
       for (const f of st.flu) if (f.t0 > 1 && f.die === 'pop') { const [u, v] = f.pos(st.burstT); (Math.hypot(u - st.netC[0], v - st.netC[1]) < st.penR ? kill : survive).push(f); }
       for (const f of kill) { f.t1 = st.burstT + 0.05 + r() * 0.2; const p = f.pos; const at = st.burstT; f.pos = t => (t < at ? p(t) : p(at)); }
@@ -2427,7 +2435,7 @@ CYT_CLIPS.stormRisk = {
       for (let i = 0; i < 5; i++) st.neuts.push(K.recruit('neutrophil', 6.4 + i * 0.15, 100 + i * 25, 230 + (i % 2) * 30, { r: 6, wob: 7 }));
       // neutrophils ignore the infected macrophage; the NK cell comes in from the vessel and pops it
       st.pop = 8.3;
-      st.nk = A.ent({ art: 'nk-cell', r: 10, rot: t => t * 0.5, t0: 6.6, arrive: A.COLORS.nk, layer: 2, pos: t => { const [u, v] = mac.pos(Math.min(t, st.pop)), p = A.ease(A.seg(t, 6.6, st.pop)); return [A.lerp(u + 50, u + 14, p) + 3 * A.noise(3, t), A.lerp(A.VES - 4, v - 6, p) + 3 * A.noise(4, t)]; } });
+      st.nk = A.ent({ art: 'nk-cell', r: 10, rot: t => t * 0.5, t0: 6.6, arrive: A.COLORS.nk, layer: 2, pos: t => { const [u, v] = mac.pos(Math.min(t, st.pop)), p = A.ease(A.seg(t, 6.6, st.pop)); return [A.lerp(u + 50, u + 14, p) + 3 * A.noise(3, t), A.lerp(A.V - A.FVES + 4, v - 6, p) + 3 * A.noise(4, t)]; } });
       mac.t1 = st.pop; mac.die = 'lilac';
       // a fresh macrophage arrives, the zone flips to Support, and tuned shots finish the TB
       st.mac2 = K.recruit('macrophage-offense', 9.8, 230, 175, { r: 17, kind: 'mac', wob: 1.5, travel: 0.8 });
@@ -4058,8 +4066,8 @@ const LEVELS = {
   },
   foot: {
     name: "Athlete's foot", blurb: 'Fungus grows threads toward the Lymph node and germs ride them like a highway. Shots pass through the threads. Nets cut them; macrophages chew them slowly.', duration: 300, units: ['neut', 'net', 'mac'],
-    waves: [{ t: 0, staph: 50 }, { t: 30, yeast: 5 }, { t: 80, staph: 60, yeast: 4 }, { t: 140, yeast: 8, staph: 40 }, { t: 200, staph: 70 }, { t: 240, yeast: 8, staph: 80, final: true }],
-    stream: { start: 0.5, end: 1.3, clump: 4, kinds: [{ k: 'staph', w: 1 }, { k: 'yeast', w: 0.04, from: 60 }] }, toxins: [110, 210],
+    waves: [{ t: 0, staph: 60 }, { t: 30, yeast: 6 }, { t: 80, staph: 72, yeast: 5 }, { t: 140, yeast: 10, staph: 48 }, { t: 200, staph: 84 }, { t: 240, yeast: 10, staph: 96, final: true }],
+    stream: { start: 0.6, end: 1.56, clump: 4, kinds: [{ k: 'staph', w: 1 }, { k: 'yeast', w: 0.04, from: 60 }] }, toxins: [110, 210], // waves x1.2 (2026-10-08): with the second vessel, a random player won 1 in 6
   },
   lungs: {
     name: 'Lungs', blurb: 'Tuberculosis turns any macrophage that swallows it into a TB factory. Only NK cells can kill an infected macrophage. Offense is a trap here.', duration: 300, units: ['neut', 'net', 'nk', 'mac'],
@@ -6112,7 +6120,7 @@ ${breach}${now}${heal}${hb.length ? `<li class="dim">Hurt by ${hb.join(', ')} in
     return [...out];
   }
   // Levels the bots say are still off (too hard or too easy); playable, just not tuned
-  const ROUGH = new Set(['pool', 'flu', 'lungs', 'foot']);
+  const ROUGH = new Set([]); // levels flagged "not balanced yet"; none since V22 (second vessel): idle and random lose everywhere, several bot styles win each level
   function showStart() {
     const lv = LEVELS[levelKey];
     openModal('start', `

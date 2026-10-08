@@ -103,7 +103,7 @@
       const z = +b.dataset.pz, zn = game && game.zones[z];
       if (!zn || !cssW) { b.hidden = true; return; }
       // the sector's on-screen rect, clipped to the stage; the button sits in its visible bottom-right corner
-      const [x0, y0] = P(z * ZONE, 0), [x1, y1] = P((z + 1) * ZONE, WIDTH);
+      const [x0, y0] = P(z * ZONE, 0), [x1, y1] = P((z + 1) * ZONE, WIDTH - FAR_VESSEL);
       const L = Math.max(0, vox + x0 * vs * SX), T = Math.max(0, voy + y0 * vs), R = Math.min(cssW, vox + x1 * vs * SX), B = Math.min(cssH, voy + y1 * vs);
       const sx = R - 26, sy = B - 26, vis = R - L > 60 && B - T > 60;
       b.hidden = !vis || !!(game && game.result);
@@ -242,6 +242,12 @@
     if (portrait) { g.translate(VESSEL * 1.1, 0); g.rotate(Math.PI / 2); }
     for (let x = 0; x < L; x += sw) g.drawImage(vb, x, -VESSEL * 0.15, sw + 0.5, sh);
     g.restore();
+    // the thinner second vessel on the far edge
+    const fh = FAR_VESSEL * 1.25;
+    g.save();
+    if (portrait) { g.translate(WIDTH - FAR_VESSEL * 1.1, L); g.rotate(-Math.PI / 2); } else { g.translate(0, WIDTH - FAR_VESSEL * 1.1); }
+    for (let x = 0; x < L; x += sw) g.drawImage(vb, x, -FAR_VESSEL * 0.15, sw + 0.5, fh);
+    g.restore();
     const [wx, wy] = P(WOUND.u, WOUND.v);
     g.save(); g.translate(wx, wy); g.scale(1 / SX, 1); if (portrait) g.rotate(Math.PI / 2);
     g.globalAlpha = 0.9; g.drawImage(img.wound, -70, -35, 140, 70);
@@ -252,7 +258,7 @@
     g.fillStyle = gr; g.fillRect(0, 0, VW, VH);
     g.strokeStyle = 'rgba(221,230,245,0.16)'; g.lineWidth = 1.5 / scale; g.setLineDash([6 / scale, 6 / scale]);
     for (let z = 1; z < 3; z++) {
-      const [x0, y0] = P(z * ZONE, VESSEL), [x1, y1] = P(z * ZONE, WIDTH);
+      const [x0, y0] = P(z * ZONE, VESSEL), [x1, y1] = P(z * ZONE, WIDTH - FAR_VESSEL);
       g.beginPath(); g.moveTo(x0, y0); g.lineTo(x1, y1); g.stroke();
     }
     g.setLineDash([]);
@@ -604,7 +610,7 @@
     }
   }
   function zoneRect(z) {
-    const [x0, y0] = P(z * ZONE, VESSEL), [x1, y1] = P((z + 1) * ZONE, WIDTH);
+    const [x0, y0] = P(z * ZONE, VESSEL), [x1, y1] = P((z + 1) * ZONE, WIDTH - FAR_VESSEL);
     return [Math.min(x0, x1), Math.min(y0, y1), Math.abs(x1 - x0), Math.abs(y1 - y0)];
   }
   const FONT = '"Instrument Sans", "Helvetica Neue", Arial, sans-serif', MONO = '"IBM Plex Mono", ui-monospace, Menlo, monospace';
@@ -1026,7 +1032,7 @@
     else if (tx && tx.state === 'coming') { cls = 'alarm'; html = `<b>Toxin burst in ${Math.ceil(tx.at - g.t)} s.</b> It will kill every cell in the Wound.`; }
     else if (g.tier >= 2) { cls = 'bad'; html = g.tier >= 3 ? `<b>Exhausted.</b> Support rings shrink, and past 100 your organs take damage. Turn the body output down to let your body recover.` : `<b>Feverish.</b> Shots spray and neutrophils die sooner. Turn the body output down to let your body recover.`; }
     else if (dev.toxinLoad && !dev.toxinSimple && ws.tox.load >= 50) { cls = 'bad'; html = `<b>Toxins are piling up.</b> Your tired liver and kidneys can't keep up, and it's adding fatigue. Rest to clear it, or swallow instead of shooting.`; }
-    else if (leakers.length && !g.zones[2].count) { html = leakers.some(a => a.leak === 'liver') ? `<b>Hepatitis is swimming for the blood vessel.</b> Each one that gets in adds ${Math.round(CONFIG.lymph.leak * 100)}% to the liver's breach clock. Nets catch the swarm in the zone it crosses.` : `<b>E. coli is swimming for the blood vessel.</b> Each one that gets in adds ${Math.round(CONFIG.lymph.leak * 100)}% to the kidneys' breach clock.${dev.toxinLoad ? ' Shooting it dumps toxin: Offense macrophages swallow it clean.' : ' It takes 2 hits, or one swallow.'}`; }
+    else if (leakers.length && !g.zones[2].count) { html = leakers.some(a => a.leak === 'liver') ? `<b>Hepatitis is swimming for the left blood vessel.</b> Each one that gets in adds ${Math.round(CONFIG.lymph.leak * 100)}% to the liver's breach clock. Nets catch the swarm in the zone it crosses.` : `<b>E. coli is swimming for the left blood vessel.</b> Each one that gets in adds ${Math.round(CONFIG.lymph.leak * 100)}% to the kidneys' breach clock.${dev.toxinLoad ? ' Shooting it dumps toxin: Offense macrophages swallow it clean.' : ' It takes 2 hits, or one swallow.'}`; }
     else if (g.zones[2].count > 0) { const hit = ORGANS.filter(o => g.inNode[o.k]).map(o => o.name.toLowerCase()); cls = 'bad'; html = `<b>Antigens in the Lymph node.</b> They're filling the ${hit.join(' and ')} clock${hit.length > 1 ? 's' : ''}; a full clock costs that organ a bar.`; }
     else if (sporeNext) html = `<b>Spores hatch in ${Math.ceil(sporeNext.t - g.t)} s.</b> Rest now, push body output right before they crack.`;
     else if (infected) { cls = 'bad'; html = `<b>${infected} infected neutrophil${infected > 1 ? 's' : ''}.</b> They burst into Herpes. NK cells pop them first.`; }
@@ -1108,7 +1114,7 @@ ${breach}${now}${heal}${hb.length ? `<li class="dim">Hurt by ${hb.join(', ')} in
     return [...out];
   }
   // Levels the bots say are still off (too hard or too easy); playable, just not tuned
-  const ROUGH = new Set(['pool', 'flu', 'lungs', 'foot']);
+  const ROUGH = new Set([]); // levels flagged "not balanced yet"; none since V22 (second vessel): idle and random lose everywhere, several bot styles win each level
   // workshop: the start screen picks a Sandbox combo or a real level
   const comboIcons = c => Object.keys(c.rates).filter(k => c.rates[k] > 0).slice(0, 6).map(k => `<img data-art="${ANTIGEN[k].art}" alt="" title="${esc(kindName(k))}">`).join('');
   function showStart() {
@@ -1196,7 +1202,7 @@ ${breach}${now}${heal}${hb.length ? `<li class="dim">Hurt by ${hb.join(', ')} in
       unit('yeast', 'Candida (fungus)', `The creeper. Settles after ${C.fungus.settle} s and grows threads (hyphae) toward the Lymph node.`, ['Germs on a thread ride it ' + C.fungus.highway + '× faster. Threads in the Lymph node fill its timer.', '<b>Shots pass through threads.</b> Net neutrophils cut them, and everything past the cut withers. Offense macrophages chew the tips slowly.', 'Loose yeast can be shot or swallowed. Thread tips bud new yeast.']),
       unit('herpes', 'Herpes', 'The sleeper. Hides inside your neutrophils.', [`Infected neutrophils flicker lilac and burst into ${C.herpes.burst} after ${C.herpes.incubate} s. NK cells pop them first.`]),
       unit('pollen', 'Measles (workshop only)', 'The hijacker. Swims to the nearest macrophage and takes it over.', [`The macrophage goes dark (no ring, no eating) for ${WS.measles.incubate} s, then bursts into ${WS.measles.burst} more. Swallowing one infects the macrophage too.`, 'NK cells pop hijacked macrophages before they burst. One hit kills Measles itself.']),
-      unit('hepatitis', 'Hepatitis (workshop only)', 'The liver leaker. Fast swarms of 6, one hit kills.', [`Swims for the blood vessel. Each one that gets in adds ${Math.round(CONFIG.lymph.leak * 100)}% to the liver's breach clock. Net neutrophils catch the swarm.`]),
+      unit('hepatitis', 'Hepatitis (workshop only)', 'The liver leaker. Fast swarms of 6, one hit kills.', [`Swims for the left blood vessel. Each one that gets in adds ${Math.round(CONFIG.lymph.leak * 100)}% to the liver's breach clock. Net neutrophils catch the swarm.`]),
       unit('e-coli', 'E. coli (workshop only)', 'The kidney leaker. Takes 2 hits and divides.', [`Each one that reaches the blood adds ${Math.round(CONFIG.lymph.leak * 100)}% to the kidneys' breach clock. ${dev.toxinLoad ? 'Shooting it dumps extra toxin; <b>swallowing it is the clean answer</b>.' : 'Swallowing it is the quickest answer.'}`]),
       unit('tapeworm-head', 'Tapeworm', 'The boss. Crawls from the Wound to the Lymph node.', [`Too big to swallow. Tuned shots hit ${C.worm.tunedDamage}× harder. Each broken segment becomes a small fast worm.`]),
       unit('toxin-burst', 'Toxin burst', 'Scripted. The Wound flashes red, then every one of your cells in the Wound dies.', ['Antigens are unharmed. Your body has to rebuild.']),

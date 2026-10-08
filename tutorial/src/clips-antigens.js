@@ -108,7 +108,7 @@
       }
       // the net neutrophil runs to the thickest crowd and bursts into a pen
       st.burstT = 5.9; st.netC = [cu - 4, cv]; st.penR = 44;
-      st.net = A.ent({ art: 'neutrophil-net', r: 7, rot: 'vel', t0: 4.5, t1: st.burstT, arrive: A.COLORS.net, die: null, layer: 2, pos: A.path([[4.5, 300, A.VES - 4], [st.burstT, st.netC[0], st.netC[1]]], 2, 4) });
+      st.net = A.ent({ art: 'neutrophil-net', r: 7, rot: 'vel', t0: 4.5, t1: st.burstT, arrive: A.COLORS.net, die: null, layer: 2, pos: A.path([[4.5, 300, A.V - A.FVES + 4], [st.burstT, st.netC[0], st.netC[1]]], 2, 4) });
       const kill = [], survive = [];
       for (const f of st.flu) if (f.t0 > 1 && f.die === 'pop') { const [u, v] = f.pos(st.burstT); (Math.hypot(u - st.netC[0], v - st.netC[1]) < st.penR ? kill : survive).push(f); }
       for (const f of kill) { f.t1 = st.burstT + 0.05 + r() * 0.2; const p = f.pos; const at = st.burstT; f.pos = t => (t < at ? p(t) : p(at)); }
@@ -267,7 +267,7 @@
       for (let i = 0; i < 5; i++) st.neuts.push(K.recruit('neutrophil', 6.4 + i * 0.15, 100 + i * 25, 230 + (i % 2) * 30, { r: 6, wob: 7 }));
       // neutrophils ignore the infected macrophage; the NK cell comes in from the vessel and pops it
       st.pop = 8.3;
-      st.nk = A.ent({ art: 'nk-cell', r: 10, rot: t => t * 0.5, t0: 6.6, arrive: A.COLORS.nk, layer: 2, pos: t => { const [u, v] = mac.pos(Math.min(t, st.pop)), p = A.ease(A.seg(t, 6.6, st.pop)); return [A.lerp(u + 50, u + 14, p) + 3 * A.noise(3, t), A.lerp(A.VES - 4, v - 6, p) + 3 * A.noise(4, t)]; } });
+      st.nk = A.ent({ art: 'nk-cell', r: 10, rot: t => t * 0.5, t0: 6.6, arrive: A.COLORS.nk, layer: 2, pos: t => { const [u, v] = mac.pos(Math.min(t, st.pop)), p = A.ease(A.seg(t, 6.6, st.pop)); return [A.lerp(u + 50, u + 14, p) + 3 * A.noise(3, t), A.lerp(A.V - A.FVES + 4, v - 6, p) + 3 * A.noise(4, t)]; } });
       mac.t1 = st.pop; mac.die = 'lilac';
       // a fresh macrophage arrives, the zone flips to Support, and tuned shots finish the TB
       st.mac2 = K.recruit('macrophage-offense', 9.8, 230, 175, { r: 17, kind: 'mac', wob: 1.5, travel: 0.8 });

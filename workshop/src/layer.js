@@ -78,8 +78,8 @@ const SPAWNABLE = [
   { k: 'virus', size: 6, about: 'Herpes. Hides in neutrophils. NK cells pop them.' },
   { k: 'measles', size: 4, about: 'Workshop only. Hijacks macrophages: they go dark, then burst into more Measles. NK cells pop them.' },
   { k: 'worm', size: 1, about: 'The Tapeworm boss.' },
-  { k: 'hep', size: 6, about: 'Hepatitis. Swims for the blood vessel. Each leak hurts the liver. Nets catch the swarm.' },
-  { k: 'ecoli', size: 4, about: 'E. coli. Swims for the vessel and hurts the kidneys. Shooting it dumps toxin: swallow it.' },
+  { k: 'hep', size: 6, about: 'Hepatitis. Swims for the left blood vessel. Each leak hurts the liver. Nets catch the swarm.' },
+  { k: 'ecoli', size: 4, about: 'E. coli. Swims for the left blood vessel and hurts the kidneys. Shooting it dumps toxin: swallow it.' },
   { k: 'yeast', size: 3, about: 'Candida. Settles and grows threads germs ride to the Lymph node. Nets cut them.' },
 ];
 const FRIENDLY = ['neut', 'net', 'nk', 'mac'];
@@ -121,7 +121,7 @@ class Workshop {
     else if (k === 'hep' || k === 'ecoli') {
       // leakers start on the far side of a zone from the vessel and have to cross that zone's cells
       const z = this.dev.leakZone === 'random' || this.dev.leakZone == null ? Math.floor(r() * 3) : +this.dev.leakZone;
-      const lu = z * ZONE + ZONE * (0.25 + r() * 0.5), lv = WIDTH - 24;
+      const lu = z * ZONE + ZONE * (0.25 + r() * 0.5), lv = WIDTH - (typeof FAR_VESSEL === 'number' ? FAR_VESSEL : 0) - 12; // just inside the far vessel's wall
       for (let i = 0; i < s.size; i++) this.spawnLeaker(k, lu + (r() - 0.5) * 30, lv - r() * 20);
     }
     else for (let i = 0; i < s.size; i++) g.spawnAg(k, cu + (r() - 0.5) * 24, cv + (r() - 0.5) * 24, k === 'spore' ? { hatchAt: g.t + C.spore.hatch } : null);

@@ -242,8 +242,8 @@ const LEVELS = {
   },
   foot: {
     name: "Athlete's foot", blurb: 'Fungus grows threads toward the Lymph node and germs ride them like a highway. Shots pass through the threads. Nets cut them; macrophages chew them slowly.', duration: 300, units: ['neut', 'net', 'mac'],
-    waves: [{ t: 0, staph: 50 }, { t: 30, yeast: 5 }, { t: 80, staph: 60, yeast: 4 }, { t: 140, yeast: 8, staph: 40 }, { t: 200, staph: 70 }, { t: 240, yeast: 8, staph: 80, final: true }],
-    stream: { start: 0.5, end: 1.3, clump: 4, kinds: [{ k: 'staph', w: 1 }, { k: 'yeast', w: 0.04, from: 60 }] }, toxins: [110, 210],
+    waves: [{ t: 0, staph: 60 }, { t: 30, yeast: 6 }, { t: 80, staph: 72, yeast: 5 }, { t: 140, yeast: 10, staph: 48 }, { t: 200, staph: 84 }, { t: 240, yeast: 10, staph: 96, final: true }],
+    stream: { start: 0.6, end: 1.56, clump: 4, kinds: [{ k: 'staph', w: 1 }, { k: 'yeast', w: 0.04, from: 60 }] }, toxins: [110, 210], // waves x1.2 (2026-10-08): with the second vessel, a random player won 1 in 6
   },
   lungs: {
     name: 'Lungs', blurb: 'Tuberculosis turns any macrophage that swallows it into a TB factory. Only NK cells can kill an infected macrophage. Offense is a trap here.', duration: 300, units: ['neut', 'net', 'nk', 'mac'],

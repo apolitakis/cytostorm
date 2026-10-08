@@ -10,7 +10,7 @@
 // Needs the art kit's global ART (prototype/assets/assets.js), loaded.
 // ---------------------------------------------------------------------------
 const CYT = (function () {
-  const U = 400, V = 300, VES = 34;
+  const U = 400, V = 300, VES = 34, FVES = 16; // FVES: the thinner second vessel on the far edge (v3 FAR_VESSEL)
   const PAL = ART.palette;
   const FONT = '"Instrument Sans", "Helvetica Neue", Arial, sans-serif', MONO = '"IBM Plex Mono", ui-monospace, Menlo, monospace';
   const BLINK = 0.6, BLINK_WARN = 0.7; // same as the game (sim.js)
@@ -265,6 +265,11 @@ const CYT = (function () {
           const tw = 96 * R.k * 0.6, th = VES * 1.25 * R.k;
           for (let x = 0; x < U * R.k; x += tw) g.drawImage(vb, x, -VES * 0.15 * R.k, tw + 0.5, th);
           g.restore();
+          // the thinner second vessel down the far edge, as in v3
+          g.save(); g.translate(x0 + (V - FVES * 1.1) * R.k, y0 + U * R.k); g.rotate(-Math.PI / 2);
+          const fh = FVES * 1.25 * R.k;
+          for (let x = 0; x < U * R.k; x += tw) g.drawImage(vb, x, -FVES * 0.15 * R.k, tw + 0.5, fh);
+          g.restore();
         }
       }
       if (bg.wound) {
@@ -273,7 +278,7 @@ const CYT = (function () {
       }
       if (bg.dividers) {
         g.strokeStyle = 'rgba(221,230,245,0.16)'; g.lineWidth = 1.5; g.setLineDash([6, 6]);
-        for (const du of bg.dividers) { const [a, b] = P(du, VES), [cx, cy] = P(du, V); g.beginPath(); g.moveTo(a, b); g.lineTo(cx, cy); g.stroke(); }
+        for (const du of bg.dividers) { const [a, b] = P(du, VES), [cx, cy] = P(du, V - FVES); g.beginPath(); g.moveTo(a, b); g.lineTo(cx, cy); g.stroke(); }
         g.setLineDash([]);
       }
       ctx = saved;
@@ -282,9 +287,9 @@ const CYT = (function () {
     }
     ctx.drawImage(c, 0, 0, R.w, R.h);
   }
-  // Screen rect of the stage band u0..u1 (below the vessel)
+  // Screen rect of the stage band u0..u1 (between the two vessels)
   function zoneRect(u0, u1) {
-    const [x0, y0] = P(u0, VES), [x1, y1] = P(u1, V);
+    const [x0, y0] = P(u0, VES), [x1, y1] = P(u1, V - FVES);
     return [Math.min(x0, x1), Math.min(y0, y1), Math.abs(x1 - x0), Math.abs(y1 - y0)];
   }
   const ZICON = { Wound: 'sector-wound', Tissue: 'sector-tissue', 'Lymph node': 'sector-lymph' };
@@ -749,7 +754,7 @@ const CYT = (function () {
     ctx.globalCompositeOperation = 'source-over';
   }
   const api = {
-    U, V, VES, PAL, BLINK, BLINK_WARN, COLORS, FONT, MONO, pen, penR,
+    U, V, VES, FVES, PAL, BLINK, BLINK_WARN, COLORS, FONT, MONO, pen, penR,
     clamp, lerp, lerp2, ease, seg, noise, rng, path, drift,
     P, ang, spr, icon, glow, blinkGlow, ringFx, burst, dots,
     ent, divide, gulp, shot, volley, alive, scene, drawEnt,

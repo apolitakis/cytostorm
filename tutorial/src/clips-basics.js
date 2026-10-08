@@ -21,8 +21,11 @@ const CYT_KIT = (function () {
     return out;
   }
   // Cells coming out of the blood vessel at time t0 and settling at (u, v); wander after
+  // A new cell comes out of a blood vessel and heads to (u, v). As in v3, macrophages use the near vessel and
+  // other cells come out of either one, half from the thin far vessel (o.side 'near' | 'far' forces one).
   function recruit(art, t0, u, v, o = {}) {
-    const keys = [[t0, u + (o.du || 0), A.VES - 4], [t0 + (o.travel || 0.8), u, v]];
+    const far = o.side ? o.side === 'far' : !art.startsWith('macrophage') && (Math.sin(t0 * 12.9898 + u * 78.233 + v * 37.719) * 43758.5453 % 1 + 1) % 1 < 0.5;
+    const keys = [[t0, u + (o.du || 0), far ? A.V - A.FVES + 4 : A.VES - 4], [t0 + (o.travel || 0.8), u, v]];
     if (o.then) for (const k of o.then) keys.push(k);
     return A.ent({ art, r: o.r || 6, t0, t1: o.t1 || 1e9, arrive: A.COLORS[o.kind || 'neut'], die: o.die || 'puff', rot: o.rot != null ? o.rot : null,
       pos: A.path(keys, o.wob == null ? 4 : o.wob, o.seed || t0 * 13 + u), layer: o.layer || 2, art2: o.art2 });
@@ -132,7 +135,7 @@ CYT_CLIPS.divide = {
 // ---- 3. Production cards ----
 CYT_CLIPS.cards = {
   id: 'cards', title: 'Choose what each zone makes', dur: 15.6,
-  cap: [[0, 'Each zone has a production card. Tap one to choose which cells you make there.'], [2.8, 'Drag a slider to share out the mix. Tap 100% to make only that cell, or 0% to stop making it.'], [4.3, 'Tap Save under a loadout slot to keep this mix. Tap the slot to use it in any zone, even next match.'], [5.9, 'Apply to all zones copies this mix to the other two. Each keeps its own stance.'], [7.8, 'New cells come out of the blood vessel beside their zone and fight there.'], [11.2, 'Neutrophils are your gunners. Three hits kill a Staph.']],
+  cap: [[0, 'Each zone has a production card. Tap one to choose which cells you make there.'], [2.8, 'Drag a slider to share out the mix. Tap 100% to make only that cell, or 0% to stop making it.'], [4.3, 'Tap Save under a loadout slot to keep this mix. Tap the slot to use it in any zone, even next match.'], [5.9, 'Apply to all zones copies this mix to the other two. Each keeps its own stance.'], [7.8, 'New cells come out of the blood vessels on both edges of their zone. Macrophages always use the wide one.'], [11.2, 'Neutrophils are your gunners. Three hits kill a Staph.']],
   hud: { bottom: true },
   bg: { wound: [55, 215], woundSize: 0.6, dividers: [133.3, 266.7], lymph: [345, 175] },
   saveAt: 4.9, applyAt: 6.2,
