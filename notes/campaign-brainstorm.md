@@ -7,28 +7,23 @@ Written 2026-10-07, following Alex's reply to the mechanics brainstorm (notes/me
 - **Likes a loadout before each map**, and **persistent upgrades bought with currency from destroying antigens**.
 - A meta system across campaigns is optional. Alex generally hates them, so it's sketched last and kept small.
 
+**Update (Alex, 2026-10-08):** no stars for now (more complexity than they're worth). Treatment costs that carry across the campaign are out, because they'd make campaigns snowball. Treatments now cost you only on the map you use them. Toxin drain is no longer part of the game, so nothing here uses it. The campaign-long version is pinned at the end as an idea for later. That also removes the win-only cost rule and the chart.
+
 ## Short answer
 
-A campaign is one patient's illness, about 10 maps on a body map. Between maps you're in the **Clinic**, where three things happen:
+A campaign is one patient's illness, about 10 maps on a body map. Between maps you're in the **Clinic**, where two things happen:
 
 1. **Spend Samples** (the currency antigens drop when you kill them) on permanent upgrades for this campaign.
 2. **Pick your loadout** for the next map: which cells you bring, plus at most one **treatment**.
-3. **Read your chart**: what your past treatments cost you.
 
-The core rule for treatments: **every treatment is a big help on one map, paid for over the rest of the campaign**, in one of two ways:
-
-- **Resistance**: the germs get stronger (antibiotics breed tougher bacteria).
-- **Scars**: your body gets weaker (antifungals hurt the liver, steroids thin your marrow).
-
-That gives you a "do I spend it here or save it?" question on every hard map, and it gives each campaign a story you made yourself.
+The core rule for treatments: **every treatment is a big help on one map with a real tradeoff on that same map**. Nothing carries over, so a rough map never makes the rest of the campaign harder. What carries over is only what you buy: upgrades and vaccines.
 
 ## How a campaign flows
 
 1. **Body map.** Levels are pinned to a body silhouette: fingertip papercut, throat, lungs, gut, and so on. Each one introduces one new antigen, as the roster does today.
 2. **Before a map: the Clinic.** Shop, loadout, treatment, then Start.
 3. **The map** plays as v3 does now. Kills drop Samples.
-4. **After a map:** Samples counted, stars for a clean win, any treatment cost written onto your chart.
-5. **Lose a map?** Retry it with everything you've bought. Treatment costs only land when you **win** with the treatment, so a failed attempt isn't punished twice.
+4. **After a map:** Samples counted.
 
 ## Currency: Samples
 
@@ -37,48 +32,42 @@ That gives you a "do I spend it here or save it?" question on every hard map, an
 - Every antigen drops Samples when it dies, scaled by toughness: Staph 1, MRSA 3, a Strep chain 1 per link, the Tapeworm 50. They float to the lymph node in a little gold stream (nice juice, no meter).
 - Maps are finite (scripted waves, a trickle that ends), so you can't farm a map by stalling.
 - **First clear pays a bonus**; replaying a cleared map pays a quarter. That stops replay-farming from becoming the best strategy, which would be the grind Alex dislikes.
-- **Stars pay a bonus**: a clean win (no storm, low fatigue, low toxin) pays more. That makes a clean win worth something without forcing it.
-- Storm kills pay nothing ("nothing to learn from a massacre"). It keeps the storm a desperation move, not a farming tool.
+- Storm kills pay nothing ("nothing to learn from a massacre"). It keeps the storm a desperation move, not a farming tool. **Alex likes this (2026-10-08).**
 
 Rough scale for tuning later: a map pays 100 to 250, a full campaign about 1,500, and the whole shop costs about 4,000. **You can afford roughly a third of it**, so every campaign ends up with a different build.
 
 ## Treatments (the Pharmacy)
 
-At most one treatment per map, chosen in the loadout. Each has a clear upside this map and a clear cost on your chart for the rest of the campaign.
+At most one treatment per map, chosen in the loadout. Each has a clear upside and a clear cost, both on this map only. **Treatments are passive** (Alex, 2026-10-08): no new buttons during a map, since there's already plenty to manage and the Cytokine storm is the one active.
 
 ### Antibiotics
-- **This map:** bacteria take double damage from everything, and you get one pill (a cloud that flushes bacteria down the flow).
-- **Campaign cost: Resistance +1.** Each point turns a slice of every later bacterial wave into armored, MRSA-style bacteria (say +10% per point). Use it twice and later maps have noticeably more tanks.
-- **Why it's fun:** it's the most tempting button in the game and it's honest about the price. Using it early to clear a wall you're stuck on makes the Gut map nastier later.
+- **This map:** bacteria take double damage from plain shots, Nets and swallows.
+- **Cost this map: resistance.** A share of bacteria (say 1 in 5) arrive resistant: armored, MRSA-style, so only Support rings kill them.
+- **Why it's fun:** it changes your plan rather than just making you stronger. Your gunners shred normal bacteria, but you need more Support than usual for the tanks.
 
 ### Antifungals
 - **This map:** fungus can't spread, and hyphae and spores die fast.
-- **Campaign cost: Liver scar.** Toxin drains 15% slower for the rest of the campaign. (True to life: antifungals are hard on the liver.)
-- **Why it's fun:** the cost lands on a different system from antibiotics, so the two don't feel like the same card. It makes Toxin load matter more as the campaign goes on.
+- **Cost this map: hard on the liver.** Fatigue recovers 1% slower (Alex, 2026-10-08: start gentle). True to life, antifungals are hard on the liver.
+- **Why it's fun:** the cost lands on your body rather than on the germs, so it doesn't feel like the same card as antibiotics.
 
 ### Antivirals
 - **This map:** viruses can't hijack your cells (Herpes, Measles) and Flu can't split.
-- **Campaign cost: Viral resistance +1.** Later viral waves are bigger (+20% per point).
-- **Why it's fun:** the Herpes and Measles maps are the most frustrating ones, and this lets a struggling player buy their way past one, at a price.
+- **Cost this map:** bacteria divide a bit faster (say 20%), since you're not fighting them with it.
+- **Why it's fun:** the Herpes and Measles maps are the most frustrating ones, and this lets a struggling player get past one by trading a virus problem for a bacteria problem.
 
-### Steroids (Alex's idea)
-- **This map:** fatigue builds half as fast, toxin spills over less, and the storm costs 30 instead of 50. It calms the systemic inflammation.
+### Steroids (Alex's idea; Alex loves this version, 2026-10-08)
+- **This map:** fatigue builds half as fast and the storm costs 30 instead of 50. It calms the systemic inflammation.
 - **Cost this map:** production is 30% lower, so you have fewer troops.
-- **Campaign cost: Marrow scar** if you use them twice or more: the Body output slider tops out lower for the rest of the campaign.
 - **Why it's fun:** it changes how you play rather than just making you stronger. You get a smaller, calmer army that can storm almost safely. Good for maps you keep losing to organ failure.
 
 ### Fever reducer (ibuprofen)
-- **This map:** the fatigue tiers' downsides (sprayed shots, slow cells) are switched off.
+- **This map:** every fatigue tier starts 10 points later (Alex, 2026-10-08), so a tier that kicked in at 40 now kicks in at 50. You stay sharp longer before shots spray and cells slow.
 - **Cost this map:** if fever slowing bacterial division goes into the game, that's off too, so bacteria multiply at full speed.
-- **No campaign cost.** It's the free, small option, so there's always something to pick that doesn't scar you.
+- It's the small, safe option, so there's always something reasonable to pick.
 
 ### Vaccine (bought, not a treatment slot)
 - Bought in the shop for one antigen kind you've already met. From then on that kind arrives **tagged**: macrophages swallow it faster and shots do more. It's permanent for the campaign.
 - This is where "antibodies kick in" ended up. Instead of building immunity during one map, you build it over the campaign by buying it.
-
-### Rest day (a skip)
-- Skip straight to the next map to heal one scar or remove one Resistance point, but the next map's trickle starts bigger ("the infection grew while you rested").
-- Gives a way out of a campaign you've treated yourself into a corner on, without a reset.
 
 ## The upgrade shop
 
@@ -103,7 +92,6 @@ Bought with Samples, kept for the whole campaign. Most have 3 ranks. The groups 
 
 **Body**
 - Fatigue recovers faster
-- Toxin drains faster (also offsets a Liver scar)
 - Storm afterburn shorter
 
 **Memory**
@@ -121,15 +109,6 @@ Bought with Samples, kept for the whole campaign. Most have 3 ranks. The groups 
 - **New specialists unlock free with progress**, the way PvZ hands you a new plant: beat Flu season, get the Net. That way nobody is locked out of a counter by spending poorly. The shop only makes them better.
 - The production card on each zone then only shows what you brought, so it stays short on a phone.
 
-## Your chart (what you've done to yourself)
-
-Between maps, a small body silhouette shows:
-- **Resistance pips** on a germ icon (bacteria and viruses separately)
-- **Scars** as cracks on the organ (liver, marrow, and others if more treatments come)
-- **Vaccines** as gold rings on antigen icons
-
-During a map you see nothing new; the costs just show up as tougher waves or a weaker stat. That keeps the in-map rule of two things to watch, fatigue and toxin. This is also where option C from the organ brainstorm (scars between levels) finally lands.
-
 ## What moves out of the map
 
 From the mechanics brainstorm:
@@ -138,26 +117,46 @@ From the mechanics brainstorm:
 |---|---|
 | Antibodies kick in (in-map learning) | Becomes Vaccines in the shop |
 | Antibody power pick | Could become vaccine flavors (Opsonize, Agglutinate...) chosen when you buy one |
-| Antibiotics pill | A treatment, with resistance across the campaign |
+| Antibiotics pill | A passive treatment: bacteria take double damage, but some arrive resistant. No pill button |
 | Immune memory | Same as Vaccines |
 | Loadout | Kept, in the Clinic |
-| Evolution (in-map) | Alex hasn't said. Could stay in-map, or become campaign Resistance, which already does a similar job |
+| Evolution (in-map) | Alex hasn't said. Recommended: keep it in-map |
 | Clot walls, Tier 2 antigens and units | Unchanged; they become loadout picks and new maps |
 
-## Optional: meta across campaigns
+## Pinned for later: treatment costs that carry across the campaign
+
+Cut on 2026-10-08 because it makes campaigns snowball: a map you struggle with makes every later map harder, so a struggling player falls further behind. Kept here in case a harder mode wants it (for example as an Ascension-style modifier).
+
+- **Resistance** (the germs get stronger): antibiotics add a point, and each point turns a slice of every later bacterial wave armored. Antivirals did the same for viral waves.
+- **Scars** (your body gets weaker): antifungals scar the liver (fatigue recovers slower for the rest of the campaign), and steroids used twice scar the marrow (Body output tops out lower).
+- **The chart:** a body silhouette between maps with resistance pips, cracked organs and vaccine rings.
+- **Rest day:** skip to the next map to heal one scar or remove a Resistance point, at the price of a bigger trickle.
+- **Win-only rule:** costs landed only when you won with the treatment, so retries weren't punished twice.
+
+## Pinned for later: meta progression across campaigns
+
+Alex (2026-10-08): pin as an idea for later, don't build now.
 
 Alex generally hates these, so here are the versions that are least like a grind, best first. My recommendation is to do none at first, and if friends ask for one, do only A and B.
 
 **A. Unlocks that add options, not power.** Finishing a campaign unlocks a new patient (a new campaign with different maps), a new starting specialist, or new cell skins. Like Slay the Spire's unlocks: more to choose from, never stronger. You never have to replay to get good enough.
 
-**B. Harder patients (like Slay the Spire's Ascension).** Beat a campaign and you can start the next one with a modifier: "Immunocompromised" (smaller marrow), "Superbug era" (start with Resistance 2), "Elderly" (fatigue recovers slower). Stack them. The progression is getting better at the game, not your numbers going up. This is the one most likely to please people who like meta without the grind.
+**B. Harder patients (like Slay the Spire's Ascension).** Beat a campaign and you can start the next one with a modifier: "Immunocompromised" (smaller marrow), "Superbug era" (a share of every bacterial wave arrives armored), "Elderly" (fatigue recovers slower). Stack them. The progression is getting better at the game, not your numbers going up. This is the one most likely to please people who like meta without the grind.
 
 **C. Family history (light power).** Finishing a campaign gives a choice of one inherited trait for the next campaign only ("Strong marrow", "Iron gut"). Swap freely. Small, and it doesn't stack forever.
 
 **D. Classic permanent power (Rogue Legacy style).** Currency carries over and buys permanent stat boosts. This is what Alex hates, for good reason: it makes losing a strategy and turns difficulty into time spent. Skip it.
 
-## Questions for Alex
+## Locked for building (Alex, 2026-10-08)
 
-1. Treatment costs only land if you **win the map** with them (recommended), or as soon as you use them?
-2. New specialists **unlock free with progress** (recommended), or are they bought in the shop?
-3. Evolution: **keep in-map** (recommended, since it's what keeps late waves hard after you've upgraded) or drop it now that Resistance exists?
+Alex: "anything I didn't give feedback on, let's build / follow your recommendations", except meta progression (pinned above).
+
+- **Clinic between maps:** upgrade shop, loadout, one passive treatment, then Start.
+- **Samples:** dropped by kills, scaled by toughness; first-clear bonus, replays pay a quarter, storm kills pay 0. No stars.
+- **Treatments (passive, this map only):** Antibiotics, Antifungals, Antivirals, Steroids, Fever reducer, as written above.
+- **Shop:** Marrow, Neutrophils, Macrophages, Specialists (NK, Net), Body, Memory (Vaccines). About 3 ranks each; a campaign affords roughly a third. No respec.
+- **Vaccines:** one kind per antigen you've met; that kind arrives tagged (swallowed faster, shots do more) for the rest of the campaign. One flavor for now.
+- **Loadout:** neutrophils and macrophages always; 2 specialist slots (3 with the upgrade). Specialists unlock free as you progress (recommended answer taken).
+- **Body map** level select; losing a map means replaying it.
+- **Evolution stays in-map** (recommended answer taken). It's an in-map mechanic, so it belongs with the main game's builder.
+- Not now: clot walls and other Tier 2 units (they'd join the loadout later), meta progression, campaign-long treatment costs.

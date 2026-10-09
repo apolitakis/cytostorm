@@ -4,8 +4,11 @@ python3 build.py -> index.html. Rebuild after v3's sim.js changes to pick them u
 import pathlib
 here = pathlib.Path(__file__).parent
 proto = here.parent / 'prototype'
+import os
+rel = pathlib.Path(os.environ['V3SRC']).resolve() if os.environ.get('V3SRC') else None # frozen release folder, if given
+pick = lambda name, live: rel / name if rel and (rel / name).exists() else live
 page = (here / 'src/template.html').read_text()
-parts = {'/*ART*/': proto / 'assets/assets.js', '/*TUT*/': here.parent / 'tutorial/tutorial.js', '/*AUDIO*/': here.parent / 'audio/cytosound.js', '/*SIM*/': proto / 'v3/src/sim.js', '/*LAYER*/': here / 'src/layer.js',
+parts = {'/*ART*/': proto / 'assets/assets.js', '/*TUT*/': pick('tutorial.js', here.parent / 'tutorial/tutorial.js'), '/*AUDIO*/': pick('cytosound.js', here.parent / 'audio/cytosound.js'), '/*SIM*/': pick('sim.js', proto / 'v3/src/sim.js'), '/*LAYER*/': here / 'src/layer.js',
          '/*COMBOS*/': here / 'src/combos.js', '/*UI*/': here / 'src/ui.js'}
 for marker, path in parts.items():
     if marker not in page: continue  # e.g. /*TUT*/ only exists once v3's template has the tutorial

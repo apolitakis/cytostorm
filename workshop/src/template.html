@@ -50,7 +50,7 @@ img.ico { width: 18px; height: 18px; flex: none; }
 #fTier { flex: none; font: 600 12px var(--display); color: #FF8FB1; }
 #cellCount { font: 500 11px var(--mono); font-variant-numeric: tabular-nums; }
 #cellCount { margin-left: auto; }
-/* The fatigue heart sits left of the body output slider */
+/* The fatigue heart sits left of the stress slider */
 #heart { grid-row: 1 / span 3; width: 54px; height: 50px; align-self: center; }
 .fatigue[data-tier="1"] #fTier { color: #FF9A4D; }
 .fatigue[data-tier="2"] #fTier { color: var(--kill); }
@@ -132,7 +132,7 @@ img.ico { width: 18px; height: 18px; flex: none; }
 .mlabel span.cut { color: #C77DFF; }
 .mlabel span { font: 500 11px var(--mono); font-variant-numeric: tabular-nums; }
 /* Production cards: one per zone, a stacked bar of the mix */
-.zones { flex: 1.4 1 0; min-width: 0; display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; }
+.zones { flex: 1.4 1 0; min-width: 0; display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; }
 .zcard { min-width: 0; display: grid; gap: 4px; align-content: center; text-align: left; background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 6px 8px; }
 .zcard.open { border-color: var(--cell); }
 .zt { display: flex; align-items: baseline; gap: 6px; min-width: 0; }
@@ -167,7 +167,7 @@ img.ico { width: 18px; height: 18px; flex: none; }
 /* The open production sheet sits over the bottom of the map */
 #sheet { position: absolute; left: 0; right: 0; bottom: 0; max-height: 100%; overflow: auto; z-index: 5; background: rgba(10, 13, 24, .96); border: 1px solid var(--line); border-radius: 14px; padding: 10px 12px 12px; display: grid; gap: 8px; box-sizing: border-box; max-width: 560px; margin: 0 auto; box-shadow: 0 -6px 30px rgba(0,0,0,.6); }
 .shd { display: flex; gap: 8px; align-items: center; }
-.ztabs { flex: 1; display: grid; grid-template-columns: repeat(3, 1fr); gap: 4px; }
+.ztabs { flex: 1; display: grid; grid-template-columns: repeat(4, 1fr); gap: 4px; }
 .ztabs button { background: var(--panel2); border: 1px solid var(--line); border-radius: 8px; padding: 5px 2px; font-size: 12.5px; font-weight: 600; }
 .ztabs button[aria-pressed="true"] { border-color: var(--cell); color: var(--cell); }
 .shint { margin: 0; font-size: 12px; color: var(--dim); text-wrap: pretty; }
@@ -193,7 +193,10 @@ img.ico { width: 18px; height: 18px; flex: none; }
 .seg2 button[data-mode="support"][aria-pressed="true"] { border-color: var(--repair); color: var(--repair); }
 /* Cytokine storm: hold to preview the cost, release to fire */
 #stormBtn { flex: none; display: grid; justify-items: center; align-content: center; gap: 2px; min-width: 58px; background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 4px 6px; font: 600 11.5px var(--display); color: var(--dim); touch-action: none; }
-#stormBtn img { width: 28px; height: 28px; }
+#stormBtn img { width: 28px; height: 28px; pointer-events: none; }
+/* Holding the Storm button (or any icon) must not open the browser's long-press menu (save image, Alex 2026-10-08) */
+img { -webkit-touch-callout: none; -webkit-user-drag: none; user-drag: none; }
+#stormBtn { -webkit-touch-callout: none; -webkit-user-select: none; user-select: none; }
 #spawnRates input[type="range"] { width: 100%; }
 #stormBtn { --charge: 0; position: relative; overflow: hidden; }
 #stormBtn::before { content: ''; position: absolute; inset: auto 0 0 0; height: calc(var(--charge) * 100%); background: linear-gradient(to top, rgba(255,210,63,.45), rgba(255,210,63,.12)); pointer-events: none; }
@@ -378,9 +381,13 @@ img.ico { width: 18px; height: 18px; flex: none; }
   #bar { flex-wrap: wrap; }
   .zones { flex-basis: 100%; }
 }
+@media (max-width: 420px) {
+  .zt .mode { display: none; } /* four cards: the zone names need the room; stances show on the map */
+}
 @media (max-width: 480px) {
   .zcard { padding: 5px 6px; }
-  .zt b { font-size: 12px; }
+  .zt b { font-size: 11.5px; }
+  .zcard { padding: 5px; }
   .mode { font-size: 0; } /* stance as a dot: the map chips spell it out, the zone name gets the room */
   .mode::before { content: ''; display: inline-block; width: 8px; height: 8px; border-radius: 50%; background: currentColor; }
   .bodybtn { gap: 2px; padding: 1px 3px 2px; }
@@ -427,8 +434,8 @@ img.ico { width: 18px; height: 18px; flex: none; }
 
   <main id="stage">
     <canvas id="prog" aria-label="Level progress, top to bottom: waves and toxin bursts still to come"></canvas>
-    <canvas id="cv" aria-label="The map: Wound, Tissue and Lymph node. Tap a zone to flip its stance between Offense and Support; double-tap to zoom in on it."></canvas>
-    <div id="pwrs" aria-label="Cell production per zone"><button type="button" class="zpwr" data-pz="0" hidden><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v8"/><path d="M6.3 6.6a8 8 0 1 0 11.4 0"/></svg></button><button type="button" class="zpwr" data-pz="1" hidden><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v8"/><path d="M6.3 6.6a8 8 0 1 0 11.4 0"/></svg></button><button type="button" class="zpwr" data-pz="2" hidden><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v8"/><path d="M6.3 6.6a8 8 0 1 0 11.4 0"/></svg></button></div>
+    <canvas id="cv" aria-label="The map: Wound, Tissue, Deep tissue and Lymph node. Tap a zone to flip its stance between Offense and Support; double-tap to zoom in on it."></canvas>
+    <div id="pwrs" aria-label="Cell production per zone"><button type="button" class="zpwr" data-pz="0" hidden><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v8"/><path d="M6.3 6.6a8 8 0 1 0 11.4 0"/></svg></button><button type="button" class="zpwr" data-pz="1" hidden><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v8"/><path d="M6.3 6.6a8 8 0 1 0 11.4 0"/></svg></button><button type="button" class="zpwr" data-pz="2" hidden><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v8"/><path d="M6.3 6.6a8 8 0 1 0 11.4 0"/></svg></button><button type="button" class="zpwr" data-pz="3" hidden><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v8"/><path d="M6.3 6.6a8 8 0 1 0 11.4 0"/></svg></button></div>
     <button id="zoomOut" class="zoomout" type="button" hidden>Watching <b>Tissue</b> · zoom out</button>
     <div id="toasts"></div>
     <div id="sheet" hidden></div>
@@ -439,12 +446,12 @@ img.ico { width: 18px; height: 18px; flex: none; }
     <div id="zones" class="zones"></div>
     <div class="output">
       <canvas id="heart" role="img" aria-label="Fatigue: the heart fills and beats faster as your body tires"></canvas>
-      <div class="mlabel"><img class="ico" data-art="body-output" alt=""><b>Body output</b><span id="outVal">1.0×</span></div>
-      <input type="range" id="output" min="0" max="100" step="5" value="50" aria-label="Body output: how fast your body makes cells">
+      <div class="mlabel"><img class="ico" data-art="body-output" alt=""><b>Stress</b><span id="outVal">100%</span></div>
+      <input type="range" id="output" min="0" max="100" step="5" value="50" aria-label="Stress: how hard your body pushes to make cells">
       <div class="fatigue" id="fatigue" data-tier="0"><span id="fTier">Fine</span><button id="bodyBtn" class="bodybtn" type="button" aria-label="Organ status"></button><span id="cellCount">0 cells</span></div>
       <div class="fatigue toxrow" id="toxRow"><span>Toxin</span><div class="toxbar"><i id="toxFill"></i><b id="toxMark"></b></div><span id="toxVal">0</span></div>
     </div>
-    <button id="stormBtn" type="button" aria-label="Cytokine storm: hold 5 seconds to charge, release to fire"><img id="stormIcon" alt=""><span id="stormLbl">Storm</span></button>
+    <button id="stormBtn" type="button" aria-label="Cytokine storm: hold 5 seconds to charge, release to fire"><img id="stormIcon" alt="" draggable="false"><span id="stormLbl">Storm</span></button>
     <button id="pauseBtn" class="hbtn" type="button" aria-label="Pause"><img data-art="pause" alt=""></button>
   </footer>
 </div>

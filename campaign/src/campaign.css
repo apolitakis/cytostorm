@@ -1,0 +1,77 @@
+/* ---- Campaign: body map, Clinic, Samples ---- */
+.smp { display: inline-flex; align-items: center; gap: 4px; font: 600 13px var(--mono); color: var(--gold); font-variant-numeric: tabular-nums; }
+.smp i { width: 8px; height: 8px; background: var(--gold); transform: rotate(45deg); box-shadow: 0 0 6px rgba(255,210,63,.7); flex: none; }
+.campchip { flex: none; min-width: 3.4em; }
+.camptop { display: flex; justify-content: space-between; gap: 8px; flex-wrap: wrap; font-size: 12.5px; color: var(--dim); border: 1px solid var(--line); border-radius: 10px; padding: 7px 10px; background: var(--panel2); }
+.mapwrap { display: grid; grid-template-columns: minmax(110px, 40%) 1fr; gap: 10px; align-items: start; }
+.bodymap { width: 100%; height: auto; display: block; }
+.bodymap .muscle path { fill: #10183A; stroke: var(--cell); stroke-opacity: .32; stroke-width: 2; }
+.bodymap .skin { fill: none; stroke: var(--cell); stroke-opacity: .75; stroke-width: 3; }
+.bodymap .pin circle { fill: var(--panel2); stroke: var(--dim); stroke-width: 4; }
+.bodymap .pin text { font: 600 28px var(--mono); fill: var(--dim); text-anchor: middle; pointer-events: none; }
+.bodymap .pin.open { cursor: pointer; }
+.bodymap .pin.open circle { stroke: var(--cell); fill: #08303A; animation: pinpulse 1.6s ease-in-out infinite; }
+.bodymap .pin.open text { fill: var(--cell); }
+.bodymap .pin.done { cursor: pointer; }
+.bodymap .pin.done circle { stroke: var(--gold); fill: #2A230A; }
+.bodymap .pin.done text { fill: var(--gold); }
+.bodymap .pin.locked circle { fill: #0B0F22; }
+.bodymap .pin.locked { opacity: .6; }
+@keyframes pinpulse { 50% { stroke-width: 10; } }
+@media (prefers-reduced-motion: reduce) { .bodymap .pin.open circle { animation: none; stroke-width: 7; } }
+.maplist { list-style: none; margin: 0; padding: 0; display: grid; gap: 4px; }
+.mrow { width: 100%; display: grid; grid-template-columns: 1.6em 1fr auto auto; gap: 6px; align-items: center; text-align: left; background: var(--panel2); border: 1px solid var(--line); border-radius: 9px; padding: 5px 8px; }
+.mrow .n { font: 600 12px var(--mono); color: var(--dim); }
+.mrow .nm { font-weight: 600; font-size: 13px; line-height: 1.15; min-width: 0; }
+.mrow .nm small { display: block; font-weight: 400; font-size: 11px; color: var(--dim); }
+.mrow .new img { width: 18px; height: 18px; vertical-align: middle; }
+.mrow .stt { font: 600 11px var(--mono); }
+.mrow.open { border-color: var(--cell); }
+.mrow.open .stt { color: var(--cell); }
+.mrow.done .stt { color: var(--gold); }
+.mrow.locked { opacity: .5; cursor: default; }
+.wipe { color: var(--dim); font-size: 12px; }
+.incoming { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; font-size: 12px; color: var(--dim); }
+.incoming img { width: 22px; height: 22px; }
+.incoming em { font-style: normal; color: var(--gold); }
+.ctabs { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; }
+.ctabs button { background: var(--panel2); border: 1px solid var(--line); border-radius: 9px; padding: 7px 4px; font-weight: 600; font-size: 13px; color: var(--dim); }
+.ctabs button[aria-selected="true"] { border-color: var(--cell); color: var(--cell); }
+.cpane { display: grid; gap: 6px; }
+.cpane h4 { margin: 6px 0 0; font: 600 11px var(--mono); letter-spacing: .1em; text-transform: uppercase; color: var(--dim); }
+.cnote { margin: 0; font-size: 12px; color: var(--dim); text-wrap: pretty; }
+.crow { display: flex; align-items: center; gap: 8px; background: var(--panel2); border: 1px solid var(--line); border-radius: 9px; padding: 7px 9px; }
+.crow.locked { opacity: .55; }
+.crow .ct { flex: 1; min-width: 0; display: grid; gap: 1px; }
+.crow .ct b { font-size: 13.5px; display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+.crow .ct small { font-size: 11.5px; color: var(--dim); line-height: 1.3; text-wrap: pretty; }
+.crow .warn { font-style: normal; color: var(--kill); }
+.cico { width: 26px; height: 26px; flex: none; }
+.cpips { display: inline-flex; gap: 3px; }
+.cpips i { width: 7px; height: 7px; border-radius: 2px; border: 1px solid var(--gold); }
+.cpips i.on { background: var(--gold); }
+.cbuy, .ctog { flex: none; background: var(--panel); border: 1px solid var(--gold); border-radius: 9px; padding: 6px 9px; min-width: 64px; }
+.cbuy:disabled { border-color: var(--line); opacity: .55; cursor: default; }
+.ctog { border-color: var(--line); color: var(--dim); font-weight: 600; font-size: 12.5px; }
+.ctog[aria-pressed="true"] { border-color: var(--cell); color: var(--cell); }
+.cmax { flex: none; font: 600 11px var(--mono); color: var(--dim); }
+.tcard { display: grid; gap: 2px; text-align: left; background: var(--panel2); border: 1px solid var(--line); border-radius: 10px; padding: 8px 10px; }
+.tcard b { font-size: 14px; }
+.tcard .plus { font-size: 12px; color: var(--repair); }
+.tcard .minus { font-size: 12px; color: var(--kill); }
+.tcard[aria-pressed="true"] { border-color: var(--cell); box-shadow: inset 0 0 0 1px var(--cell); }
+.camppay { display: grid; gap: 2px; justify-items: start; border: 1px solid var(--gold); border-radius: 10px; padding: 8px 10px; background: #1A1708; }
+.camppay b { font-size: 15px; display: flex; gap: 6px; align-items: center; }
+.camppay small { font-size: 11.5px; color: var(--dim); }
+.camppay > span { font-size: 12px; color: var(--dim); }
+.glowp { color: var(--gold) !important; }
+.campend .stars, .campend .goals { display: none; }
+@media (max-width: 380px) { .mapwrap { grid-template-columns: 1fr; } .bodymap { max-width: 180px; justify-self: center; } }
+.incoming .press { color: var(--kill); }
+.ctabs { grid-template-columns: repeat(var(--n, 3), minmax(0, 1fr)); }
+.ctabs button { position: relative; }
+.newdot { position: absolute; top: 5px; right: 6px; width: 7px; height: 7px; border-radius: 50%; background: var(--gold); box-shadow: 0 0 6px rgba(255,210,63,.7); }
+.coach { display: grid; gap: 6px; justify-items: start; border: 1px solid var(--cell); border-radius: 10px; padding: 9px 11px; background: #08232A; }
+.coach b { font-size: 14px; color: var(--cell); }
+.coach p { margin: 0; font-size: 12.5px; text-wrap: pretty; }
+.coach .btn { padding: 5px 12px; font-size: 12.5px; }

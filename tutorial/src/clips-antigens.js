@@ -24,39 +24,53 @@
   const tapAt = (t0, u, v) => (t, st, AA) => AA.finger(t, [[t0 - 0.5, K.off], [t0 - 0.1, K.world(u, v)], [t0, K.world(u, v), true], [t0 + 0.25, K.world(u, v), false, 'out']]);
 
   // ---- MRSA (Hospital visit) ----
+  // As in v3 Version 24: plain shots chip its armor (12 hits kill one), it heals fully when it divides,
+  // macrophages spit it out, and a tuned shot from a Support ring kills it in one hit.
+  const armor = (u, v, left, a, w = 3) => {
+    if (a <= 0) return;
+    const [x, y] = A.P(u, v), c = A.ctx, g = 1, W = 12 * (w + g) - g, x0 = x - W / 2, y0 = y - 24;
+    c.globalAlpha = a; c.fillStyle = 'rgba(10,13,24,.8)'; c.fillRect(x0 - 2, y0 - 2, W + 4, 8);
+    for (let i = 0; i < 12; i++) { c.fillStyle = i < left ? '#9AD7FF' : '#2A3150'; c.fillRect(x0 + i * (w + g), y0, w, 4); }
+    c.globalAlpha = 1;
+  };
   CYT_CLIPS.mrsa = {
-    id: 'mrsa', title: 'MRSA', dur: 12.5,
-    cap: [[0, 'MRSA is armored. Like every germ, it blinks when it divides.'], [2.2, 'Plain shots bounce off it.'], [4.4, 'Macrophages can\'t swallow it. They spit it back out.'], [6.6, 'Flip the zone to Support. A tuned shot from the ring kills MRSA in one hit.']],
+    id: 'mrsa', title: 'MRSA', dur: 13.5,
+    cap: [[0, 'MRSA is armored. Like every germ, it blinks when it divides.'], [0.9, 'Plain shots only chip its armor. It takes 12 hits to kill one.'], [3.1, 'And every time it divides, it heals right back to full.'], [5.0, 'Macrophages can\'t swallow it. They spit it back out.'], [7.2, 'Flip the zone to Support. A tuned shot from the ring kills MRSA in one hit.']],
     bg: { tile: 1.2 },
+    divAt: 3.4,
     build(st) {
-      const m0 = A.ent({ art: 'mrsa', r: 11, rot: 0, die: 'pop', big: true, pos: A.drift(140, 175, 0, 3, 0, 3, 1) });
-      const [a, b] = A.divide(m0, 1.5, { angle: Math.PI / 2, dist: 16, then: [5, 0] });
-      a.big = b.big = true; st.mrsa = [a, b];
+      const m0 = st.m0 = A.ent({ art: 'mrsa', r: 11, rot: 0, die: 'pop', big: true, pos: A.drift(140, 175, 0, 3, 0, 3, 1) });
       st.neuts = [K.recruit('neutrophil', -2, 90, 110, { r: 6, wob: 7 }), K.recruit('neutrophil', -2, 120, 250, { r: 6, wob: 7 }), K.recruit('neutrophil', -2, 340, 110, { r: 6, wob: 7 }), K.recruit('neutrophil', -2, 350, 250, { r: 6, wob: 7 })];
-      for (let k = 0; k < 8; k++) A.shot(2.3 + k * 0.28, st.neuts[k % 4], st.mrsa[k % 2], { bounce: true });
-      const mac = st.mac = A.ent({ art: 'macrophage-offense', r: 17, layer: 1, pos: A.path([[0, 300, 190], [4.3, 296, 190], [4.9, 196, 172], [6.4, 205, 180], [7.4, 255, 185]], 2, 3) });
-      A.gulp(mac, a, 5.0, true);
-      mac.flip = [{ t: 6.9, art: 'macrophage-support' }];
+      // seven plain hits chip the armor down to 5 of 12...
+      st.chips = []; for (let k = 0; k < 7; k++) st.chips.push(A.shot(0.9 + k * 0.32, st.neuts[k % 4], m0));
+      // ...then it divides, and both halves are back to full
+      const [a, b] = A.divide(m0, this.divAt, { angle: Math.PI / 2, dist: 16, then: [5, 0] });
+      a.big = b.big = true; st.mrsa = [a, b];
+      const mac = st.mac = A.ent({ art: 'macrophage-offense', r: 17, layer: 1, pos: A.path([[0, 300, 190], [4.9, 296, 190], [5.5, 196, 172], [7.0, 205, 180], [8.0, 255, 185]], 2, 3) });
+      A.gulp(mac, a, 5.6, true);
+      mac.flip = [{ t: 7.5, art: 'macrophage-support' }];
       // neutrophils gather in the ring, then fire tuned shots
-      st.neuts.forEach((n, i) => { const old = n.pos, ang = i / 4 * 6.283 + 0.5; n.pos = t => (t < 7.0 ? old(t) : A.lerp2(old(7.0), [255 + Math.cos(ang) * 32 + 6 * A.noise(i, t), 185 + Math.sin(ang) * 30 + 6 * A.noise(i + 9, t)], A.ease(A.seg(t, 7.0, 7.8)))); });
-      A.shot(8.3, st.neuts[0], a, { tuned: true, speed: 700 }); a.t1 = a.hits[a.hits.length - 1];
-      A.shot(9.1, st.neuts[2], b, { tuned: true, speed: 700 }); b.t1 = b.hits[b.hits.length - 1];
+      st.neuts.forEach((n, i) => { const old = n.pos, ang = i / 4 * 6.283 + 0.5; n.pos = t => (t < 7.6 ? old(t) : A.lerp2(old(7.6), [255 + Math.cos(ang) * 32 + 6 * A.noise(i, t), 185 + Math.sin(ang) * 30 + 6 * A.noise(i + 9, t)], A.ease(A.seg(t, 7.6, 8.4)))); });
+      A.shot(8.9, st.neuts[0], a, { tuned: true, speed: 700 }); a.t1 = a.hits[a.hits.length - 1];
+      A.shot(9.7, st.neuts[2], b, { tuned: true, speed: 700 }); b.t1 = b.hits[b.hits.length - 1];
     },
     frame(t, st) {
-      A.scene(t, { under: () => ring(st.mac, 7.0, t, st.neuts) });
-      flipFx(st.mac, 6.9, t);
+      A.scene(t, { under: () => ring(st.mac, 7.6, t, st.neuts) });
+      flipFx(st.mac, 7.5, t);
       A.zoneName(0, 400, 'Tissue');
-      A.zoneChip(0, 400, t < 6.9 ? 'offense' : 'support', A.seg(t, 6.9, 7.2));
-      if (t > 2.4 && t < 4.4) { const [u, v] = st.mrsa[0].pos(t); A.tag(u, v, 'bounces off', A.PAL.antibody, tagWin(t, 2.4, 4.4), -22); }
-      if (t > 5.6 && t < 7) { const [u, v] = st.mrsa[0].pos(t); A.tag(u, v, 'spat out', A.PAL.kill, tagWin(t, 5.6, 7), -22); }
+      A.zoneChip(0, 400, t < 7.5 ? 'offense' : 'support', A.seg(t, 7.5, 7.8));
+      if (t < this.divAt) { const [u, v] = st.m0.pos(t); armor(u, v, 12 - st.chips.filter(h => h <= t).length, A.seg(t, 0.7, 1.0)); }
+      else if (t < 5.4) for (const m of st.mrsa) { const [u, v] = m.pos(t); armor(u, v, 12, 1 - A.seg(t, 5.0, 5.4), 1.6); }
+      if (t > 3.5 && t < 5.0) { const [u, v] = st.mrsa[1].pos(t); A.tag(u, v, 'healed', '#9AD7FF', tagWin(t, 3.5, 5.0), 26); }
+      if (t > 6.2 && t < 7.6) { const [u, v] = st.mrsa[0].pos(t); A.tag(u, v, 'spat out', A.PAL.kill, tagWin(t, 6.2, 7.6), -22); }
     },
-    fingers: tapAt(6.8, 120, 120),
+    fingers: tapAt(7.4, 120, 120),
   };
 
   // ---- Pseudomonas (Pool water) ----
   CYT_CLIPS.pseudo = {
     id: 'pseudo', title: 'Pseudomonas', dur: 12.5,
-    cap: [[0, 'Pseudomonas swims in, settles, and grows a slime dome over itself.'], [3.2, 'Shots fizzle on the dome. Nothing gets in.'], [5.6, 'Offense macrophages tear domes down, bite by bite.'], [9.6, 'Then your shots can reach the germs inside.']],
+    cap: [[0, 'Pseudomonas swims in, settles, and grows a slime dome over itself.'], [3.2, 'Shots still get through the dome, but it soaks up most of each hit. Plain shots do a quarter of the damage.'], [5.6, 'Offense macrophages tear domes down, bite by bite.'], [9.6, 'With the dome gone, every shot hits at full strength.']],
     bg: { tile: 1.2 },
     domeR(t) { const grow = A.seg(t, 2.3, 4.0) * 46, bites = [6.2, 7.2, 8.2, 9.2].filter(b => t > b + 0.3).length; return bites >= 4 ? 0 : grow * (1 - 0.12 * bites); },
     domeA(t) { const bites = [6.2, 7.2, 8.2, 9.2].filter(b => t > b + 0.3).length; return 0.35 + 0.5 * (4 - bites) / 4; },
@@ -69,7 +83,7 @@
       kids.forEach(k => { k.rot = 0.9; });
       st.germs.splice(2, 1, ...kids);
       st.neuts = [K.recruit('neutrophil', -2, 330, 100, { r: 6, wob: 6 }), K.recruit('neutrophil', -2, 345, 250, { r: 6, wob: 6 }), K.recruit('neutrophil', -2, 120, 260, { r: 6, wob: 6 })];
-      for (let k = 0; k < 9; k++) { const n = st.neuts[k % 3], [nu, nv] = n.pos(3.3 + k * 0.25), a = Math.atan2(nv - C[1], nu - C[0]); A.shot(3.3 + k * 0.25, n, pt(C[0] + Math.cos(a) * 44, C[1] + Math.sin(a) * 30), { fizzle: true }); }
+      for (let k = 0; k < 9; k++) { const n = st.neuts[k % 3], [nu, nv] = n.pos(3.3 + k * 0.25), a = Math.atan2(nv - C[1], nu - C[0]); A.shot(3.3 + k * 0.25, n, st.germs[k % st.germs.length]); } // V27: domes no longer block shots; plain shots do 0.25 damage, tuned shots 1
       const mac = st.mac = A.ent({ art: 'macrophage-offense', r: 16, layer: 1, pos: A.path([[0, 90, 110], [5.4, 95, 112], [6.1, 178, 148], [7.0, 182, 152], [7.7, 200, 205], [8.7, 205, 205], [9.6, 180, 170]], 1.5, 5) });
       [[6.2, 196, 160], [7.2, 196, 168], [8.2, 212, 196], [9.2, 214, 190]].forEach(([tb, u, v]) => mac.gulps.push({ t: tb, prey: pt(u, v) }));
       K.fight(st.neuts, st.germs, 9.7, { hp: 3, every: 0.45, seed: 3 });
@@ -82,7 +96,7 @@
       if (t > 9.5 && t < 10.2) A.dots(st.C[0], st.C[1], (t - 9.5) / 0.7, 99, 14, 'rgba(169,207,60,0.9)', 40, 3);
       A.zoneName(0, 400, 'Tissue');
       A.zoneChip(0, 400, 'offense');
-      if (t > 3.4 && t < 5.6) A.tag(st.C[0], st.C[1] - 34, 'shots fizzle', A.PAL.slime, tagWin(t, 3.4, 5.6), -8);
+      if (t > 3.4 && t < 5.6) A.tag(st.C[0], st.C[1] - 34, '25% damage', A.PAL.slime, tagWin(t, 3.4, 5.6), -8);
     },
   };
 
@@ -175,7 +189,7 @@
   CYT_CLIPS.yeast = {
     id: 'yeast', title: 'Candida', dur: 13.5,
     cap: [[0, 'Candida settles and grows a thread toward the Lymph node.'], [3.4, 'Germs ride the thread 2.5 times faster. A thread in the Lymph node fills the spleen\'s breach clock too.'], [6.2, 'Shots pass straight through threads.'], [7.8, 'A Net neutrophil cuts the thread, and everything past the cut withers.'], [10.4, 'Offense macrophages chew the tips too, slowly.']],
-    bg: { tile: 1.2, dividers: [270], lymph: [350, 175] },
+    bg: { tile: 1.2, dividers: [360], lymph: [380, 175] }, // close-up of Deep tissue and the Lymph node strip
     build(st) {
       const r = A.rng(4);
       st.root = [60, 190];
@@ -193,7 +207,7 @@
       A.ent({ art: 'yeast', r: 6, rot: 1, t0: 4.4, blinks: [[4.4, 4.4 + A.BLINK]], die: 'pop', pos: A.path([[4.4, tip[0], tip[1]], [5.2, tip[0] + 6, tip[1] + 22], [20, tip[0] + 20, tip[1] + 40, 'l']], 2, 5) }).t1 = 11.2;
       // riders: germs latch onto the thread and race along it
       const along = (i0, i1, t0, t1) => t => { const q = A.clamp((t - t0) / (t1 - t0)) * (i1 - i0) + i0, k = Math.floor(q), f = q - k, p0 = main[Math.min(k, main.length - 1)], p1 = main[Math.min(k + 1, main.length - 1)]; return [A.lerp(p0[0], p1[0], f), A.lerp(p0[1], p1[1], f) - 4]; };
-      st.riders = [0, 1].map(j => { const t0 = 3.6 + j * 0.7, ride = along(2, 26 - j * 2, t0 + 0.6, t0 + 2.4), start = [-10, 150 + j * 70], [su, sv] = ride(t0 + 0.6);
+      st.riders = [0, 1].map(j => { const t0 = 3.6 + j * 0.7, ride = along(2, 28 - j, t0 + 0.6, t0 + 2.4), start = [-10, 150 + j * 70], [su, sv] = ride(t0 + 0.6);
         return germ({ r: 6.5, t0, pos: t => (t < t0 + 0.6 ? [A.lerp(start[0], su, A.ease(A.seg(t, t0, t0 + 0.6))), A.lerp(start[1], sv, A.ease(A.seg(t, t0, t0 + 0.6)))] : t < t0 + 2.4 ? ride(t) : [ride(t0 + 2.4)[0] + 4 * A.noise(j, t), ride(t0 + 2.4)[1] + 4 * A.noise(j + 3, t)]) }); });
       st.rideWin = st.riders.map((g, j) => [3.6 + j * 0.7 + 0.6, 3.6 + j * 0.7 + 2.4]);
       st.neuts = [K.recruit('neutrophil', -2, 200, 90, { r: 6, wob: 5 }), K.recruit('neutrophil', -2, 180, 270, { r: 6, wob: 5 }), K.recruit('neutrophil', -2, 340, 260, { r: 6, wob: 5 })];
@@ -237,12 +251,12 @@
       } });
       A.ringFx(c[0], c[1], nt / 0.35, '#FFD23F', 6, 30); // the burst
       A.dots(c[0], c[1], nt / 0.5, 7, 12, 'rgba(220,240,120,0.9)', 22, 2.4);
-      A.zoneName(0, 270, 'Tissue'); A.zoneName(270, 400, 'Lymph node');
-      // the Lymph node ring fills while the thread tip or a rider is inside
-      const inside = tt => (tt < st.cutT + 0.1 && st.main[Math.floor(st.mainLen(tt))][0] > 270) || st.riders.some(g => A.alive(g, tt) && g.pos(tt)[0] > 270);
+      A.zoneName(0, A.NODE_U, 'Deep tissue');
+      // the Lymph node's breach clock fills while the thread tip or a rider is in the strip
+      const inside = tt => (tt < st.cutT + 0.1 && st.main[Math.floor(st.mainLen(tt))][0] > A.NODE_U) || st.riders.some(g => A.alive(g, tt) && g.pos(tt)[0] > A.NODE_U);
       let f = 0; for (let tt = 0; tt < t; tt += 0.1) if (inside(tt)) f += 0.006;
-      A.lymphTimer(270, 400, f, inside(t), t);
-      A.zoneChip(0, 270, 'offense');
+      A.nodeRow({ frac: f, busy: inside(t), t, mode: null });
+      A.zoneChip(0, A.NODE_U, 'offense');
       if (t > 6.3 && t < 7.8) { const p = st.main[14]; A.tag(p[0], p[1], 'passes through', A.PAL.antibody, tagWin(t, 6.3, 7.8), -14); }
     },
   };

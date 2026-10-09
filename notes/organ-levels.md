@@ -18,12 +18,12 @@ Status: approved by Alex 22:48 ("build those 5 organ systems"). At 22:49 Alex ch
 | **Kidneys** | clear waste, so you recover | 0.8 | recovery 25% slower | 50% slower | 75% slower |
 | **Lungs** | oxygen for every cell | 0.6 | all your cells move 10% slower (on top of Tired) | 20% slower | 30% slower |
 | **Liver** | building blocks for new cells | 0.6 | cells made 15% slower | 30% slower | 45% slower |
-| **Spleen** | immune cell reserve, filters blood | 0.4 | total cell limit 150 (from 180) | 120 | 90 |
-| **Brain** | coordination: finding and chasing targets | 0.5 | every cell wanders 20% more | 40% more, and production mix changes take 3 s to kick in | 60% more, and delirium (the view's edges swim) |
+| **Spleen** | immune cell reserve, filters blood | 0.4 | total cell limit 450 (from 540) | 360 | 270 |
+| **Brain** | coordination: finding and chasing targets | 0.5 | every cell wanders 20% more | 40% more, and response changes take 3 s to kick in | 60% more, and delirium (the view's edges swim) |
 
 ## Breaches hurt organs (Alex, 22:59 and 23:03; built in v3 after Version 14)
 - The old 20 s Lymph node timer no longer ends the match. Each organ has its own **breach clock** instead.
-- **Filling:** a clock fills while any germ mapped to that organ sits in the Lymph node. It takes 20 s (`lymph.fill`), and a bigger crowd fills it faster: +10% per extra germ, capped at 2×.
+- **Filling:** a clock fills while any germ mapped to that organ sits in the Lymph node. It takes 20 s (`lymph.fill`), and a bigger crowd fills it faster: +10% per extra germ, capped at 2× (since V28, with 3x germs, +3.3% per extra germ so the same share of a wave fills it as fast; still capped at 2×).
 - **Full clock:** the organ loses 1 bar and the clock resets.
 - **Draining:** once that organ's germs are gone, its clock drains over 60 s (`lymph.drain`).
 - **Clocks run side by side:** Staph and Herpes in the node fill the spleen's clock and the brain's clock at the same time.

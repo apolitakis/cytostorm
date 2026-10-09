@@ -5,7 +5,10 @@ Big workshop blocks live in src/ui-blocks.js. Every anchor is asserted, so if v3
 fails loudly and names the anchor. Usage: python3 fork_ui.py && python3 build.py"""
 import pathlib, re
 here = pathlib.Path(__file__).parent
-v3 = here.parent / 'prototype/v3/src'
+import os
+# V3SRC=<folder> forks from a frozen release (e.g. prototype/v3/releases/v26) instead of live src
+v3 = pathlib.Path(os.environ['V3SRC']).resolve() if os.environ.get('V3SRC') else here.parent / 'prototype/v3/src'
+print('forking from', v3)
 s = (v3 / 'ui.js').read_text()
 t = (v3 / 'template.html').read_text()
 blocks = dict(re.findall(r'//@@ (\w+)\n(.*?)(?=//@@ |\Z)', (here / 'src/ui-blocks.js').read_text(), re.S))
@@ -31,6 +34,8 @@ ui("  let levelKey = LEVELS[store.get('immuneWorkshopV3.level')] ? store.get('im
   mergeWs(store.get('immuneWorkshopV3.ws'));
   const dev = Object.assign(defaultDev(), store.get('immuneWorkshopV3.dev') || {});
   if ((dev.ver || 0) < 2) { dev.toxinLoad = false; dev.ver = 2; } // toxin went optional and off (Alex, 2026-10-07): reset older saved setups once
+  if (dev.ver < 3) { if (dev.leakZone === '2') dev.leakZone = '3'; dev.ver = 3; } // four sectors (2026-10-08): the Lymph node moved from 2 to 3
+  if (dev.ver < 4) { for (const u in dev.friendly) dev.friendly[u] = Math.min(90, (dev.friendly[u] || 0) * 3); dev.ver = 4; } // V28: x3 units, so extra cells x3 too (antigen groups are already x3)
   dev.rates = Object.assign(ZERO_RATES(), dev.rates); dev.friendly = Object.assign(defaultDev().friendly, dev.friendly);
   if (!LEVELS[dev.level]) dev.level = 'sandbox';
   let levelKey = dev.level;
@@ -59,8 +64,8 @@ _pa = next(x for x in ("    const W = w / dpr, H = h / dpr, D = game.duration;\n
 ui(_pa, _pa + blocks['prog'])
 i = s.index("    $('#cellCount').textContent") if "    $('#cellCount').textContent" in s else s.index("    const cc = $('#cellCount');"); j = s.index('\n', i) + 1
 s = s[:j] + blocks['hud'] + s[j:]
-ui("    else if (g.zones[2].count > 0) {",
-   "    else if (dev.toxinLoad && !dev.toxinSimple && ws.tox.load >= 50) { cls = 'bad'; html = `<b>Toxins are piling up.</b> Your tired liver and kidneys can't keep up, and it's adding fatigue. Rest to clear it, or swallow instead of shooting.`; }\n    else if (g.zones[2].count > 0) {")
+ui("    else if (g.zones[LYMPH].count > 0) {",
+   "    else if (dev.toxinLoad && !dev.toxinSimple && ws.tox.load >= 50) { cls = 'bad'; html = `<b>Toxins are piling up.</b> Your tired liver and kidneys can't keep up, and it's adding fatigue. Rest to clear it, or swallow instead of shooting.`; }\n    else if (g.zones[LYMPH].count > 0) {")
 # v3 version 7 put its tutorial-clip helpers between showStart and guideHtml; keep them (the guide's "How to play" tab uses TUT)
 s = between(s, "  function showStart() {", "  // ---- tutorial clips" if "  // ---- tutorial clips" in s else "  function guideHtml(tab) {", blocks['start'])
 ui("      unit('tapeworm-head', 'Tapeworm',",
@@ -69,7 +74,7 @@ ui("      unit('tapeworm-head', 'Tapeworm',",
 ui("        <li><b>Pause</b>: the II button, or Space.",
 """        <li><b>Workshop</b> (top right): pick a combo or a real level, set spawn rates for antigens and your cells, turn on cheats, and change any number live.</li>
         <li><b>Toxin load</b> (when on, the blood vessel turns green as it builds, and a green strip on the organ button shows the level; with Organ health off it gets its own bar): shots, nets and the storm fill it; swallows don't. Your liver and kidneys clear it fast when you're rested and slowly when you're tired, and whatever is left feeds the heart. With Toxin puddles on, kills over the mark leave green puddles that slow your cells.</li>
-        <li><b>Leakers in the Sandbox</b>: the liver and kidneys are also drawn in the blood vessel at the Lymph node end. Each Hepatitis or E. coli that reaches the blood adds ${Math.round(CONFIG.lymph.leak * 100)}% to that organ's breach clock. With Toxin load on, they also clear toxin (liver ${Math.round(WS.organs.liverShare * 100)}%, kidneys the rest), toxin over ${WS.organs.kidneyToxAt} wears the kidneys down, and a green strip under the organ button shows the level.</li>
+        <li><b>Leakers in the Sandbox</b>: the liver and kidneys are also drawn in the blood vessel at the Lymph node end. Each Hepatitis or E. coli that reaches the blood adds ${Math.round(WS.leakers.leak * 100)}% to that organ's breach clock. With Toxin load on, they also clear toxin (liver ${Math.round(WS.organs.liverShare * 100)}%, kidneys the rest), toxin over ${WS.organs.kidneyToxAt} wears the kidneys down, and a green strip under the organ button shows the level.</li>
         <li><b>Pause</b>: the II button, or Space.""")
 # end screen: keep going, levels go through the workshop
 ui("""      <div class="btnrow">${r.win && nextKey ?""", """      ${!r.win ? '<div class="btnrow"><button class="btn primary" id="keepGoing" type="button">Keep going with No death</button></div>' : ''}
@@ -87,7 +92,7 @@ ui("    game = new Game(levelKey, seed);\n", """    levelKey = dev.level;
     ws = new Workshop(dev, seed); game = ws.game;
     const c = pendingSetup;
     if (c) {
-      if (c.mix) for (let z = 0; z < 3; z++) game.setMix(z, c.mix);
+      if (c.mix) for (let z = 0; z < NZ; z++) game.setMix(z, c.mix);
       if (c.zones) c.zones.forEach((m, z) => game.setZone(z, m));
       if (c.output != null) game.setOutput(c.output);
       if (c.boss) ws.spawnGroup('worm');
@@ -96,11 +101,10 @@ ui("    game = new Game(levelKey, seed);\n", """    levelKey = dev.level;
     }
 """)
 ui("    closeSheet(); buildCards();\n    hud();\n  }", "    closeSheet(); buildCards();\n    hud(); syncWorkshop();\n  }")
-# v3 later added its own dev spawner (devSpawn) to this loop; keep it if present
-if "{ devSpawn(STEP); game.step(STEP);" in s:
-    ui("      while (acc >= STEP && n < 16) { devSpawn(STEP); game.step(STEP); acc -= STEP; n++; }", "      while (acc >= STEP && n < 16 && !game.result) { devSpawn(STEP); ws.step(STEP); acc -= STEP; n++; }")
-else:
-    ui("      while (acc >= STEP && n < 16) { game.step(STEP); acc -= STEP; n++; }", "      while (acc >= STEP && n < 16 && !game.result) { ws.step(STEP); acc -= STEP; n++; }")
+# the step loop: v3 later added its own dev spawner (devSpawn) and a MAX_STEPS cap (V28); keep whatever is there, step through the workshop
+_m = re.search(r"      while \(acc >= STEP && n < (16|MAX_STEPS)\) \{ (devSpawn\(STEP\); )?game\.step\(STEP\); acc -= STEP; n\+\+; \}", s)
+assert _m, 'step loop anchor'
+ui(_m.group(0), f"      while (acc >= STEP && n < {_m.group(1)} && !game.result) {{ {_m.group(2) or ''}ws.step(STEP); acc -= STEP; n++; }}")
 ui("  $('#devStep').addEventListener('click', () => { if (game && !game.result) for (let i = 0; i < 60; i++) game.step(STEP); });",
    "  $('#devStep').addEventListener('click', () => { if (game && !game.result) for (let i = 0; i < 60 && !game.result; i++) ws.step(STEP); });")
 ui("  $('#devSkip').addEventListener('click', () => { if (game && !game.result) for (let i = 0; i < 900 && !game.result; i++) game.step(STEP); });",
@@ -112,7 +116,7 @@ ui("""  $('#devBtn').addEventListener('click', () => { $('#dev').hidden = !$('#d
   $('#devClose').addEventListener('click', () => setDevOpen(false));""")
 s = between(s, "  function buildTuning() {", "  $('#tuneCopy')", blocks['tuning'])
 ui("JSON.stringify(tuningDiff(), null, 1)", "JSON.stringify({ tune: tuningDiff(DEFAULTS, CONFIG), ws: tuningDiff(WS_DEFAULTS, WS) }, null, 1)")
-panel = blocks['panel'].replace('/*NEWMECH*/', blocks['newmech'])
+panel = blocks['panel'].replace('/*NEWMECH*/', blocks.get('newmech', ''))
 ui("  // ---- boot ----", panel + "  // ---- boot ----")
 ui("  buildTuning();\n  $('#seed').value = seed;", "  buildTuning();\n  buildWorkshop();\n  $('#seed').value = seed;")
 ui("  newGame();\n  showStart();\n  requestAnimationFrame(frame);", "  pendingSetup = dev.level === 'sandbox' && dev.combo ? COMBOS[dev.combo] || null : null;\n  newGame();\n  showStart();\n  requestAnimationFrame(frame);")
@@ -138,7 +142,7 @@ ui("        case 'measlesBurst': burstParts(f.u, f.v, 'lilac', 10, 70, 0.5); bre
 
 # leakers ride flu and staph bodies: keep them out of those hints and out of the Lymph node warning, and give them their own hint
 ui("    const has = k => g.ag.some(a => a.k === k && !a.dead);", "    const has = k => g.ag.some(a => a.k === k && !a.dead && !a.leak); // workshop: leakers aren't flu or Staph\n    const leakers = g.ag.filter(a => a.leak && !a.dead && !a.eaten);")
-ui("    else if (g.zones[2].count > 0) {", "    else if (leakers.length && !g.zones[2].count) { html = leakers.some(a => a.leak === 'liver') ? `<b>Hepatitis is swimming for the left blood vessel.</b> Each one that gets in adds ${Math.round(CONFIG.lymph.leak * 100)}% to the liver's breach clock. Nets catch the swarm in the zone it crosses.` : `<b>E. coli is swimming for the left blood vessel.</b> Each one that gets in adds ${Math.round(CONFIG.lymph.leak * 100)}% to the kidneys' breach clock.${dev.toxinLoad ? ' Shooting it dumps toxin: Offense macrophages swallow it clean.' : ' It takes 2 hits, or one swallow.'}`; }\n    else if (g.zones[2].count > 0) {") # workshop: leakers head for the vessel
+ui("    else if (g.zones[LYMPH].count > 0) {", "    else if (leakers.length && !g.zones[LYMPH].count) { html = leakers.some(a => a.leak === 'liver') ? `<b>Hepatitis is swimming for the left blood vessel.</b> Each one that gets in adds ${Math.round(WS.leakers.leak * 100)}% to the liver's breach clock. Nets catch the swarm in the zone it crosses.` : `<b>E. coli is swimming for the left blood vessel.</b> Each one that gets in adds ${Math.round(WS.leakers.leak * 100)}% to the kidneys' breach clock.${dev.toxinLoad ? ' Shooting it dumps toxin: Offense macrophages swallow it clean.' : ' It takes 2 hits, or one swallow.'}`; }\n    else if (g.zones[LYMPH].count > 0) {") # workshop: leakers head for the vessel
 
 ui("        const warn = KINDS[a.k].divides && a.age < a.div && a.div - a.age < BLINK_WARN && a.div - a.age > 0;\n        const tm = a.blink > 0 ? a.blink : warn ? a.div - a.age : -1;",
    "        const ewarn = a.leak === 'kidney' && a.ediv > 0 && a.ediv < BLINK_WARN; // workshop: E. coli keeps its own division clock\n        const warn = ewarn || (KINDS[a.k].divides && a.age < a.div && a.div - a.age < BLINK_WARN && a.div - a.age > 0);\n        const tm = a.blink > 0 ? a.blink : warn ? (ewarn ? a.ediv : a.div - a.age) : -1;")
@@ -147,7 +151,7 @@ ui("        const warn = KINDS[a.k].divides && a.age < a.div && a.div - a.age < 
 ui("${TUT.ANTIGENS.filter(id => TUT.CLIPS[id]).map(btn).join('')}</div>`;",
    "${TUT.ANTIGENS.filter(id => TUT.CLIPS[id]).map(btn).join('')}${(TUT.SYSTEMS || []).some(id => TUT.CLIPS[id]) ? `<h4>Systems</h4>${TUT.SYSTEMS.filter(id => TUT.CLIPS[id]).map(btn).join('')}` : ''}</div>`;")
 ui("      unit('tapeworm-head', 'Tapeworm',",
-   "      unit('hepatitis', 'Hepatitis (workshop only)', 'The liver leaker. Fast swarms of 6, one hit kills.', [`Swims for the left blood vessel. Each one that gets in adds ${Math.round(CONFIG.lymph.leak * 100)}% to the liver's breach clock. Net neutrophils catch the swarm.`]),\n      unit('e-coli', 'E. coli (workshop only)', 'The kidney leaker. Takes 2 hits and divides.', [`Each one that reaches the blood adds ${Math.round(CONFIG.lymph.leak * 100)}% to the kidneys' breach clock. ${dev.toxinLoad ? 'Shooting it dumps extra toxin; <b>swallowing it is the clean answer</b>.' : 'Swallowing it is the quickest answer.'}`]),\n      unit('tapeworm-head', 'Tapeworm',")
+   "      unit('hepatitis', 'Hepatitis (workshop only)', 'The liver leaker. Fast swarms of 18, one hit kills.', [`Swims for the left blood vessel. Each one that gets in adds ${Math.round(WS.leakers.leak * 100)}% to the liver's breach clock. Net neutrophils catch the swarm.`]),\n      unit('e-coli', 'E. coli (workshop only)', 'The kidney leaker. Takes 2 hits and divides.', [`Each one that reaches the blood adds ${Math.round(WS.leakers.leak * 100)}% to the kidneys' breach clock. ${dev.toxinLoad ? 'Shooting it dumps extra toxin; <b>swallowing it is the clean answer</b>.' : 'Swallowing it is the quickest answer.'}`]),\n      unit('tapeworm-head', 'Tapeworm',")
 
 ui("      <div class=\"bodyview\">${ORGANS.map(card).join('')}</div>", "      <div class=\"bodyview\">${wsToxCard()}${ORGANS.map(card).join('')}</div>") # workshop: toxin and leaks
 

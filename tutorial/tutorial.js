@@ -294,7 +294,37 @@ const CYT = (function () {
     const [x0, y0] = P(u0, VES), [x1, y1] = P(u1, V - FVES);
     return [Math.min(x0, x1), Math.min(y0, y1), Math.abs(x1 - x0), Math.abs(y1 - y0)];
   }
-  const ZICON = { Wound: 'sector-wound', Tissue: 'sector-tissue', 'Lymph node': 'sector-lymph' };
+  const ZICON = { Wound: 'sector-wound', Tissue: 'sector-tissue', 'Deep tissue': 'sector-tissue', 'Lymph node': 'sector-lymph' };
+  // The map, as in v3 (2026-10-08): Wound, Tissue and Deep tissue 30% each, then a thin Lymph node strip (10%)
+  const MAP = [[0, 120, 'Wound'], [120, 240, 'Tissue'], [240, 360, 'Deep tissue'], [360, 400, 'Lymph node']], NODE_U = 360;
+  const MAP_BG = { dividers: [120, 240, 360], lymph: [380, 175] };
+  // Names (and germ counts) for the three big sectors, and the Lymph node's one-row strip: name, count, stance chip
+  // and its breach clock, like v3's nodeLayer. o: { counts: [4], frac, busy, organ, lv, mode, t }
+  function mapLabels(o = {}) {
+    MAP.slice(0, 3).forEach(([u0, u1, name], z) => { zoneName(u0, u1, name); if (o.counts) zoneCount(u0, u1, o.counts[z]); });
+    return nodeRow(o);
+  }
+  function nodeRow(o = {}) {
+    const [x, y, w, h] = zoneRect(NODE_U, U), my = y + h / 2, n = o.counts ? o.counts[3] : null;
+    icon('sector-lymph', x + 16, my, 16, 0.9);
+    ctx.globalAlpha = 0.9; ctx.fillStyle = PAL.ui; ctx.font = `600 12px ${FONT}`; ctx.textAlign = 'left'; ctx.textBaseline = 'middle';
+    ctx.fillText('Lymph node', x + 28, my);
+    let left = x + 28 + ctx.measureText('Lymph node').width + 6;
+    if (n != null) { ctx.font = `600 16px ${FONT}`; ctx.globalAlpha = n ? 0.9 : 0.3; ctx.fillStyle = n ? PAL.germHi : PAL.ui; ctx.fillText(String(n), left, my + 0.5); left += ctx.measureText(String(n)).width + 8; }
+    if (o.off) { ctx.font = `500 9.5px ${MONO}`; ctx.fillStyle = PAL.ui; ctx.globalAlpha = 0.55; ctx.fillText('OFF', left, my); left += ctx.measureText('OFF').width + 8; }
+    ctx.globalAlpha = 1;
+    const sup = o.mode === 'support', col = sup ? PAL.repair : PAL.kill, cw = 74, ch = 20, chx = Math.max(left, x + w / 2 - cw / 2);
+    if (o.mode !== null && chx + cw < x + w - 80) {
+      ctx.fillStyle = 'rgba(10,13,24,0.85)'; ctx.strokeStyle = col; ctx.lineWidth = 1.5; rrect(chx, my - ch / 2, cw, ch, ch / 2); ctx.fill(); ctx.stroke();
+      icon(sup ? 'mode-support' : 'mode-offense', chx + 12, my, 16);
+      ctx.fillStyle = col; ctx.font = `600 11px ${FONT}`; ctx.fillText(sup ? 'Support' : 'Offense', chx + 22, my + 0.5);
+    }
+    // breach clock, left of the power button: the organ in a ring, an empty ring when the node is clear
+    const r = Math.min(13, h * 0.36), tx = x + w - 46 - r, frac = o.frac || 0, live = !!o.busy, organ = o.organ || 'spleen';
+    ART.drawTimer(ctx, tx, my, r, frac, { beating: live, t: o.t || 0 });
+    if (frac > 0.001 || live) organImg(`${organ === 'kidney' ? 'kidneys' : organ}-${ORGAN_STATE[o.lv == null ? 4 : o.lv]}`, tx - r * 0.75, my - r * 0.56, r * 1.5, r * 1.12, live ? 1 : 0.55);
+    return [tx, my, r];
+  }
   function zoneName(u0, u1, name) {
     const [x, y] = zoneRect(u0, u1);
     icon(ZICON[name] || 'sector-tissue', x + 16, y + 15, 18, 0.9);
@@ -336,7 +366,7 @@ const CYT = (function () {
   // A sector's power button, as in v3: 30 px round, bottom-right of the sector. On: green ring and glow;
   // off: dashed grey. shake 0..1 wobbles it sideways (the "last zone" refusal). Returns its centre.
   function zonePower(u0, u1, on, shake = 0) {
-    const [x, y, w, h] = zoneRect(u0, u1), cx = x + w - 26 + Math.sin(shake * 40) * 4 * shake, cy = y + h - 26, r = 15;
+    const [x, y, w, h] = zoneRect(u0, u1), cx = x + w - 26 + Math.sin(shake * 40) * 4 * shake, cy = h < 60 ? y + h / 2 : y + h - 26, r = 15;
     ctx.save();
     ctx.fillStyle = 'rgba(10,13,24,.82)'; ctx.beginPath(); ctx.arc(cx, cy, r, 0, 6.283); ctx.fill();
     ctx.lineWidth = 1.5; ctx.strokeStyle = on ? '#7BE0A0' : '#5A6070';
@@ -378,9 +408,9 @@ const CYT = (function () {
   // ---- HUD pieces (screen space, inside the strips the clip asks for) ----
   const UNIT_LOWER = { neut: 'neutrophils', net: 'net neutrophils', nk: 'NK cells', mac: 'macrophages' };
   function hudCards(rect, st) {
-    const [x, y, w, h] = rect, gap = 6, cw = (w - gap * 2) / 3, names = ['Wound', 'Tissue', 'Lymph node'];
+    const names = st.names || MAP.map(m => m[2]), N = st.mix.length, [x, y, w, h] = rect, gap = 6, cw = (w - gap * (N - 1)) / N, slim = cw < 100;
     R.hud.cards = [];
-    for (let z = 0; z < 3; z++) {
+    for (let z = 0; z < N; z++) {
       const cx = x + z * (cw + gap), mix = st.mix[z], mode = st.modes ? st.modes[z] : 'offense', open = st.open === z;
       const off = st.off && st.off[z], boost = st.boost && st.boost[z];
       ctx.fillStyle = off ? '#07090F' : '#0A0D18'; ctx.strokeStyle = open ? PAL.cell : off ? '#3A4360' : boost ? '#FFD23F' : '#1E2540'; ctx.lineWidth = open || boost ? 1.5 : 1;
@@ -400,9 +430,9 @@ const CYT = (function () {
       for (const k of keys) { const ww = (bw - 2 * (keys.length - 1)) * mix[k]; ctx.fillStyle = COLORS[k]; ctx.shadowColor = COLORS[k]; ctx.shadowBlur = 5; ctx.fillRect(ax, by, ww, 7); ax += ww + 2; }
       ctx.shadowBlur = 0;
       ctx.font = `500 10px ${MONO}`; ctx.fillStyle = '#7A86A0'; ctx.textAlign = 'left';
-      if (off) { ctx.globalAlpha = 1; ctx.fillStyle = '#9AA4BC'; ctx.fillText('Off · no new cells', bx, y + h - 11); }
-      else ctx.fillText(keys.length === 1 ? `100% ${UNIT_LOWER[keys[0]]}` : keys.map(k => Math.round(mix[k] * 100) + '%').join(' · '), bx, y + h - 11);
-      if (boost && !off) { ctx.font = `600 11px ${MONO}`; ctx.fillStyle = '#FFD23F'; ctx.shadowColor = '#FFD23F'; ctx.shadowBlur = 6; ctx.textAlign = 'right'; ctx.fillText(boost, cx + cw - 7, y + h - 11); ctx.shadowBlur = 0; }
+      if (off) { ctx.globalAlpha = 1; ctx.fillStyle = '#9AA4BC'; ctx.fillText(slim ? 'Off' : 'Off · no new cells', bx, y + h - 11); }
+      else if (!(boost && slim)) ctx.fillText(keys.length === 1 ? (slim ? '100%' : `100% ${UNIT_LOWER[keys[0]]}`) : keys.map(k => Math.round(mix[k] * 100) + '%').join(' · '), bx, y + h - 11);
+      if (boost && !off) { ctx.font = `600 11px ${MONO}`; ctx.fillStyle = '#FFD23F'; ctx.shadowColor = '#FFD23F'; ctx.shadowBlur = 6; ctx.textAlign = slim ? 'left' : 'right'; ctx.fillText(slim ? `${boost} output` : boost, slim ? bx : cx + cw - 7, y + h - 11); ctx.shadowBlur = 0; }
       ctx.globalAlpha = 1;
       ctx.restore();
       if (st.flash > 0) { ctx.globalAlpha = clamp(st.flash); ctx.strokeStyle = '#FFD23F'; ctx.lineWidth = 2; ctx.shadowColor = '#FFD23F'; ctx.shadowBlur = 12; rrect(cx - 1, y - 1, cw + 2, h + 2, 11); ctx.stroke(); ctx.shadowBlur = 0; ctx.globalAlpha = 1; }
@@ -418,7 +448,7 @@ const CYT = (function () {
     ctx.fillStyle = 'rgba(10,13,24,0.96)'; ctx.strokeStyle = '#1E2540'; ctx.lineWidth = 1;
     rrect(x, y, w, h, 12); ctx.fill(); ctx.stroke();
     ctx.fillStyle = PAL.ui; ctx.font = `600 13px ${FONT}`; ctx.textAlign = 'left'; ctx.textBaseline = 'middle';
-    ctx.fillText(`${st.zone} production`, x + 12, y + 17);
+    ctx.fillText(`${st.zone} response`, x + 12, y + 17);
     ctx.font = `500 11px ${MONO}`; ctx.fillStyle = '#7A86A0'; ctx.textAlign = 'right'; ctx.fillText('adds up to 100%', x + w - 12, y + 17);
     R.hud.sliders = {}; R.hud.pills = {};
     rows.forEach((u, i) => {
@@ -445,12 +475,12 @@ const CYT = (function () {
     });
     // "Use this mix everywhere" with an "Apply to all zones" button: copies this zone's mix to the others
     let rowY = y + 34 + rows.length * rh + 4;
-    // "Loadouts": three saved mixes; tap a saved slot to use it here, tap Save to store this zone's mix.
+    // "Responses" (formerly Loadouts; Alex 2026-10-08): three saved responses; tap a saved slot to use it here, tap Save to store this zone's mix.
     // The slot matching the current mix lights cyan.
     if (st.loadouts) {
       const L = st.loadouts, cy = rowY + 14, sw = 50, sg = 6, bx0 = x + w - 12 - 3 * sw - 2 * sg;
       ctx.strokeStyle = '#1E2540'; ctx.lineWidth = 1; ctx.beginPath(); ctx.moveTo(x + 12, rowY - 2); ctx.lineTo(x + w - 12, rowY - 2); ctx.stroke();
-      ctx.fillStyle = PAL.ui; ctx.font = `600 12px ${FONT}`; ctx.textAlign = 'left'; ctx.textBaseline = 'middle'; ctx.fillText('Loadouts', x + 12, cy);
+      ctx.fillStyle = PAL.ui; ctx.font = `600 12px ${FONT}`; ctx.textAlign = 'left'; ctx.textBaseline = 'middle'; ctx.fillText('Responses', x + 12, cy);
       R.hud.slots = []; R.hud.saves = [];
       for (let i = 0; i < 3; i++) {
         const sx = bx0 + i * (sw + sg), mix = L.slots[i], on = L.active === i, hot = L.saving === i;
@@ -469,7 +499,7 @@ const CYT = (function () {
     if (st.apply) {
       const cy = rowY + 16, bw = 128, bx = x + w - 12 - bw, hot = st.apply === 'pressed';
       ctx.strokeStyle = '#1E2540'; ctx.lineWidth = 1; ctx.beginPath(); ctx.moveTo(x + 12, rowY - 2); ctx.lineTo(x + w - 12, rowY - 2); ctx.stroke();
-      ctx.fillStyle = PAL.ui; ctx.font = `600 12px ${FONT}`; ctx.textAlign = 'left'; ctx.textBaseline = 'middle'; ctx.fillText('Use this mix everywhere', x + 12, cy);
+      ctx.fillStyle = PAL.ui; ctx.font = `600 12px ${FONT}`; ctx.textAlign = 'left'; ctx.textBaseline = 'middle'; ctx.fillText('Use this response everywhere', x + 12, cy);
       ctx.fillStyle = hot ? '#FFD23F' : '#10152A'; ctx.strokeStyle = '#FFD23F'; rrect(bx, cy - 11, bw, 22, 6); ctx.fill(); ctx.stroke();
       ctx.fillStyle = hot ? '#04050A' : '#FFD23F'; ctx.font = `600 12px ${FONT}`; ctx.textAlign = 'center'; ctx.fillText('Apply to all zones', bx + bw / 2, cy + 0.5);
       R.hud.apply = [bx + bw / 2, cy + (1 - pop) * 30];
@@ -570,12 +600,12 @@ const CYT = (function () {
   }
   // The game's Organ status window (paused): one row per organ with its bars and what it costs you now
   const ORGAN_EFFECT = {
-    heart: ['Body output tops out at 1.25×', 'Body output tops out at 1.5×', 'Body output tops out at 1.75×'],
+    heart: ['Stress tops out at 125%', 'Stress tops out at 150%', 'Stress tops out at 175%'],
     kidneys: ['Recovery 75% slower', 'Recovery 50% slower', 'Recovery 25% slower'],
     lungs: ['All your cells 30% slower', 'All your cells 20% slower', 'All your cells 10% slower'],
     liver: ['Cells made 45% slower', 'Cells made 30% slower', 'Cells made 15% slower'],
-    spleen: ['Cell limit 90', 'Cell limit 120', 'Cell limit 150'],
-    brain: ['Every cell wanders 60% more; delirium', 'Every cell wanders 40% more; mix changes lag 3 s', 'Every cell wanders 20% more'],
+    spleen: ['Cell limit 270', 'Cell limit 360', 'Cell limit 450'],
+    brain: ['Every cell wanders 60% more; delirium', 'Every cell wanders 40% more; response changes lag 3 s', 'Every cell wanders 20% more'],
   };
   function organPanel(hp, a) {
     if (a <= 0) return;
@@ -602,17 +632,17 @@ const CYT = (function () {
     R.hud.resume = [bx + bw / 2, by + 13];
     ctx.restore();
   }
-  // Heart + Body output slider; st.out = 0..1 slider, st.f = fatigue
+  // Heart + Stress slider (formerly Body output; v3 V27); st.out = 0..1 slider, st.f = fatigue
   function hudOutput(rect, st, t, o = {}) {
     const [x, y, w, h] = rect;
     ctx.fillStyle = '#0A0D18'; ctx.strokeStyle = '#1E2540'; ctx.lineWidth = 1; rrect(x, y, w, h, 10); ctx.fill(); ctx.stroke();
     heart(x + 30, y + h / 2 + 2, Math.min(40, h - 12), st.f, t, st, o);
     const lx = x + 58, rw = x + w - 10 - lx;
     ctx.textBaseline = 'middle'; ctx.textAlign = 'left'; ctx.font = `600 12px ${FONT}`; ctx.fillStyle = PAL.ui;
-    ctx.fillText('Body output', lx, y + 13);
+    ctx.fillText('Stress', lx, y + 13);
     const mul = 0.5 * Math.pow(4, st.out);
-    // the game's label: "Body output 1.9×", the number being the effective production speed
-    const bw = ctx.measureText('Body output').width; ctx.font = `500 11px ${MONO}`; ctx.fillStyle = '#9AA4BC'; ctx.fillText(`${mul.toFixed(1)}×`, lx + bw + 6, y + 13.5);
+    // the game's label (V27): "Stress 100%", from 50% to 200%
+    const bw = ctx.measureText('Stress').width; ctx.font = `500 11px ${MONO}`; ctx.fillStyle = '#9AA4BC'; ctx.fillText(`${Math.round(mul * 20) * 5}%`, lx + bw + 6, y + 13.5);
     const ty = y + h / 2 + 1, tx0 = lx, tx1 = x + w - 12, rest = 0.6;
     const gr = ctx.createLinearGradient(tx0, 0, tx1, 0);
     gr.addColorStop(0, 'rgba(63,230,255,.15)'); gr.addColorStop(rest, 'rgba(63,230,255,.45)'); gr.addColorStop(rest + 0.001, '#FFD23F'); gr.addColorStop(rest + (1 - rest) / 2, '#FF7A3D'); gr.addColorStop(1, '#FF3B4E');
@@ -761,7 +791,7 @@ const CYT = (function () {
     P, ang, spr, icon, glow, blinkGlow, ringFx, burst, dots,
     ent, divide, gulp, shot, volley, alive, scene, drawEnt,
     zoneRect, zoneName, zoneCount, zoneChip, lymphTimer, tag, flowArrow, flash, rrect,
-    zonePower, hudCards, hudSheet, hudOutput, hudStorm, hudProgress, heart, finger, toast, spotlight, vesselRect, organPanel, organLevel, TIER,
+    MAP, MAP_BG, NODE_U, mapLabels, nodeRow, zonePower, hudCards, hudSheet, hudOutput, hudStorm, hudProgress, heart, finger, toast, spotlight, vesselRect, organPanel, organLevel, TIER,
     get ctx() { return ctx; }, get R() { return R; },
   };
   return { render, api, U, V };
@@ -778,7 +808,7 @@ const CYT_CLIPS = {};
 const CYT_KIT = (function () {
   const A = CYT.api;
   // Map-view zones (the whole level squeezed onto the stage)
-  const ZM = [0, 133.3, 266.7, 400];
+  const ZM = [0, 120, 240, 360, 400];
   // Staph-like germs milling in a region; returns the entities
   function crowd(n, reg, seed, o = {}) {
     const r = A.rng(seed), out = [];
@@ -842,28 +872,27 @@ const CYT_KIT = (function () {
 // ---- 1. The goal ----
 CYT_CLIPS.goal = {
   id: 'goal', title: 'Hold the Lymph node', dur: 10.5,
-  cap: [[0, 'Germs pour out of the Wound and drift toward the Lymph node.'], [3.7, 'Germs in the Lymph node fill a breach clock. Staph hurts your spleen: a full clock costs it a bar.'], [7.4, 'Kill them and the clock drains away. Lose every bar of an organ and it\'s Host failure.']],
-  bg: { wound: [48, 205], woundSize: 0.6, dividers: [133.3, 266.7], lymph: [345, 175] },
+  cap: [[0, 'Germs pour out of the Wound and drift down toward the Lymph node, the thin strip at the bottom.'], [3.7, 'Germs that reach the Lymph node fill a breach clock. Staph hurts your spleen: a full clock costs it a bar.'], [7.4, 'Kill them and the clock drains away. Lose every bar of an organ and it\'s Host failure.']],
+  bg: { wound: [48, 205], woundSize: 0.6, dividers: [120, 240, 360], lymph: [380, 175] },
   build(st) {
     const A = CYT.api, K = CYT_KIT, r = A.rng(11);
     st.germs = [];
     for (let i = 0; i < 12; i++) {
-      const ts = 0.1 + i * 0.22, u0 = 40 + r() * 16, v0 = 190 + r() * 30, u1 = 300 + r() * 75, v1 = 95 + r() * 170;
+      const ts = 0.1 + i * 0.22, u0 = 40 + r() * 16, v0 = 190 + r() * 30, u1 = 365 + r() * 26, v1 = 95 + r() * 170;
       st.germs.push(A.ent({ art: 'bacterium', hitArt: 'bacterium-hit', r: 4.6, rot: 'vel', t0: ts, die: 'pop',
-        pos: A.path([[ts, u0, v0], [ts + 0.5, u0 + 14, v0 - 4], [ts + 4.1, u1, v1, 'l'], [ts + 12, u1 + 12, v1 + 5, 'l']], 3, i * 3.1) }));
+        pos: A.path([[ts, u0, v0], [ts + 0.5, u0 + 14, v0 - 4], [ts + 4.1, u1, v1, 'l'], [ts + 12, u1 + 3, v1 + 5, 'l']], 3, i * 3.1) }));
     }
     st.neuts = [];
-    for (let i = 0; i < 6; i++) st.neuts.push(K.recruit('neutrophil', 4.6 + i * 0.12, 285 + i * 19, 120 + (i % 3) * 55, { r: 4.8, wob: 5, travel: 0.7 }));
+    for (let i = 0; i < 6; i++) st.neuts.push(K.recruit('neutrophil', 4.6 + i * 0.12, 318 + i * 11, 120 + (i % 3) * 55, { r: 4.8, wob: 5, travel: 0.7 }));
     K.fight(st.neuts, st.germs.slice().sort((a, b) => a.pos(5)[0] - b.pos(5)[0]).reverse(), 5.2, { hp: 3, every: 0.32, seed: 3 });
-    st.timer = K.timerTable(st.germs, 266.7, 0.11, this.dur, 0, 0.06);
+    st.timer = K.timerTable(st.germs, A.NODE_U, 0.11, this.dur, 0, 0.06);
   },
   frame(t, st, A) {
     const [frac, busy] = st.timer(t);
-    A.flowArrow(70, 300, 245, A.seg(t, 0.4, 0.9) * (1 - A.seg(t, 3.2, 3.8)), t);
+    A.flowArrow(70, 372, 245, A.seg(t, 0.4, 0.9) * (1 - A.seg(t, 3.2, 3.8)), t);
     A.scene(t);
-    A.zoneName(0, 133.3, 'Wound'); A.zoneName(133.3, 266.7, 'Tissue'); A.zoneName(266.7, 400, 'Lymph node');
-    A.lymphTimer(266.7, 400, frac, busy, t);
-    if (t > 3.6 && t < 7.3) { const [x, y] = A.lymphTimer(266.7, 400, frac, busy, t); A.ctx.globalAlpha = 0.5 + 0.5 * Math.sin(t * 8); A.ctx.strokeStyle = A.PAL.damage; A.ctx.lineWidth = 1.5; A.ctx.beginPath(); A.ctx.arc(x, y, 28, 0, 6.283); A.ctx.stroke(); A.ctx.globalAlpha = 1; }
+    const [x, y, r] = A.mapLabels({ frac, busy, t });
+    if (t > 3.6 && t < 7.3) { A.ctx.globalAlpha = 0.5 + 0.5 * Math.sin(t * 8); A.ctx.strokeStyle = A.PAL.damage; A.ctx.lineWidth = 1.5; A.ctx.beginPath(); A.ctx.arc(x, y, r + 7, 0, 6.283); A.ctx.stroke(); A.ctx.globalAlpha = 1; }
   },
 };
 
@@ -904,9 +933,9 @@ CYT_CLIPS.divide = {
 // ---- 3. Production cards ----
 CYT_CLIPS.cards = {
   id: 'cards', title: 'Choose what each zone makes', dur: 15.6,
-  cap: [[0, 'Each zone has a production card. Tap one to choose which cells you make there.'], [2.8, 'Drag a slider to share out the mix. Tap 100% to make only that cell, or 0% to stop making it.'], [4.3, 'Tap Save under a loadout slot to keep this mix. Tap the slot to use it in any zone, even next match.'], [5.9, 'Apply to all zones copies this mix to the other two. Each keeps its own stance.'], [7.8, 'New cells come out of the blood vessels on both edges of their zone. Macrophages always use the wide one.'], [11.2, 'Neutrophils are your gunners. Three hits kill a Staph.']],
+  cap: [[0, 'Each zone has a card showing its response: the cells it makes. Tap one to change it.'], [2.8, 'Drag a slider to share out the response. Tap 100% to make only that cell, or 0% to stop making it.'], [4.3, 'Tap Save under a Response slot to keep this response. Tap the slot to use it in any zone, even next match.'], [5.9, 'Apply to all zones copies this response to the other three. Each keeps its own stance.'], [7.8, 'New cells come out of the blood vessels on both edges of their zone. Macrophages always use the wide one.'], [11.2, 'Neutrophils are your gunners. Three hits kill a Staph.']],
   hud: { bottom: true },
-  bg: { wound: [55, 215], woundSize: 0.6, dividers: [133.3, 266.7], lymph: [345, 175] },
+  bg: { wound: [55, 215], woundSize: 0.6, dividers: [120, 240, 360], lymph: [380, 175] },
   saveAt: 4.9, applyAt: 6.2,
   build(st) {
     const A = CYT.api, K = CYT_KIT, r = A.rng(5);
@@ -924,16 +953,16 @@ CYT_CLIPS.cards = {
   },
   frame(t, st, A) {
     A.scene(t);
-    A.zoneName(0, 133.3, 'Wound'); A.zoneName(133.3, 266.7, 'Tissue'); A.zoneName(266.7, 400, 'Lymph node');
-    if (t > 7.4 && t < 9.2) { const [x, y, w] = A.zoneRect(0, 133.3); const c = A.ctx; c.globalAlpha = 0.5 * (1 - A.seg(t, 8.6, 9.2)); c.strokeStyle = A.PAL.cell; c.lineWidth = 2; c.setLineDash([4, 4]); c.strokeRect(x + 2, y - 8, w - 4, 10); c.setLineDash([]); c.globalAlpha = 1; }
-    A.toast('Wound mix copied to all zones', A.seg(t, this.applyAt + 0.1, this.applyAt + 0.3) - A.seg(t, this.applyAt + 1.8, this.applyAt + 2.1));
+    A.mapLabels({ t });
+    if (t > 7.4 && t < 9.2) { const [x, y, w] = A.zoneRect(0, 120); const c = A.ctx; c.globalAlpha = 0.5 * (1 - A.seg(t, 8.6, 9.2)); c.strokeStyle = A.PAL.cell; c.lineWidth = 2; c.setLineDash([4, 4]); c.strokeRect(x + 2, y - 8, w - 4, 10); c.setLineDash([]); c.globalAlpha = 1; }
+    A.toast('Wound response copied to all zones', A.seg(t, this.applyAt + 0.1, this.applyAt + 0.3) - A.seg(t, this.applyAt + 1.8, this.applyAt + 2.1));
   },
   hudFrame(t, st, A) {
     A.hudSheet({ zone: 'Wound', units: ['neut', 'mac'], mix: this.mixAt(t), loadouts: this.loadouts(t), apply: t >= this.applyAt && t < this.applyAt + 0.2 ? 'pressed' : 'idle', show: A.seg(t, 1.3, 1.6) - A.seg(t, 7.0, 7.3) });
     const m = this.mixAt(t), base = { neut: 0.7, mac: 0.3 }, q = A.ease(A.seg(t, this.applyAt, this.applyAt + 0.25));
     const copied = { neut: A.lerp(base.neut, m.neut, q), mac: A.lerp(base.mac, m.mac, q) };
     const d = t - this.applyAt, flash = d > 0 && d < 1.2 ? (1 - d / 1.2) * (0.65 + 0.35 * Math.sin(d * 18)) : 0;
-    A.hudCards(A.R.bottom, { mix: [m, copied, copied], open: t > 1.25 && t < 7.3 ? 0 : -1, flash });
+    A.hudCards(A.R.bottom, { mix: [m, copied, copied, copied], open: t > 1.25 && t < 7.3 ? 0 : -1, flash });
   },
   fingers(t, st, A) {
     const K = CYT_KIT, card = () => A.R.hud.cards[0], sl = () => A.R.hud.sliders ? A.R.hud.sliders.neut : { x0: 0, x1: 0, y: 0 };
@@ -947,58 +976,60 @@ CYT_CLIPS.cards = {
 // ---- 3b. Switching a zone off ----
 CYT_CLIPS.shutoff = {
   id: 'shutoff', title: 'Switch a zone off', dur: 13.5,
-  cap: [[0, 'The Lymph node is quiet, but it still gets a third of your new cells.'], [1.4, 'Tap the power button in its corner to switch it off. The switch on its card works too.'], [3.4, 'Cells already there stay and fight. No new ones are made.'], [5.4, 'Its share goes to the zones still on, so each gets ×1.5. The Wound floods with cells.'], [8.6, 'Switch the Tissue off too, and the Wound gets ×3.'], [10.6, 'The last zone won\'t switch off. One zone always has to keep making cells.']],
+  cap: [[0, 'The Lymph node is quiet, but it still gets a quarter of your new cells.'], [1.4, 'Tap the power button in its corner to switch it off. The switch on its card works too.'], [3.4, 'Cells already there stay and fight. No new ones are made.'], [5.4, 'Its share goes to the zones still on, so each makes a bit more. The Wound fills faster.'], [8.6, 'Switch the Tissue and Deep tissue off too, and the Wound makes the most it can. Its vessel walls only let so many cells through.'], [10.6, 'The last zone won\'t switch off. One zone always has to keep making cells.']],
   hud: { bottom: true },
-  bg: { wound: [55, 215], woundSize: 0.6, dividers: [133.3, 266.7], lymph: [345, 175] },
-  offAt: 2.7, off2At: 9.3, noAt: 11.2,
-  zones: [[0, 133.3, 'Wound'], [133.3, 266.7, 'Tissue'], [266.7, 400, 'Lymph node']],
+  bg: { wound: [55, 215], woundSize: 0.6, dividers: [120, 240, 360], lymph: [380, 175] },
+  offAt: 2.7, off2At: 9.2, off3At: 9.8, noAt: 11.2,
   build(st) {
     const A = CYT.api, K = CYT_KIT, r = A.rng(31);
-    st.germs = [].concat(K.crowd(18, [20, 110, 122, 280], 32, { r: 4.6, vu: 1.5, wob: 5 }), K.crowd(3, [150, 120, 250, 260], 33, { r: 4.6, vu: 1, wob: 5 }));
-    const wound = [K.recruit('neutrophil', -5, 60, 150, { r: 4.8 }), K.recruit('neutrophil', -5, 95, 240, { r: 4.8 }), K.recruit('macrophage-offense', -5, 70, 95, { r: 11, wob: 2 })];
-    const tissue = [K.recruit('neutrophil', -5, 190, 140, { r: 4.8 }), K.recruit('neutrophil', -5, 220, 230, { r: 4.8 })];
-    const lymph = [K.recruit('neutrophil', -5, 300, 120, { r: 4.8 }), K.recruit('neutrophil', -5, 330, 220, { r: 4.8 }), K.recruit('neutrophil', -5, 365, 170, { r: 4.8 })];
-    // before: a trickle into every zone; Lymph node off: x1.5 into the other two; Tissue off too: x3 into the Wound
-    for (const t0 of [0.5, 1.7]) wound.push(K.recruit('neutrophil', t0, 15 + r() * 105, 110 + r() * 160, { r: 4.8, wob: 6 }));
-    for (const t0 of [1.0, 2.3]) tissue.push(K.recruit('neutrophil', t0, 145 + r() * 110, 110 + r() * 160, { r: 4.8, wob: 6 }));
-    for (const t0 of [0.8, 2.1]) lymph.push(K.recruit('neutrophil', t0, 280 + r() * 105, 110 + r() * 160, { r: 4.8, wob: 6 }));
-    for (let i = 0; i < 16; i++) wound.push(K.recruit('neutrophil', 3.6 + i * 0.36, 12 + r() * 112, 105 + r() * 170, { r: 4.8, wob: 6 }));
-    for (let i = 0; i < 12; i++) wound.push(K.recruit('neutrophil', this.off2At + 0.3 + i * 0.18, 12 + r() * 112, 105 + r() * 170, { r: 4.8, wob: 6 }));
-    for (let i = 0; i < 6; i++) tissue.push(K.recruit('neutrophil', 3.9 + i * 0.9, 145 + r() * 110, 110 + r() * 160, { r: 4.8, wob: 6 }));
+    st.germs = [].concat(K.crowd(18, [20, 110, 110, 278], 32, { r: 4.6, vu: 1.5, wob: 5 }), K.crowd(3, [140, 120, 225, 260], 33, { r: 4.6, vu: 1, wob: 5 }));
+    const wound = [K.recruit('neutrophil', -5, 60, 150, { r: 4.8 }), K.recruit('neutrophil', -5, 90, 240, { r: 4.8 }), K.recruit('macrophage-offense', -5, 65, 95, { r: 11, wob: 2 })];
+    const tissue = [K.recruit('neutrophil', -5, 170, 140, { r: 4.8 }), K.recruit('neutrophil', -5, 200, 230, { r: 4.8 })];
+    const deep = [K.recruit('neutrophil', -5, 280, 130, { r: 4.8 }), K.recruit('neutrophil', -5, 320, 210, { r: 4.8 })];
+    st.extra = [K.recruit('neutrophil', -5, 378, 150, { r: 4.8, wob: 3 }), K.recruit('neutrophil', -5, 382, 230, { r: 4.8, wob: 3 })];
+    // before: a trickle into every zone; then the zones still on make a bit more each (v3 V27: 109% / 119% / 132%; vessel walls cap the rest)
+    for (const t0 of [0.5, 1.7]) wound.push(K.recruit('neutrophil', t0, 15 + r() * 95, 110 + r() * 160, { r: 4.8, wob: 6 }));
+    for (const t0 of [1.0, 2.3]) tissue.push(K.recruit('neutrophil', t0, 130 + r() * 100, 110 + r() * 160, { r: 4.8, wob: 6 }));
+    for (const t0 of [0.8, 2.0]) deep.push(K.recruit('neutrophil', t0, 250 + r() * 100, 110 + r() * 160, { r: 4.8, wob: 6 }));
+    st.extra.push(K.recruit('neutrophil', 1.3, 372, 120 + r() * 120, { r: 4.8, wob: 3 }));
+    for (let i = 0; i < 12; i++) wound.push(K.recruit('neutrophil', 3.6 + i * 0.48, 12 + r() * 100, 105 + r() * 170, { r: 4.8, wob: 6 }));
+    for (let i = 0; i < 6; i++) wound.push(K.recruit('neutrophil', this.off3At + 0.3 + i * 0.3, 12 + r() * 100, 105 + r() * 170, { r: 4.8, wob: 6 }));
+    for (let i = 0; i < 5; i++) tissue.push(K.recruit('neutrophil', 3.9 + i * 1.0, 130 + r() * 100, 110 + r() * 160, { r: 4.8, wob: 6 }));
+    for (let i = 0; i < 5; i++) deep.push(K.recruit('neutrophil', 4.2 + i * 1.0, 250 + r() * 100, 110 + r() * 160, { r: 4.8, wob: 6 }));
     K.fight(wound.filter(c => c.art === 'neutrophil'), st.germs.slice(0, 18).sort((a, b) => a.pos(4)[1] - b.pos(4)[1]), 1.2, { hp: 3, every: 0.75, seed: 34 });
     K.fight(tissue, st.germs.slice(18), 1.6, { hp: 3, every: 0.9, seed: 35 });
   },
-  on(t) { return [true, t < this.off2At, t < this.offAt]; },
+  // making cells, per zone (Wound, Tissue, Deep tissue, Lymph node)
+  on(t) { return [true, t < this.off2At, t < this.off3At, t < this.offAt]; },
   frame(t, st, A) {
     A.scene(t);
-    const on = this.on(t), c = A.ctx;
-    st.pwr = this.zones.map(([u0, u1, name], z) => {
-      A.zoneName(u0, u1, name);
-      A.zoneCount(u0, u1, st.germs.filter(g => A.alive(g, t) && g.pos(t)[0] >= u0 && g.pos(t)[0] < u1).length);
-      const at = z === 2 ? this.offAt : z === 1 ? this.off2At : 1e9;
-      if (t >= at) {
-        const [x, y] = A.zoneRect(u0, u1);
-        c.globalAlpha = A.seg(t, at, at + 0.3); c.fillStyle = '#9AA4BC'; c.font = `600 10.5px ${A.MONO}`; c.textAlign = 'left'; c.textBaseline = 'middle';
-        c.fillText('NO NEW CELLS', x + 10, y + 72); c.globalAlpha = 1;
-      }
-      const shake = z === 0 && t > this.noAt && t < this.noAt + 0.45 ? 1 - (t - this.noAt) / 0.45 : 0;
-      return A.zonePower(u0, u1, on[z], shake);
+    const on = this.on(t), c = A.ctx, offAt = [1e9, this.off2At, this.off3At];
+    const counts = A.MAP.map(([u0, u1]) => st.germs.filter(g => A.alive(g, t) && g.pos(t)[0] >= u0 && g.pos(t)[0] < u1).length);
+    A.mapLabels({ counts, off: !on[3], t });
+    A.MAP.slice(0, 3).forEach(([u0, u1], z) => {
+      if (t < offAt[z]) return;
+      const [x, y] = A.zoneRect(u0, u1);
+      c.globalAlpha = A.seg(t, offAt[z], offAt[z] + 0.3); c.fillStyle = '#9AA4BC'; c.font = `600 10.5px ${A.MONO}`; c.textAlign = 'left'; c.textBaseline = 'middle';
+      c.fillText('NO NEW CELLS', x + 10, y + 72); c.globalAlpha = 1;
     });
+    st.pwr = A.MAP.map(([u0, u1], z) => A.zonePower(u0, u1, on[z], z === 0 && t > this.noAt && t < this.noAt + 0.45 ? 1 - (t - this.noAt) / 0.45 : 0));
   },
   hudFrame(t, st, A) {
-    const base = { neut: 0.7, mac: 0.3 }, on = this.on(t), n = on.filter(Boolean).length, b = n === 3 ? null : n === 2 ? '×1.5' : '×3';
-    A.hudCards(A.R.bottom, { mix: [base, base, base], off: on.map(x => !x), boost: on.map(x => (x ? b : null)) });
+    const base = { neut: 0.7, mac: 0.3 }, on = this.on(t), n = on.filter(Boolean).length, b = { 4: null, 3: '109%', 2: '119%', 1: '132%' }[n];
+    A.hudCards(A.R.bottom, { mix: [base, base, base, base], off: on.map(x => !x), boost: on.map(x => (x ? b : null)) });
   },
   overlay(t, st, A) {
-    const toast = (at, text) => A.toast(text, A.seg(t, at + 0.05, at + 0.25) - A.seg(t, at + 1.7, at + 2.0));
-    toast(this.offAt, 'Lymph node off: its share goes to the other zones');
-    toast(this.off2At, 'Tissue off: its share goes to the other zones');
-    toast(this.noAt, 'One zone has to keep making cells');
+    const toast = (at, end, text) => A.toast(text, A.seg(t, at + 0.05, at + 0.25) - A.seg(t, end, end + 0.3));
+    toast(this.offAt, this.offAt + 1.8, 'Lymph node off: its share goes to the other zones');
+    toast(this.off2At, this.off3At - 0.3, 'Tissue off: its share goes to the other zones');
+    toast(this.off3At, this.off3At + 1.2, 'Deep tissue off: its share goes to the Wound');
+    toast(this.noAt, this.noAt + 1.8, 'One zone has to keep making cells');
   },
   fingers(t, st, A) {
     const K = CYT_KIT, p = z => () => (st.pwr ? st.pwr[z] : [0, 0]);
-    A.finger(t, [[1.6, K.off], [2.4, p(2)], [this.offAt, p(2), true], [this.offAt + 0.15, p(2)], [3.2, p(2), false, 'out']]);
-    A.finger(t, [[8.5, K.off], [9.0, p(1)], [this.off2At, p(1), true], [this.off2At + 0.15, p(1)], [10.0, p(0)], [this.noAt, p(0), true], [this.noAt + 0.15, p(0)], [11.8, p(0), false, 'out']]);
+    A.finger(t, [[1.6, K.off], [2.4, p(3)], [this.offAt, p(3), true], [this.offAt + 0.15, p(3)], [3.2, p(3), false, 'out']]);
+    A.finger(t, [[8.4, K.off], [8.9, p(1)], [this.off2At, p(1), true], [this.off2At + 0.15, p(1)], [this.off3At - 0.2, p(2)], [this.off3At, p(2), true], [this.off3At + 0.15, p(2)],
+      [10.8, p(0)], [this.noAt, p(0), true], [this.noAt + 0.15, p(0)], [11.8, p(0), false, 'out']]);
   },
 };
 
@@ -1052,12 +1083,12 @@ CYT_CLIPS.modes = {
   },
 };
 
-// ---- 5. Body output and fatigue ----
+// ---- 5. Stress and fatigue (the slider was Body output before v3 V27) ----
 CYT_CLIPS.output = {
-  id: 'output', title: 'Body output and fatigue', dur: 12.5,
-  cap: [[0, 'Body output speeds up how fast you make cells.'], [2.8, 'But it wears your body out. The heart fills and beats faster as fatigue builds.'], [5.4, 'Tired cells slow down. Feverish ones spray their shots and die sooner.'], [8.4, 'Turn it back down and your body recovers.']],
+  id: 'output', title: 'Stress and fatigue', dur: 12.5,
+  cap: [[0, 'Stress speeds up how fast you make cells.'], [2.8, 'But it wears your body out. The heart fills and beats faster as fatigue builds.'], [5.4, 'Tired cells slow down. Feverish ones spray their shots and die sooner.'], [8.4, 'Turn stress down and your body recovers.']],
   hud: { bottom: true },
-  bg: { dividers: [133.3, 266.7], lymph: [345, 175] },
+  bg: { dividers: [120, 240, 360], lymph: [380, 175] },
   outAt(t) { const A = CYT.api; return 0.12 + 0.88 * A.ease(A.seg(t, 2.0, 2.7)) - 0.75 * A.ease(A.seg(t, 7.8, 8.5)); },
   fAt(t) { const A = CYT.api; return 10 + 64 * A.ease(A.seg(t, 2.4, 7.9)) - 26 * A.ease(A.seg(t, 8.4, 12.5)); },
   build(st) {
@@ -1073,7 +1104,7 @@ CYT_CLIPS.output = {
   },
   frame(t, st, A) {
     A.scene(t);
-    A.zoneName(0, 133.3, 'Wound'); A.zoneName(133.3, 266.7, 'Tissue'); A.zoneName(266.7, 400, 'Lymph node');
+    A.mapLabels({ t });
     const n = CYT_KIT.count(st.cells, t), [zx, zy, zw] = A.zoneRect(0, 400), c = A.ctx;
     c.textAlign = 'right'; c.textBaseline = 'alphabetic'; c.font = `600 26px ${A.FONT}`; c.fillStyle = A.PAL.cellHi; c.globalAlpha = 0.85;
     c.fillText(String(n), zx + zw - 62, zy + 54); c.font = `500 11px ${A.MONO}`; c.fillStyle = A.PAL.ui; c.globalAlpha = 0.7; c.fillText('cells', zx + zw - 22, zy + 52); c.globalAlpha = 1;
@@ -1097,7 +1128,7 @@ CYT_CLIPS.output = {
 const ORGAN_W = [1, 0.8, 0.6, 0.6, 0.4, 0.5], ORGAN_HEALS = [2, 3]; // heart, kidneys, lungs, liver, spleen, brain
 const orgLv = h => Math.max(0, Math.min(4, Math.ceil(h - 1e-9)));
 const heartCap = h => [1.25, 1.25, 1.5, 1.75, 2][orgLv(h)];
-// fatigue per game second at effective body output mul (kidneys slow recovery; 4× faster in Overload)
+// fatigue per game second at effective stress mul (kidneys slow recovery; 4× faster in Overload)
 const fatigueRate = (mul, f, kid) => mul > 1.15 ? (mul - 1.15) * 1.2 : (mul - 1.15) * 1.2 * [0.25, 0.25, 0.5, 0.75, 1][orgLv(kid)] * (f > 100 ? 4 : 1);
 function organTable(dur, f0, hp0, step, gs = () => 1) {
   const dt = 0.02, rows = [];
@@ -1119,7 +1150,7 @@ CYT_CLIPS.organs = {
   id: 'organs', title: 'Organs and overload', dur: 19,
   cap: [[0, 'The organ button shows your six organs. Each one has 4 bars to lose.'], [3.0, 'Tap it, or press O, to pause and see what each hurt organ is costing you.'], [7.4, 'Push fatigue past 100 and you\'re in Overload. Every organ loses health, the heart fastest.'], [11.6, 'Ease off. Above 100 your body recovers 4 times faster.'], [13.9, 'Once you\'re Fine, your liver and lungs grow back. The others stay hurt.'], [16.6, 'If any organ hits 0 bars, that\'s Host failure.']],
   hud: { bottom: true },
-  bg: { wound: [48, 205], woundSize: 0.6, dividers: [133.3, 266.7], lymph: [345, 175] },
+  bg: { wound: [48, 205], woundSize: 0.6, dividers: [120, 240, 360], lymph: [380, 175] },
   openAt: 3.5, closeAt: 7.0, up: [7.6, 8.1], down: [11.6, 12.0], ff: [13.9, 16.5],
   outAt(t) { const A = CYT.api; return 0.12 + 0.78 * A.ease(A.seg(t, ...this.up)) - 0.9 * A.ease(A.seg(t, ...this.down)); },
   sceneT(t) { const p = this.closeAt - this.openAt; return t < this.openAt ? t : t < this.closeAt ? this.openAt : t - p; },
@@ -1134,7 +1165,7 @@ CYT_CLIPS.organs = {
   frame(t, st, A) {
     const ts = this.sceneT(t);
     A.scene(ts);
-    A.zoneName(0, 133.3, 'Wound'); A.zoneName(133.3, 266.7, 'Tissue'); A.zoneName(266.7, 400, 'Lymph node');
+    A.mapLabels({ t });
     const f = st.tab.at(t).f, tier = f >= 85 ? 3 : f >= 60 ? 2 : f >= 35 ? 1 : 0;
     A.ctx.save(); A.ctx.translate(A.R.sx, A.R.sy); ART.drawFatigueEdge(A.ctx, A.R.sw, A.R.sh, tier, ts); A.ctx.restore();
   },
@@ -1164,12 +1195,12 @@ CYT_CLIPS.organs = {
 // toxin left in the blood feeds fatigue. Spotlights point at each piece of UI as the caption names it.
 CYT_CLIPS.toxload = {
   id: 'toxload', title: 'Fatigue and toxins', dur: 17,
-  cap: [[0, 'Every germ you shoot dies messy and leaves toxin in your blood. Watch the vessel.'], [2.4, 'Your liver and kidneys clear it. While you\'re rested, it\'s gone almost as fast as it comes.'], [4.4, 'Making immune cells takes effort. Push body output up for more cells...'], [6.4, '...and fatigue builds. The heart fills and beats faster.'], [8.6, 'Tired organs clear toxin slowly, so it builds up in your blood.'], [10.8, 'Toxin left in your blood tires you even more. You win the battle and lose the war.'], [13.0, 'Ease off and your body recovers. The toxin clears again.'], [14.8, 'Germs your macrophages swallow leave no toxin at all.']],
+  cap: [[0, 'Every germ you shoot dies messy and leaves toxin in your blood. Watch the vessel.'], [2.4, 'Your liver and kidneys clear it. While you\'re rested, it\'s gone almost as fast as it comes.'], [4.4, 'Making immune cells takes effort. Push stress up for more cells...'], [6.4, '...and fatigue builds. The heart fills and beats faster.'], [8.6, 'Tired organs clear toxin slowly, so it builds up in your blood.'], [10.8, 'Toxin left in your blood tires you even more. You win the battle and lose the war.'], [13.0, 'Ease off and your body recovers. The toxin clears again.'], [14.8, 'Germs your macrophages swallow leave no toxin at all.']],
   hud: { bottom: true },
-  bg: { wound: [40, 200], woundSize: 0.55, dividers: [133.3, 266.7], lymph: [345, 175] },
+  bg: { wound: [40, 200], woundSize: 0.55, dividers: [120, 240, 360], lymph: [380, 175] },
   organs: { liver: [342, 18], kidneys: [380, 18] },
   swallowAt: 14.6,
-  spots: [[0.6, 2.4, 'vessel', 'Toxin in your blood'], [2.4, 4.4, 'organs', 'Liver and kidneys'], [4.6, 6.4, 'output', 'Body output'], [6.4, 8.6, 'heart', 'Fatigue'],
+  spots: [[0.6, 2.4, 'vessel', 'Toxin in your blood'], [2.4, 4.4, 'organs', 'Liver and kidneys'], [4.6, 6.4, 'output', 'Stress'], [6.4, 8.6, 'heart', 'Fatigue'],
     [8.8, 10.8, 'vessel', 'Toxin builds up'], [10.8, 12.9, 'heart', 'Toxin tires you'], [13.0, 14.6, 'organs', 'Clearing again']],
   outAt(t) { const A = CYT.api; return 0.15 + 0.8 * A.ease(A.seg(t, 4.6, 5.3)) - 0.6 * A.ease(A.seg(t, 13.1, 13.7)); },
   fAt(t) { const A = CYT.api; return 12 + 63 * A.ease(A.seg(t, 5.0, 8.6)) + 13 * A.ease(A.seg(t, 8.8, 13.0)) - 58 * A.ease(A.seg(t, 13.3, 15.4)); },
@@ -1183,7 +1214,7 @@ CYT_CLIPS.toxload = {
       const u0 = 12 + r() * 40, v0 = 60 + r() * 220;
       st.germs.push(A.ent({ art: 'bacterium', hitArt: 'bacterium-hit', r: 4.6, rot: r() * 6.283, die: 'pop', t0: Math.max(-1e9, t0), t1: t0 + 30, pos: A.drift(u0, v0, t0, 9 + r() * 6, (r() - 0.5) * 4, 5, t0 * 3.1 + 1) }));
     }
-    // cells: a few already out, then the stream of new cells follows body output
+    // cells: a few already out, then the stream of new cells follows stress
     st.neuts = [];
     for (let i = 0; i < 6; i++) st.neuts.push(K.recruit('neutrophil', -5, 30 + i * 60, 90 + r() * 180, { r: 4.8, wob: 7, seed: i * 3.3 }));
     for (let t = 0.3; t < this.dur;) {
@@ -1218,7 +1249,7 @@ CYT_CLIPS.toxload = {
   },
   frame(t, st, A) {
     A.scene(t, { under: () => this.drawVessel(t, st, A) });
-    A.zoneName(0, 133.3, 'Wound'); A.zoneName(133.3, 266.7, 'Tissue'); A.zoneName(266.7, 400, 'Lymph node');
+    A.mapLabels({ t });
     for (const w of st.wisps) {
       const p = (t - w.t) / 0.9; if (p < 0 || p > 1) continue;
       const [u, v] = A.lerp2(w.from, w.to, A.ease(p));
@@ -1251,41 +1282,134 @@ CYT_CLIPS.toxload = {
   },
 };
 
-// ---- 6. Waves and toxin bursts ----
+// ---- 6. Waves and quorum bursts (v3 V26-V27: the scripted burst became a Staph quorum burst; Alex 2026-10-08 11:48) ----
+// Staph-family germs that crowd up (20 within a tight circle by default since V28; 28 on Papercut, 36 on Flu season and Sore throat) grow a red bubble that pulls more Staph in. A yellow wick
+// burns down clockwise from the top for 10 s, then it pops: every cell of yours within the blast dies and half the crowd
+// at its core dies with it; 15 s cooldown per zone. Act 1: a Net pen thins the crowd in time and the bubble goes out.
+// Act 2: a crowd left alone pops.
 CYT_CLIPS.toxin = {
-  id: 'toxin', title: 'Waves and toxin bursts', dur: 11.5,
-  cap: [[0, 'The bar on top is the level\'s script. Badges are waves; the diamond is a toxin burst.'], [3.2, 'When the Wound flashes red, a toxin burst is 2 seconds away.'], [5.5, 'It kills every one of your cells in the Wound. Germs are untouched.'], [8.6, 'Your body has to rebuild them, so plan for it.']],
+  id: 'toxin', title: 'Waves and quorum bursts', dur: 23.5,
+  Q: 20, FUSE: 10, CORE: 26, BLAST: 130, // clip units: the game's 20 / 100 at this stage's scale
+  C1: [112, 104], C2: [268, 196], glow2: 8.4,
+  realtime: [[9.0, 17.8]], // the wick burns in real seconds
+  cap: [[0, 'The bar on top is the level\'s script. Each badge is a wave. A ringed badge is a Staph wave big enough to crowd up.'], [2.5, 'When a Staph crowd gets big enough, a red bubble forms and pulls more in. Its wick burns down for 10 seconds.'], [4.0, 'Thin the crowd in time and the bubble goes out. A Net pen is the natural answer.'], [7.0, 'Leave a crowd alone and the wick burns down...'], [18.4, '...until it pops. Every cell of yours nearby dies, and half the crowd at its core dies too.'], [21.2, 'That zone can\'t pop again for 15 seconds. Thin Staph crowds early.']],
   hud: { top: true },
   bg: { wound: [120, 210], woundSize: 1.2, tile: 1.1 },
   build(st) {
-    const A = CYT.api, K = CYT_KIT, r = A.rng(23);
-    st.hitT = 5.2;
-    st.germs = K.crowd(10, [150, 90, 380, 270], 31, { r: 6.5, vu: 4, wob: 6 });
-    for (let i = 0; i < 12; i++) { const t0 = 0.3 + i * 0.85, v = 190 + r() * 40; st.germs.push(A.ent({ art: 'bacterium', hitArt: 'bacterium-hit', r: 6.5, rot: 'vel', t0, die: 'pop', pos: A.path([[t0, 115, v], [t0 + 10, 330 + r() * 60, 80 + r() * 190, 'l']], 4, i * 2) })); }
-    st.mine = [];
-    for (let i = 0; i < 12; i++) st.mine.push(K.recruit('neutrophil', -3, 40 + r() * 330, 70 + r() * 200, { r: 6, wob: 10, seed: i * 3 }));
-    st.mine.push(K.recruit('macrophage-offense', -3, 260, 150, { r: 15, wob: 3 }), K.recruit('macrophage-offense', -3, 90, 110, { r: 15, wob: 3 }));
-    // the shockwave kills each cell as its front passes
-    const [wu, wv] = [120, 210];
-    for (const c of st.mine) { const [u, v] = c.pos(st.hitT); c.t1 = st.hitT + Math.hypot(u - wu, v - wv) / 600; c.deathAt = null; if (c.r > 10) c.big = true; }
-    K.fight(st.mine, st.germs.slice(0, 6), 0.4, { hp: 3, every: 0.7, seed: 2 });
+    const A = CYT.api, K = CYT_KIT, r = A.rng(23), clip = this;
+    st.pop = this.glow2 + this.FUSE;
+    // a Staph clump arriving from the top edge and milling tightly round C; the bubble pulls it tighter from tg
+    const pull = (C, p, tg, tEnd) => t => { const q = p(t); if (t < tg) return q; const s = 1 - 0.25 * A.ease(A.seg(Math.min(t, tEnd), tg, tg + clip.FUSE)); return [C[0] + (q[0] - C[0]) * s, C[1] + (q[1] - C[1]) * s]; };
+    const clump = (n, C, t0, seed, tg, tEnd) => {
+      const rr = A.rng(seed), out = [];
+      for (let i = 0; i < n; i++) {
+        const a = rr() * 6.283, d = Math.sqrt(rr()) * (clip.CORE - 6), tu = C[0] + Math.cos(a) * d, tv = C[1] + Math.sin(a) * d * 0.9;
+        const ta = t0 + 0.06 * i, tl = ta + 1.4 + rr() * 0.4, v0 = C[1] + (rr() - 0.5) * 60;
+        const mill = A.drift(tu, tv, 0, 0, 0, 3, seed + i * 1.7), arrive = A.path([[ta, -12, v0], [tl, tu, tv]], 2, seed + i);
+        out.push(A.ent({ art: 'bacterium', hitArt: 'bacterium-hit', r: 4.4, rot: rr() * 6.283, t0: ta, die: 'pop', pos: pull(C, t => (t < tl ? arrive(t) : mill(t)), tg, tEnd) }));
+      }
+      return out;
+    };
+    st.netT = 4.5; st.penR = 34;
+    st.a = clump(24, this.C1, 0.2, 41, 2.4, st.netT);
+    st.b = clump(24, this.C2, 5.6, 77, this.glow2, st.pop);
+    // strays the second bubble drags in
+    for (let i = 0; i < 3; i++) {
+      const a = 2.2 + i * 1.5, home = [this.C2[0] + Math.cos(a) * 62, this.C2[1] + Math.sin(a) * 56], to = [this.C2[0] + Math.cos(a) * 14, this.C2[1] + Math.sin(a) * 12];
+      const ta = 5.0 + i * 0.3, tl = ta + 1.8, arrive = A.path([[ta, -12, home[1]], [tl, home[0], home[1]]], 2, 95 + i);
+      const mill = A.drift(home[0], home[1], 0, 0, 0, 3, 90 + i), t1 = this.glow2 + 1 + i * 0.8, at = t => (t < tl ? arrive(t) : mill(t));
+      st.b.push(A.ent({ art: 'bacterium', hitArt: 'bacterium-hit', r: 5, rot: r() * 6.283, die: 'pop', t0: ta, pos: t => (t < t1 ? at(t) : A.lerp2(at(t), to, A.ease(A.seg(Math.min(t, st.pop), t1, t1 + 3.5)))) }));
+    }
+    // Act 1: a Net neutrophil pens the first crowd and the neutrophils thin it below quorum
+    st.net = A.ent({ art: 'neutrophil-net', r: 7, rot: 'vel', t0: 3.4, t1: st.netT, arrive: A.COLORS.net, die: null, layer: 2, pos: A.path([[3.4, this.C1[0] + 30, A.V - A.FVES + 4], [st.netT, this.C1[0], this.C1[1]]], 2, 4) });
+    for (const g of st.a) g.hits.push(st.netT + 0.03);
+    st.n1 = [K.recruit('neutrophil', -3, 60, 200, { r: 6, wob: 6, side: 'far' }), K.recruit('neutrophil', -3, 160, 210, { r: 6, wob: 6 }), K.recruit('neutrophil', -3, 40, 60, { r: 6, wob: 6, side: 'near' })];
+    K.fight(st.n1, st.a.slice(0, 8), st.netT + 0.3, { hp: 2, every: 0.25, seed: 2 });
+    K.fight(st.n1, st.a.slice(8), 7.2, { hp: 2, every: 0.5, seed: 9 }); // then they mop up the rest
+    // Act 2: neutrophils and a macrophage near the second crowd chip at it, too slowly
+    st.n2 = [];
+    for (let i = 0; i < 9; i++) { const a = i / 9 * 6.283 + r() * 0.4, d = 44 + r() * 70; st.n2.push(K.recruit('neutrophil', -3 + i * 0.1, this.C2[0] + Math.cos(a) * d, Math.min(A.V - A.FVES - 10, Math.max(A.VES + 10, this.C2[1] + Math.sin(a) * d * 0.9)), { r: 6, wob: 8, seed: 30 + i })); }
+    st.mac = K.recruit('macrophage-offense', -3, this.C2[0] + 70, this.C2[1] - 80, { r: 15, wob: 3 });
+    K.fight(st.n2.slice(0, 3), st.b.slice(0, 1), 9.0, { hp: 3, every: 1.1, seed: 5 });
+    // the pop: the shockwave front kills each of your cells within the blast as it passes; half the core dies
+    const [cu, cv] = this.C2;
+    for (const c of st.n2.concat([st.mac], st.n1)) {
+      const [u, v] = c.pos(st.pop), d = Math.hypot(u - cu, v - cv);
+      if (d < this.BLAST && c.t1 > st.pop) { c.t1 = st.pop + d / 600; c.deathAt = null; if (c.r > 10) c.big = true; }
+    }
+    let k = 0;
+    for (const g of st.b) {
+      if (g.t1 <= st.pop) continue;
+      const [u, v] = g.pos(st.pop);
+      if (Math.hypot(u - cu, v - cv) < this.CORE && k++ % 2 === 0) { g.t1 = st.pop + 0.05; continue; }
+      // survivors scatter from the core
+      const p = g.pos, a = Math.atan2(v - cv, u - cu), T = st.pop;
+      g.pos = t => { const q = p(t); if (t < T) return q; const s = 34 * A.ease(A.seg(t, T, T + 0.9)); return [q[0] + Math.cos(a) * s, q[1] + Math.sin(a) * s]; };
+    }
+    // fresh cells come back in after the pop
     st.fresh = [];
-    for (let i = 0; i < 8; i++) st.fresh.push(K.recruit('neutrophil', 8.6 + i * 0.2, 30 + r() * 340, 80 + r() * 160, { r: 6, wob: 8 }));
-    K.fight(st.fresh, st.germs.slice(10, 16), 9.2, { hp: 3, every: 0.7, seed: 5 });
+    for (let i = 0; i < 6; i++) st.fresh.push(K.recruit('neutrophil', st.pop + 2.2 + i * 0.25, 190 + r() * 180, 90 + r() * 170, { r: 6, wob: 8 }));
+    // act 1's wick: burns while Q+ of the crowd are alive inside the core, resets when it's thinned (sampled every 0.05 s)
+    const tab = []; let f = 0;
+    for (let t = 0; t <= this.dur + 0.05; t += 0.05) {
+      const n = st.a.reduce((m, g) => { if (!A.alive(g, t)) return m; const [u, v] = g.pos(t); return m + (Math.hypot(u - this.C1[0], v - this.C1[1]) < this.CORE + 4 ? 1 : 0); }, 0);
+      f = n >= this.Q ? Math.min(1, f + 0.05 / this.FUSE) : 0; tab.push(f);
+    }
+    st.fuse1 = t => tab[Math.max(0, Math.min(tab.length - 1, Math.round(t / 0.05)))];
   },
-  shake(t) { return t > this.dur ? 0 : Math.max(0, 1 - (t - 5.2) / 0.5) * (t > 5.2 ? 1 : 0); },
+  fuse2(t) { const A = CYT.api; return t >= this.glow2 && t < this.glow2 + this.FUSE ? Math.max(0.001, A.seg(t, this.glow2, this.glow2 + this.FUSE)) : 0; },
+  // V27 look: a red bubble round the crowd, a yellow wick on its rim burning down clockwise from the top, a spark at the burning end
+  bubble(A, C, f, fade, t) {
+    const a = f > 0 ? 1 : fade;
+    if (a <= 0) return;
+    const c = A.ctx, k = A.R.k, [x, y] = A.P(C[0], C[1]), R = (this.CORE + 8) * k;
+    c.save();
+    const g = c.createRadialGradient(x, y, R * 0.2, x, y, R);
+    g.addColorStop(0, 'rgba(255,59,78,0.05)'); g.addColorStop(0.8, 'rgba(255,59,78,0.22)'); g.addColorStop(1, 'rgba(255,59,78,0.4)');
+    c.globalAlpha = a; c.fillStyle = g; c.beginPath(); c.arc(x, y, R, 0, 6.283); c.fill();
+    c.strokeStyle = 'rgba(255,59,78,0.85)'; c.lineWidth = Math.max(1.2, 1.4 * k); c.stroke();
+    if (f > 0) {
+      const top = -Math.PI / 2, end = top + f * 6.283, wr = R + 3 * k;
+      c.strokeStyle = '#FFD23F'; c.lineWidth = Math.max(2, 2.6 * k); c.lineCap = 'round';
+      c.beginPath(); c.arc(x, y, wr, end, top + 6.283); c.stroke(); // what's left of the wick
+      const sx = x + Math.cos(end) * wr, sy = y + Math.sin(end) * wr, on = Math.floor(t * 12) % 2 === 0;
+      const sg = c.createRadialGradient(sx, sy, 0, sx, sy, (on ? 9 : 6) * k);
+      sg.addColorStop(0, 'rgba(255,255,255,1)'); sg.addColorStop(0.35, 'rgba(255,210,63,0.9)'); sg.addColorStop(1, 'rgba(255,122,61,0)');
+      c.globalCompositeOperation = 'lighter'; c.fillStyle = sg; c.beginPath(); c.arc(sx, sy, (on ? 9 : 6) * k, 0, 6.283); c.fill();
+    }
+    c.restore();
+  },
+  shake(t) { const d = t - this.glow2 - this.FUSE; return d > 0 && d < 0.5 ? 1 - d / 0.5 : 0; },
+  fade1(st, t) { if (st.fuse1(t) > 0) return 0; for (let d = 0.05; d <= 0.4; d += 0.05) if (st.fuse1(t - d) > 0) return 1 - d / 0.4; return 0; },
   frame(t, st, A) {
-    const zr = A.zoneRect(0, 400), c = A.ctx;
-    if (t > 3.2 && t < st.hitT && ART.ready['wound-flash']) { c.globalCompositeOperation = 'lighter'; c.globalAlpha = 0.25 + 0.55 * (Math.sin(t * 6.283 * 3) > 0 ? 1 : 0); c.drawImage(ART.ready['wound-flash'], zr[0], zr[1], zr[2], zr[3]); c.globalAlpha = 1; c.globalCompositeOperation = 'source-over'; }
-    A.scene(t, { under: () => { const p = (t - st.hitT) / 0.6; if (p > 0 && p < 1.4) A.spr('toxin-shockwave', 120, 210, 118 * Math.max(0.05, p * 3.4), null, Math.max(0, 1 - p * 0.7)); } });
-    A.flash('rgba(180,92,255,1)', 0.6 * Math.max(0, 1 - (t - st.hitT) / 0.25) * (t > st.hitT ? 1 : 0));
+    const tagWin = (a, b) => A.seg(t, a, a + 0.3) * (1 - A.seg(t, b - 0.3, b));
+    const f1 = st.fuse1(t), f2 = this.fuse2(t), np = t - st.pop;
+    A.scene(t, { under: () => {
+      this.bubble(A, this.C1, f1, this.fade1(st, t), t);
+      this.bubble(A, this.C2, f2, 0, t);
+      A.pen(this.C1[0], this.C1[1], st.penR, t - st.netT, t, 2.5, 3);
+      const p = np / 0.5; if (p > 0 && p < 1.4) A.spr('toxin-shockwave', this.C2[0], this.C2[1], this.BLAST * 2 * Math.max(0.05, p), null, Math.max(0, 1 - p * 0.7));
+    } });
+    A.ringFx(this.C1[0], this.C1[1], (t - st.netT) / 0.35, '#FFD23F', 6, st.penR);
+    A.flash('rgba(180,92,255,1)', 0.18 * Math.max(0, 1 - np / 0.25) * (np > 0 ? 1 : 0));
     A.zoneName(0, 400, 'Wound');
-    if (t > 3.2 && t < st.hitT) { const left = Math.ceil(st.hitT - t); A.tag(120, 210, `Toxin burst in ${left} s`, A.PAL.toxin, 1, -26); }
+    if (t > 5.6 && t < 7.0) A.tag(this.C1[0], this.C1[1] - this.CORE - 10, 'too few: bubble out', A.PAL.ui, tagWin(5.6, 7.0), -6);
+    if (np > 1.0 && np < 5.0) A.tag(this.C2[0], this.C2[1], 'Wound: no pop for 15 s', A.PAL.ui, tagWin(st.pop + 1.0, st.pop + 5.0), -16);
+  },
+  // the game's banner while a wick burns
+  overlay(t, st, A) {
+    const f1 = st.fuse1(t), f2 = this.fuse2(t), f = f2 || f1, fd = f ? 1 : this.fade1(st, t);
+    if (fd <= 0) return;
+    let g1 = f1; for (let d = 0.05; !g1 && d <= 0.4; d += 0.05) g1 = st.fuse1(t - d); // while fading, hold the last count
+    const left = f2 ? Math.ceil(st.pop - t) : Math.ceil(this.FUSE * (1 - Math.max(g1, 0.0001)));
+    A.toast(`Staph crowd in the Wound: pops in ${Math.max(1, left)} s. Thin it.`, fd * A.seg(t, f2 ? this.glow2 : 2.3, (f2 ? this.glow2 : 2.3) + 0.25));
   },
   hudFrame(t, st, A) {
-    const frac = 0.38 + t * 0.02;
-    A.hudProgress(A.R.top, frac, [{ at: 0.02, kind: 'wave' }, { at: 0.19, kind: 'wave' }, { at: 0.484, kind: 'toxin' }, { at: 0.66, kind: 'wave' }, { at: 0.86, kind: 'wave-final' }]);
-    if (t < 3) { const p = A.R.hud.prog, x = A.lerp(p.x0, p.x1, 0.484), c = A.ctx; c.globalAlpha = 0.6 + 0.4 * Math.sin(t * 8); c.strokeStyle = A.PAL.toxin; c.lineWidth = 1.5; c.beginPath(); c.arc(x, p.y, 13, 0, 6.283); c.stroke(); c.globalAlpha = 1; }
+    const frac = 0.36 + t * 0.009, big = 0.47;
+    A.hudProgress(A.R.top, frac, [{ at: 0.02, kind: 'wave' }, { at: 0.19, kind: 'wave' }, { at: big, kind: 'wave' }, { at: 0.66, kind: 'wave' }, { at: 0.86, kind: 'wave-final' }]);
+    // the rail rings a Staph wave big enough to reach quorum on arrival (steady, never blinking)
+    const p = A.R.hud.prog, x = A.lerp(p.x0, p.x1, big), c = A.ctx;
+    c.globalAlpha = frac < big ? 0.95 : 0.3; c.strokeStyle = A.PAL.toxin; c.lineWidth = 1.8; c.beginPath(); c.arc(x, p.y, 12, 0, 6.283); c.stroke(); c.globalAlpha = 1;
   },
 };
 
@@ -1293,17 +1417,18 @@ CYT_CLIPS.toxin = {
 function stormScene(st, seed, A, K) {
   const r = A.rng(seed);
   st.germs = [].concat(
-    K.crowd(14, [15, 90, 125, 280], seed + 1, { r: 4.4, vu: 3, wob: 5 }),
-    K.crowd(16, [140, 80, 260, 280], seed + 2, { r: 4.4, vu: 3, wob: 5 }),
-    K.crowd(12, [275, 80, 385, 280], seed + 3, { r: 4.4, vu: 1, wob: 5 }));
+    K.crowd(13, [15, 90, 112, 278], seed + 1, { r: 4.4, vu: 3, wob: 5 }),
+    K.crowd(14, [128, 80, 232, 278], seed + 2, { r: 4.4, vu: 3, wob: 5 }),
+    K.crowd(11, [248, 80, 350, 278], seed + 3, { r: 4.4, vu: 2, wob: 5 }),
+    K.crowd(5, [366, 90, 390, 270], seed + 4, { r: 4.4, vu: 0, wob: 3 }));
   st.neuts = [];
-  for (let i = 0; i < 16; i++) st.neuts.push(K.recruit('neutrophil', -3, 15 + r() * 370, 70 + r() * 210, { r: 4.6, wob: 8, seed: i * 2.3 }));
-  st.macs = [K.recruit('macrophage-offense', -3, 80, 140, { r: 9.5, wob: 2 }), K.recruit('macrophage-offense', -3, 205, 220, { r: 9.5, wob: 2 }), K.recruit('macrophage-offense', -3, 320, 130, { r: 9.5, wob: 2 })];
+  for (let i = 0; i < 16; i++) st.neuts.push(K.recruit('neutrophil', -3, 15 + r() * 340, 70 + r() * 205, { r: 4.6, wob: 8, seed: i * 2.3 }));
+  st.macs = [K.recruit('macrophage-offense', -3, 70, 140, { r: 9.5, wob: 2 }), K.recruit('macrophage-offense', -3, 185, 220, { r: 9.5, wob: 2 }), K.recruit('macrophage-offense', -3, 300, 130, { r: 9.5, wob: 2 })];
 }
 function stormHit(st, hitT, A, K, seed, noFight) {
   const r = A.rng(seed);
   // about 70% of germs (all of the ones in the Lymph node here) and 40% of neutrophils die on the hit
-  st.germs.forEach((g, i) => { if (g.pos(hitT)[0] > 266 || r() < 0.62) { g.t1 = hitT + r() * 0.15; g.die = 'storm'; } });
+  st.germs.forEach((g, i) => { if (g.pos(hitT)[0] > 360 || r() < 0.62) { g.t1 = hitT + r() * 0.15; g.die = 'storm'; } });
   st.neuts.forEach(n => { if (r() < 0.4) { n.t1 = hitT + r() * 0.15; n.die = 'storm'; } });
   if (noFight) return;
   const left = st.germs.filter(g => g.t1 > hitT + 1);
@@ -1330,8 +1455,7 @@ function stormDraw(t, st, A, o) {
   const stun = t > o.hit && t < o.hit + 3;
   for (const m of st.macs) m.alpha = stun ? (tt => (tt > o.hit && tt < o.hit + 3 ? 0.5 + 0.3 * Math.sin(tt * 20) : 1)) : null;
   A.scene(t);
-  A.zoneName(0, 133.3, 'Wound'); A.zoneName(133.3, 266.7, 'Tissue'); A.zoneName(266.7, 400, 'Lymph node');
-  A.lymphTimer(266.7, 400, st.timer(t)[0], st.timer(t)[1], t);
+  A.mapLabels({ frac: st.timer(t)[0], busy: st.timer(t)[1], t });
   const c = A.ctx, w = A.R.sw, h = A.R.sh;
   c.save(); c.translate(A.R.sx, A.R.sy);
   const f = o.f(t), tier = f >= 85 ? 3 : f >= 60 ? 2 : f >= 35 ? 1 : 0;
@@ -1349,7 +1473,7 @@ CYT_CLIPS.storm = {
   id: 'storm', title: 'The Cytokine storm', dur: 15,
   cap: [[0, 'Overrun? The Cytokine storm is your nuclear option.'], [1.0, 'Press and hold the button. It takes 5 full seconds to charge, so you only fire it on purpose.'], [4.6, 'While it charges, the heart shows where your fatigue would land. Fully charged, it fires when you let go.'], [8.4, 'It kills about 70% of germs and 40% of your own neutrophils.'], [10.8, 'Fatigue jumps, then keeps climbing for 8 seconds. That\'s the afterburn.'], [12.8, 'Keep it under 100. Past that, your organs start taking damage.']],
   hud: { bottom: true },
-  bg: { wound: [48, 205], woundSize: 0.6, dividers: [133.3, 266.7], lymph: [345, 175] },
+  bg: { wound: [48, 205], woundSize: 0.6, dividers: [120, 240, 360], lymph: [380, 175] },
   press: 2.0, release: 7.4, hit: 8.4, realtime: [[2.0, 7.4]], // the hold runs in real seconds
   charge(t) { return holdCharge(t, this.press, this.release); },
   fAt(t) { const A = CYT.api; return t < this.hit ? 24 : 24 + 50 * A.ease(A.seg(t, this.hit, this.hit + 0.4)) + 2 * Math.min(8, Math.max(0, t - this.hit - 0.4)); },
@@ -1357,7 +1481,7 @@ CYT_CLIPS.storm = {
     const A = CYT.api, K = CYT_KIT;
     stormScene(st, 40, A, K);
     stormHit(st, this.hit, A, K, 41);
-    st.timer = K.timerTable(st.germs, 266.7, 0.05, this.dur, 0.25, 0.03);
+    st.timer = K.timerTable(st.germs, A.NODE_U, 0.05, this.dur, 0.25, 0.03);
   },
   shake(t) { return t > this.hit && t < this.hit + 0.5 ? 1.4 * (1 - (t - this.hit) / 0.5) : chargeShake(this.charge(t)); },
   frame(t, st, A) { stormDraw(t, st, A, { hit: this.hit, f: tt => this.fAt(tt), charge: tt => this.charge(tt) }); },
@@ -1380,14 +1504,14 @@ CYT_CLIPS.stormRisk = {
   id: 'stormRisk', title: 'Risky storms', dur: 19.5,
   cap: [[0, 'Already tired? While you charge, the heart shows where your fatigue would land.'], [2.6, 'Orange means this storm takes you past 100, so your organs will lose bars. Fully charged, it says Risky: you can still fire it.'], [7.9, 'Past 100 the heart floods red and every organ loses health. The heart goes fastest.'], [10.8, 'The further past 100, the faster they drop.'], [13.2, 'Above 100 your body recovers 4 times faster. Back under 100, the damage stops.'], [16.2, 'Now another storm would empty an organ, so it charges red. That\'s Host failure. Let go to cancel.']],
   hud: { bottom: true },
-  bg: { wound: [48, 205], woundSize: 0.6, dividers: [133.3, 266.7], lymph: [345, 175] },
+  bg: { wound: [48, 205], woundSize: 0.6, dividers: [120, 240, 360], lymph: [380, 175] },
   holds: [[0.8, 6.8, 0], [16.4, 18.4, 0.35]], hit: 7.8, burnEnd: 13.2, realtime: [[0.8, 6.8], [16.4, 18.75]],
   charge(t) { return Math.max(...this.holds.map(([a, b, d]) => holdCharge(t, a, b, d))); },
   build(st) {
     const A = CYT.api, K = CYT_KIT, hit = this.hit;
     stormScene(st, 60, A, K);
     stormHit(st, hit, A, K, 61);
-    st.timer = K.timerTable(st.germs, 266.7, 0.04, this.dur, 0.2, 0.03);
+    st.timer = K.timerTable(st.germs, A.NODE_U, 0.04, this.dur, 0.2, 0.03);
     st.tab = organTable(this.dur, 52, [4, 4, 4, 4, 4, 4],
       (t, f, hp, d) => (t < hit ? f : t < hit + 0.4 ? f + 125 * d : t < this.burnEnd ? f + 2 * d : f + fatigueRate(0.5, f, hp[1]) * d),
       t => (t < hit + 1 ? 1 : t < this.burnEnd ? 1.6 : t < 16 ? 3 : 1));
@@ -1439,39 +1563,53 @@ CYT_CLIPS.stormRisk = {
   const tapAt = (t0, u, v) => (t, st, AA) => AA.finger(t, [[t0 - 0.5, K.off], [t0 - 0.1, K.world(u, v)], [t0, K.world(u, v), true], [t0 + 0.25, K.world(u, v), false, 'out']]);
 
   // ---- MRSA (Hospital visit) ----
+  // As in v3 Version 24: plain shots chip its armor (12 hits kill one), it heals fully when it divides,
+  // macrophages spit it out, and a tuned shot from a Support ring kills it in one hit.
+  const armor = (u, v, left, a, w = 3) => {
+    if (a <= 0) return;
+    const [x, y] = A.P(u, v), c = A.ctx, g = 1, W = 12 * (w + g) - g, x0 = x - W / 2, y0 = y - 24;
+    c.globalAlpha = a; c.fillStyle = 'rgba(10,13,24,.8)'; c.fillRect(x0 - 2, y0 - 2, W + 4, 8);
+    for (let i = 0; i < 12; i++) { c.fillStyle = i < left ? '#9AD7FF' : '#2A3150'; c.fillRect(x0 + i * (w + g), y0, w, 4); }
+    c.globalAlpha = 1;
+  };
   CYT_CLIPS.mrsa = {
-    id: 'mrsa', title: 'MRSA', dur: 12.5,
-    cap: [[0, 'MRSA is armored. Like every germ, it blinks when it divides.'], [2.2, 'Plain shots bounce off it.'], [4.4, 'Macrophages can\'t swallow it. They spit it back out.'], [6.6, 'Flip the zone to Support. A tuned shot from the ring kills MRSA in one hit.']],
+    id: 'mrsa', title: 'MRSA', dur: 13.5,
+    cap: [[0, 'MRSA is armored. Like every germ, it blinks when it divides.'], [0.9, 'Plain shots only chip its armor. It takes 12 hits to kill one.'], [3.1, 'And every time it divides, it heals right back to full.'], [5.0, 'Macrophages can\'t swallow it. They spit it back out.'], [7.2, 'Flip the zone to Support. A tuned shot from the ring kills MRSA in one hit.']],
     bg: { tile: 1.2 },
+    divAt: 3.4,
     build(st) {
-      const m0 = A.ent({ art: 'mrsa', r: 11, rot: 0, die: 'pop', big: true, pos: A.drift(140, 175, 0, 3, 0, 3, 1) });
-      const [a, b] = A.divide(m0, 1.5, { angle: Math.PI / 2, dist: 16, then: [5, 0] });
-      a.big = b.big = true; st.mrsa = [a, b];
+      const m0 = st.m0 = A.ent({ art: 'mrsa', r: 11, rot: 0, die: 'pop', big: true, pos: A.drift(140, 175, 0, 3, 0, 3, 1) });
       st.neuts = [K.recruit('neutrophil', -2, 90, 110, { r: 6, wob: 7 }), K.recruit('neutrophil', -2, 120, 250, { r: 6, wob: 7 }), K.recruit('neutrophil', -2, 340, 110, { r: 6, wob: 7 }), K.recruit('neutrophil', -2, 350, 250, { r: 6, wob: 7 })];
-      for (let k = 0; k < 8; k++) A.shot(2.3 + k * 0.28, st.neuts[k % 4], st.mrsa[k % 2], { bounce: true });
-      const mac = st.mac = A.ent({ art: 'macrophage-offense', r: 17, layer: 1, pos: A.path([[0, 300, 190], [4.3, 296, 190], [4.9, 196, 172], [6.4, 205, 180], [7.4, 255, 185]], 2, 3) });
-      A.gulp(mac, a, 5.0, true);
-      mac.flip = [{ t: 6.9, art: 'macrophage-support' }];
+      // seven plain hits chip the armor down to 5 of 12...
+      st.chips = []; for (let k = 0; k < 7; k++) st.chips.push(A.shot(0.9 + k * 0.32, st.neuts[k % 4], m0));
+      // ...then it divides, and both halves are back to full
+      const [a, b] = A.divide(m0, this.divAt, { angle: Math.PI / 2, dist: 16, then: [5, 0] });
+      a.big = b.big = true; st.mrsa = [a, b];
+      const mac = st.mac = A.ent({ art: 'macrophage-offense', r: 17, layer: 1, pos: A.path([[0, 300, 190], [4.9, 296, 190], [5.5, 196, 172], [7.0, 205, 180], [8.0, 255, 185]], 2, 3) });
+      A.gulp(mac, a, 5.6, true);
+      mac.flip = [{ t: 7.5, art: 'macrophage-support' }];
       // neutrophils gather in the ring, then fire tuned shots
-      st.neuts.forEach((n, i) => { const old = n.pos, ang = i / 4 * 6.283 + 0.5; n.pos = t => (t < 7.0 ? old(t) : A.lerp2(old(7.0), [255 + Math.cos(ang) * 32 + 6 * A.noise(i, t), 185 + Math.sin(ang) * 30 + 6 * A.noise(i + 9, t)], A.ease(A.seg(t, 7.0, 7.8)))); });
-      A.shot(8.3, st.neuts[0], a, { tuned: true, speed: 700 }); a.t1 = a.hits[a.hits.length - 1];
-      A.shot(9.1, st.neuts[2], b, { tuned: true, speed: 700 }); b.t1 = b.hits[b.hits.length - 1];
+      st.neuts.forEach((n, i) => { const old = n.pos, ang = i / 4 * 6.283 + 0.5; n.pos = t => (t < 7.6 ? old(t) : A.lerp2(old(7.6), [255 + Math.cos(ang) * 32 + 6 * A.noise(i, t), 185 + Math.sin(ang) * 30 + 6 * A.noise(i + 9, t)], A.ease(A.seg(t, 7.6, 8.4)))); });
+      A.shot(8.9, st.neuts[0], a, { tuned: true, speed: 700 }); a.t1 = a.hits[a.hits.length - 1];
+      A.shot(9.7, st.neuts[2], b, { tuned: true, speed: 700 }); b.t1 = b.hits[b.hits.length - 1];
     },
     frame(t, st) {
-      A.scene(t, { under: () => ring(st.mac, 7.0, t, st.neuts) });
-      flipFx(st.mac, 6.9, t);
+      A.scene(t, { under: () => ring(st.mac, 7.6, t, st.neuts) });
+      flipFx(st.mac, 7.5, t);
       A.zoneName(0, 400, 'Tissue');
-      A.zoneChip(0, 400, t < 6.9 ? 'offense' : 'support', A.seg(t, 6.9, 7.2));
-      if (t > 2.4 && t < 4.4) { const [u, v] = st.mrsa[0].pos(t); A.tag(u, v, 'bounces off', A.PAL.antibody, tagWin(t, 2.4, 4.4), -22); }
-      if (t > 5.6 && t < 7) { const [u, v] = st.mrsa[0].pos(t); A.tag(u, v, 'spat out', A.PAL.kill, tagWin(t, 5.6, 7), -22); }
+      A.zoneChip(0, 400, t < 7.5 ? 'offense' : 'support', A.seg(t, 7.5, 7.8));
+      if (t < this.divAt) { const [u, v] = st.m0.pos(t); armor(u, v, 12 - st.chips.filter(h => h <= t).length, A.seg(t, 0.7, 1.0)); }
+      else if (t < 5.4) for (const m of st.mrsa) { const [u, v] = m.pos(t); armor(u, v, 12, 1 - A.seg(t, 5.0, 5.4), 1.6); }
+      if (t > 3.5 && t < 5.0) { const [u, v] = st.mrsa[1].pos(t); A.tag(u, v, 'healed', '#9AD7FF', tagWin(t, 3.5, 5.0), 26); }
+      if (t > 6.2 && t < 7.6) { const [u, v] = st.mrsa[0].pos(t); A.tag(u, v, 'spat out', A.PAL.kill, tagWin(t, 6.2, 7.6), -22); }
     },
-    fingers: tapAt(6.8, 120, 120),
+    fingers: tapAt(7.4, 120, 120),
   };
 
   // ---- Pseudomonas (Pool water) ----
   CYT_CLIPS.pseudo = {
     id: 'pseudo', title: 'Pseudomonas', dur: 12.5,
-    cap: [[0, 'Pseudomonas swims in, settles, and grows a slime dome over itself.'], [3.2, 'Shots fizzle on the dome. Nothing gets in.'], [5.6, 'Offense macrophages tear domes down, bite by bite.'], [9.6, 'Then your shots can reach the germs inside.']],
+    cap: [[0, 'Pseudomonas swims in, settles, and grows a slime dome over itself.'], [3.2, 'Shots still get through the dome, but it soaks up most of each hit. Plain shots do a quarter of the damage.'], [5.6, 'Offense macrophages tear domes down, bite by bite.'], [9.6, 'With the dome gone, every shot hits at full strength.']],
     bg: { tile: 1.2 },
     domeR(t) { const grow = A.seg(t, 2.3, 4.0) * 46, bites = [6.2, 7.2, 8.2, 9.2].filter(b => t > b + 0.3).length; return bites >= 4 ? 0 : grow * (1 - 0.12 * bites); },
     domeA(t) { const bites = [6.2, 7.2, 8.2, 9.2].filter(b => t > b + 0.3).length; return 0.35 + 0.5 * (4 - bites) / 4; },
@@ -1484,7 +1622,7 @@ CYT_CLIPS.stormRisk = {
       kids.forEach(k => { k.rot = 0.9; });
       st.germs.splice(2, 1, ...kids);
       st.neuts = [K.recruit('neutrophil', -2, 330, 100, { r: 6, wob: 6 }), K.recruit('neutrophil', -2, 345, 250, { r: 6, wob: 6 }), K.recruit('neutrophil', -2, 120, 260, { r: 6, wob: 6 })];
-      for (let k = 0; k < 9; k++) { const n = st.neuts[k % 3], [nu, nv] = n.pos(3.3 + k * 0.25), a = Math.atan2(nv - C[1], nu - C[0]); A.shot(3.3 + k * 0.25, n, pt(C[0] + Math.cos(a) * 44, C[1] + Math.sin(a) * 30), { fizzle: true }); }
+      for (let k = 0; k < 9; k++) { const n = st.neuts[k % 3], [nu, nv] = n.pos(3.3 + k * 0.25), a = Math.atan2(nv - C[1], nu - C[0]); A.shot(3.3 + k * 0.25, n, st.germs[k % st.germs.length]); } // V27: domes no longer block shots; plain shots do 0.25 damage, tuned shots 1
       const mac = st.mac = A.ent({ art: 'macrophage-offense', r: 16, layer: 1, pos: A.path([[0, 90, 110], [5.4, 95, 112], [6.1, 178, 148], [7.0, 182, 152], [7.7, 200, 205], [8.7, 205, 205], [9.6, 180, 170]], 1.5, 5) });
       [[6.2, 196, 160], [7.2, 196, 168], [8.2, 212, 196], [9.2, 214, 190]].forEach(([tb, u, v]) => mac.gulps.push({ t: tb, prey: pt(u, v) }));
       K.fight(st.neuts, st.germs, 9.7, { hp: 3, every: 0.45, seed: 3 });
@@ -1497,7 +1635,7 @@ CYT_CLIPS.stormRisk = {
       if (t > 9.5 && t < 10.2) A.dots(st.C[0], st.C[1], (t - 9.5) / 0.7, 99, 14, 'rgba(169,207,60,0.9)', 40, 3);
       A.zoneName(0, 400, 'Tissue');
       A.zoneChip(0, 400, 'offense');
-      if (t > 3.4 && t < 5.6) A.tag(st.C[0], st.C[1] - 34, 'shots fizzle', A.PAL.slime, tagWin(t, 3.4, 5.6), -8);
+      if (t > 3.4 && t < 5.6) A.tag(st.C[0], st.C[1] - 34, '25% damage', A.PAL.slime, tagWin(t, 3.4, 5.6), -8);
     },
   };
 
@@ -1590,7 +1728,7 @@ CYT_CLIPS.stormRisk = {
   CYT_CLIPS.yeast = {
     id: 'yeast', title: 'Candida', dur: 13.5,
     cap: [[0, 'Candida settles and grows a thread toward the Lymph node.'], [3.4, 'Germs ride the thread 2.5 times faster. A thread in the Lymph node fills the spleen\'s breach clock too.'], [6.2, 'Shots pass straight through threads.'], [7.8, 'A Net neutrophil cuts the thread, and everything past the cut withers.'], [10.4, 'Offense macrophages chew the tips too, slowly.']],
-    bg: { tile: 1.2, dividers: [270], lymph: [350, 175] },
+    bg: { tile: 1.2, dividers: [360], lymph: [380, 175] }, // close-up of Deep tissue and the Lymph node strip
     build(st) {
       const r = A.rng(4);
       st.root = [60, 190];
@@ -1608,7 +1746,7 @@ CYT_CLIPS.stormRisk = {
       A.ent({ art: 'yeast', r: 6, rot: 1, t0: 4.4, blinks: [[4.4, 4.4 + A.BLINK]], die: 'pop', pos: A.path([[4.4, tip[0], tip[1]], [5.2, tip[0] + 6, tip[1] + 22], [20, tip[0] + 20, tip[1] + 40, 'l']], 2, 5) }).t1 = 11.2;
       // riders: germs latch onto the thread and race along it
       const along = (i0, i1, t0, t1) => t => { const q = A.clamp((t - t0) / (t1 - t0)) * (i1 - i0) + i0, k = Math.floor(q), f = q - k, p0 = main[Math.min(k, main.length - 1)], p1 = main[Math.min(k + 1, main.length - 1)]; return [A.lerp(p0[0], p1[0], f), A.lerp(p0[1], p1[1], f) - 4]; };
-      st.riders = [0, 1].map(j => { const t0 = 3.6 + j * 0.7, ride = along(2, 26 - j * 2, t0 + 0.6, t0 + 2.4), start = [-10, 150 + j * 70], [su, sv] = ride(t0 + 0.6);
+      st.riders = [0, 1].map(j => { const t0 = 3.6 + j * 0.7, ride = along(2, 28 - j, t0 + 0.6, t0 + 2.4), start = [-10, 150 + j * 70], [su, sv] = ride(t0 + 0.6);
         return germ({ r: 6.5, t0, pos: t => (t < t0 + 0.6 ? [A.lerp(start[0], su, A.ease(A.seg(t, t0, t0 + 0.6))), A.lerp(start[1], sv, A.ease(A.seg(t, t0, t0 + 0.6)))] : t < t0 + 2.4 ? ride(t) : [ride(t0 + 2.4)[0] + 4 * A.noise(j, t), ride(t0 + 2.4)[1] + 4 * A.noise(j + 3, t)]) }); });
       st.rideWin = st.riders.map((g, j) => [3.6 + j * 0.7 + 0.6, 3.6 + j * 0.7 + 2.4]);
       st.neuts = [K.recruit('neutrophil', -2, 200, 90, { r: 6, wob: 5 }), K.recruit('neutrophil', -2, 180, 270, { r: 6, wob: 5 }), K.recruit('neutrophil', -2, 340, 260, { r: 6, wob: 5 })];
@@ -1652,12 +1790,12 @@ CYT_CLIPS.stormRisk = {
       } });
       A.ringFx(c[0], c[1], nt / 0.35, '#FFD23F', 6, 30); // the burst
       A.dots(c[0], c[1], nt / 0.5, 7, 12, 'rgba(220,240,120,0.9)', 22, 2.4);
-      A.zoneName(0, 270, 'Tissue'); A.zoneName(270, 400, 'Lymph node');
-      // the Lymph node ring fills while the thread tip or a rider is inside
-      const inside = tt => (tt < st.cutT + 0.1 && st.main[Math.floor(st.mainLen(tt))][0] > 270) || st.riders.some(g => A.alive(g, tt) && g.pos(tt)[0] > 270);
+      A.zoneName(0, A.NODE_U, 'Deep tissue');
+      // the Lymph node's breach clock fills while the thread tip or a rider is in the strip
+      const inside = tt => (tt < st.cutT + 0.1 && st.main[Math.floor(st.mainLen(tt))][0] > A.NODE_U) || st.riders.some(g => A.alive(g, tt) && g.pos(tt)[0] > A.NODE_U);
       let f = 0; for (let tt = 0; tt < t; tt += 0.1) if (inside(tt)) f += 0.006;
-      A.lymphTimer(270, 400, f, inside(t), t);
-      A.zoneChip(0, 270, 'offense');
+      A.nodeRow({ frac: f, busy: inside(t), t, mode: null });
+      A.zoneChip(0, A.NODE_U, 'offense');
       if (t > 6.3 && t < 7.8) { const p = st.main[14]; A.tag(p[0], p[1], 'passes through', A.PAL.antibody, tagWin(t, 6.3, 7.8), -14); }
     },
   };

@@ -15,11 +15,11 @@ const COMBOS = {
   worm:     { name: 'Tapeworm boss', blurb: 'One huge worm crawls in. Support rings hit it harder.', rates: R({ staph: 3 }), boss: true, zones: ['support', 'support', 'offense'] },
   storm:    { name: 'Storm or die', blurb: 'Far too much at once. Is a storm worth it?', rates: R({ staph: 6, flu: 0.6, mrsa: 0.8 }) },
   chaos:    { name: 'Everything', blurb: 'A little of every antigen. Pure chaos.', rates: R({ staph: 1.2, mrsa: 0.4, pseudo: 0.4, flu: 0.4, spore: 0.15, tb: 0.3, toxic: 0.3, strep: 0.3, virus: 0.3 }), mix: { neut: 0.55, net: 0.15, nk: 0.1, mac: 0.2 } },
-  fever:    { name: 'Fever gamble', blurb: 'Fever slows division is on. Run hot to slow the Staph, but your cells suffer.', rates: R({ staph: 8, toxic: 0.5 }), dev: { feverDivision: true }, output: 0.8 },
+  fever:    { name: 'Fever gamble', blurb: 'Run hot so Fever slows the Staph down, but your cells suffer. (Fever slows division is on unless you switched it off.)', rates: R({ staph: 8, toxic: 0.5 }), output: 0.8 },
   measles:  { name: 'Measles', blurb: 'A virus that hijacks macrophages. Offense feeds it. NK cells are the answer.', rates: R({ measles: 1.2, staph: 3 }), mix: { neut: 0.6, mac: 0.25, nk: 0.15 } },
   fungus:   { name: 'Fungus highway', blurb: 'Candida grows threads that carry Staph to the Lymph node. No Nets yet: add some to cut them.', rates: R({ yeast: 3, staph: 3 }), mix: { neut: 0.85, mac: 0.15 } },
   jaundice: { name: 'Jaundice', blurb: 'A Hepatitis stream crosses the Tissue for the left blood vessel. Every leak costs the liver part of a bar, and a hurt liver makes new cells slower. Nets catch swarms.', rates: R({ hep: 7, staph: 2 }), dev: { organs: true, leakZone: '1' }, mix: { neut: 0.55, mac: 0.45 } },
-  badWater: { name: 'Bad water', blurb: 'E. coli plus Staph at high Body output. Leaks hurt the kidneys. With Toxin load on, shooting E. coli dumps toxin: swallow it.', rates: R({ ecoli: 5, staph: 4 }), dev: { organs: true, leakZone: 'random' }, output: 0.85, mix: { neut: 0.55, mac: 0.45 } },
+  badWater: { name: 'Bad water', blurb: 'E. coli plus Staph at high Stress. Leaks hurt the kidneys. With Toxin load on, shooting E. coli dumps toxin: swallow it.', rates: R({ ecoli: 5, staph: 4 }), dev: { organs: true, leakZone: 'random' }, output: 0.85, mix: { neut: 0.55, mac: 0.45 } },
   empty:    { name: 'Running on empty', blurb: 'Liver and kidneys start at 2 of 4 bars and fatigue at 60. Toxin clears slowly. Can you stay calm enough to recover?', rates: R({ staph: 4, ecoli: 1 }), dev: { organs: true }, organs: { liver: 0.5, kidney: 0.5 }, fatigue: 60 },
   clean:    { name: 'Kill clean', blurb: 'Toxin load on and lots of Pseudomonas. Can swallowing keep up?', rates: R({ pseudo: 1.5, staph: 5 }), mix: { neut: 0.4, mac: 0.6 } },
 };

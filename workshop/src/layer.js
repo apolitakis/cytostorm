@@ -12,11 +12,10 @@
 
 // Workshop-only tunables (v3's own numbers stay in CONFIG)
 const WS_DEFAULTS = {
-  toxload: { perKill: 2, perEndo: 5, perBurst: 10, clear: 1.4, clearTired: 0.12, feed: 0.02, safe: 25, puddleAt: 50, puddleSlow: 0.6, puddleLife: 8, puddleR: 9 },
-  toxheart: { perKill: 0.03, perEndo: 0.12, perBurst: 3 },
+  toxload: { perKill: 0.7, perEndo: 1.7, perBurst: 10, clear: 1.4, clearTired: 0.12, feed: 0.02, safe: 25, puddleAt: 50, puddleSlow: 0.6, puddleLife: 8, puddleR: 9 },
+  toxheart: { perKill: 0.01, perEndo: 0.04, perBurst: 3 }, // per-kill toxin /3 since V28's x3 armies
   organs: { liverShare: 0.35, minClear: 0.15, kidneyToxAt: 40, kidneyToxBars: 0.04 },
-  leakers: { hepSpeed: 70, ecoliSpeed: 55, ecoliHp: 2, ecoliDivide: 20, ecoliTox: 5, wobble: 0.35 },
-  fever: { tired: 0.85, feverish: 0.6, exhausted: 0.45 },
+  leakers: { hepSpeed: 70, ecoliSpeed: 55, ecoliHp: 2, ecoliDivide: 20, ecoliTox: 1.7, wobble: 0.35, leak: 0.08 },
   measles: { speed: 26, seek: 140, incubate: 12, burst: 5, radius: 2.2 },
 };
 const WS_HINTS = {
@@ -42,11 +41,9 @@ const WS_HINTS = {
   'leakers.ecoliSpeed': 'E. coli swim speed toward the blood vessel.',
   'leakers.ecoliHp': 'Hits to kill an E. coli.',
   'leakers.ecoliDivide': 'Seconds between E. coli divisions.',
+  'leakers.leak': 'Share of the organ\'s breach clock each leaker adds when it reaches the blood (0.08: about 12 leaks per bar; it was 0.25 before V28 tripled the leaker swarms).',
   'leakers.ecoliTox': 'Toxin when an E. coli is shot, netted or stormed (it is endotoxin-heavy). Swallowing adds none.',
   'leakers.wobble': 'How much leakers weave side to side on their way to the vessel.',
-  'fever.tired': 'Fever slows division (when on): bacteria divide at this speed while you are Tired.',
-  'fever.feverish': 'Bacteria division speed while Feverish.',
-  'fever.exhausted': 'Bacteria division speed while Exhausted.',
   'measles.speed': 'Measles swim speed toward a macrophage.',
   'measles.seek': 'How far Measles can sense a macrophage.',
   'measles.incubate': 'Seconds a hijacked macrophage stays dark before it bursts.',
@@ -66,28 +63,29 @@ LEVELS.sandbox = {
 };
 
 // What can be spawned, in groups. size = antigens per group (Strep and Tapeworm come as whole chains).
+// Group sizes are x3 since Play V28 (Alex: every unit count on both sides x3); the Tapeworm stays one worm.
 const SPAWNABLE = [
-  { k: 'staph', size: 6, about: 'The grunt. 3 hits, divides.' },
-  { k: 'mrsa', size: 3, about: 'Armored. Only tuned shots (Support rings) kill it.' },
-  { k: 'pseudo', size: 3, about: 'Settles and grows a slime dome. Offense tears domes down.' },
-  { k: 'flu', size: 12, about: 'One-hit swarm. Splits in the Tissue. Nets love it.' },
-  { k: 'spore', size: 5, about: 'Inert, then hatches into fast-dividing Clostridium.' },
-  { k: 'tb', size: 2, about: 'Tough. Infects any macrophage that swallows it.' },
-  { k: 'toxic', size: 4, about: 'Fatigue builds twice as fast while any live.' },
-  { k: 'strep', size: 1, about: 'A chain that sprints for the Lymph node.' },
-  { k: 'virus', size: 6, about: 'Herpes. Hides in neutrophils. NK cells pop them.' },
-  { k: 'measles', size: 4, about: 'Workshop only. Hijacks macrophages: they go dark, then burst into more Measles. NK cells pop them.' },
+  { k: 'staph', size: 18, about: 'The grunt. 3 hits, divides.' },
+  { k: 'mrsa', size: 9, about: 'Armored. Support rings kill it in one hit; plain shots take 12 and it heals when it divides.' },
+  { k: 'pseudo', size: 9, about: 'Settles and grows a slime dome. Offense tears domes down.' },
+  { k: 'flu', size: 36, about: 'One-hit swarm. Splits in the Tissue. Nets love it.' },
+  { k: 'spore', size: 15, about: 'Inert, then hatches into fast-dividing Clostridium.' },
+  { k: 'tb', size: 6, about: 'Tough. Infects any macrophage that swallows it.' },
+  { k: 'toxic', size: 12, about: 'Fatigue builds twice as fast while any live.' },
+  { k: 'strep', size: 3, about: 'A chain that sprints for the Lymph node.' },
+  { k: 'virus', size: 18, about: 'Herpes. Hides in neutrophils. NK cells pop them.' },
+  { k: 'measles', size: 12, about: 'Workshop only. Hijacks macrophages: they go dark, then burst into more Measles. NK cells pop them.' },
   { k: 'worm', size: 1, about: 'The Tapeworm boss.' },
-  { k: 'hep', size: 6, about: 'Hepatitis. Swims for the left blood vessel. Each leak hurts the liver. Nets catch the swarm.' },
-  { k: 'ecoli', size: 4, about: 'E. coli. Swims for the left blood vessel and hurts the kidneys. Shooting it dumps toxin: swallow it.' },
-  { k: 'yeast', size: 3, about: 'Candida. Settles and grows threads germs ride to the Lymph node. Nets cut them.' },
+  { k: 'hep', size: 18, about: 'Hepatitis. Swims for the left blood vessel. Each leak hurts the liver. Nets catch the swarm.' },
+  { k: 'ecoli', size: 12, about: 'E. coli. Swims for the left blood vessel and hurts the kidneys. Shooting it dumps toxin: swallow it.' },
+  { k: 'yeast', size: 9, about: 'Candida. Settles and grows threads germs ride to the Lymph node. Nets cut them.' },
 ];
 const FRIENDLY = ['neut', 'net', 'nk', 'mac'];
 const ZERO_RATES = () => Object.fromEntries(SPAWNABLE.map(s => [s.k, 0]));
 function defaultDev() {
   return {
     level: 'sandbox', rates: ZERO_RATES(), friendly: { neut: 0, net: 0, nk: 0, mac: 0 }, marrowOn: true, spawnMul: 1,
-    toxinLoad: false, toxinSimple: false, organs: true, leakZone: 'random', puddles: false, noFatigue: false, noDeath: false, immortal: false, noDivision: false, feverDivision: false,
+    toxinLoad: false, toxinSimple: false, organs: true, leakZone: 'random', puddles: false, noFatigue: false, noDeath: false, immortal: false, noDivision: false,
   };
 }
 const NO_TOXIN = { flu: 1, virus: 1 };   // viruses: nets against flu stay clean
@@ -115,13 +113,13 @@ class Workshop {
     const g = this.game, r = g.rand, C = CONFIG;
     const s = SPAWNABLE.find(x => x.k === k); if (!s) return;
     const cu = WOUND.u + (r() - 0.5) * 60, cv = WOUND.v + (r() - 0.5) * 160;
-    if (k === 'strep') g.spawnChain('strep', C.strep.links, WOUND.u + 30, cv);
+    if (k === 'strep') for (let i = 0; i < s.size; i++) g.spawnChain('strep', C.strep.links, WOUND.u + 30 + i * 12, cv + (r() - 0.5) * 60);
     else if (k === 'worm') g.spawnChain('worm', C.worm.segments, WOUND.u + 60, WOUND.v);
     else if (k === 'measles') for (let i = 0; i < s.size; i++) this.spawnMeasles(cu + (r() - 0.5) * 24, cv + (r() - 0.5) * 24);
     else if (k === 'hep' || k === 'ecoli') {
       // leakers start on the far side of a zone from the vessel and have to cross that zone's cells
-      const z = this.dev.leakZone === 'random' || this.dev.leakZone == null ? Math.floor(r() * 3) : +this.dev.leakZone;
-      const lu = z * ZONE + ZONE * (0.25 + r() * 0.5), lv = WIDTH - (typeof FAR_VESSEL === 'number' ? FAR_VESSEL : 0) - 12; // just inside the far vessel's wall
+      const z = this.dev.leakZone === 'random' || this.dev.leakZone == null ? Math.floor(r() * NZ) : Math.min(NZ - 1, +this.dev.leakZone);
+      const lu = zStart(z) + zLen(z) * (0.25 + r() * 0.5), lv = WIDTH - (typeof FAR_VESSEL === 'number' ? FAR_VESSEL : 0) - 12; // just inside the far vessel's wall
       for (let i = 0; i < s.size; i++) this.spawnLeaker(k, lu + (r() - 0.5) * 30, lv - r() * 20);
     }
     else for (let i = 0; i < s.size; i++) g.spawnAg(k, cu + (r() - 0.5) * 24, cv + (r() - 0.5) * 24, k === 'spore' ? { hatchAt: g.t + C.spore.hatch } : null);
@@ -150,8 +148,8 @@ class Workshop {
     const g = this.game, o = this.organs; o.leaks[organ]++;
     g.fx.push({ k: 'leak', organ });
     if (!this.dev.organs) return;
-    o.pops.push({ organ, t: 0, txt: `+${Math.round(CONFIG.lymph.leak * 100)}%` });
-    g.breach(organ, CONFIG.lymph.leak, organ === 'liver' ? 'Hepatitis' : 'E. coli');
+    o.pops.push({ organ, t: 0, txt: `+${Math.round(WS.leakers.leak * 100)}%` });
+    g.breach(organ, WS.leakers.leak, organ === 'liver' ? 'Hepatitis' : 'E. coli');
   }
   // h: share of full health (1 = 4 bars), as the Workshop buttons and combos give it
   setOrgan(organ, h) { this.game.setOrgan(organ, h * 4); }
@@ -226,7 +224,7 @@ class Workshop {
   spawnFriendly(type, n) {
     const g = this.game;
     for (let i = 0; i < (n || 1); i++) {
-      const z = this.nextZone; this.nextZone = (this.nextZone + 1) % 3;
+      const z = this.nextZone; this.nextZone = (this.nextZone + 1) % NZ;
       const c = g.spawnCell(type, z);
       g.fx.push({ k: 'arrive', u: c.u, v: c.v, type });
     }
@@ -261,11 +259,7 @@ class Workshop {
     if (d.immortal) for (const c of g.cells) if (c.type === 'neut' || c.type === 'nk') c.age = Math.min(c.age, 1);
     if (d.noFatigue) g.fatigue = 0;
 
-    // Fever slows division (bacteria only: viruses copy themselves inside your cells)
-    if (d.feverDivision && !d.noDivision) {
-      const F = WS.fever, mul = [1, F.tired, F.feverish, F.exhausted][g.fatigueTier()];
-      if (mul < 1) for (const a of g.ag) if (KINDS[a.k] && KINDS[a.k].divides && !a.dead && !a.eaten) a.age = Math.max(0, a.age - dt * (1 - mul));
-    }
+    // Fever slows division lives in the sim now (CONFIG.fever, Play V26); the Workshop panel switches CONFIG.fever.on
     const from = g.fx.length, u0 = new Map();
     if (this.tox.puddles.length) for (const c of g.cells) u0.set(c, [c.u, c.v]);
     g.organLoss = !d.noDeath && !d.immortal; // the cheats keep a failed organ from ending the match

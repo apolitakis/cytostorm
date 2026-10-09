@@ -11,6 +11,7 @@ Writes site/ and cytostorm-site.zip next to this file:
     /sandbox/    the workshop <- workshop/index.html
     /v2/         prototype v2 <- prototype/v2/index.html
     /ost/        soundtrack   <- audio/ost/index.html (music synthesized live, no audio files)
+    /campaign/   campaign     <- campaign/index.html (reads v3's sim at build time)
 The game builds are not changed: each is wrapped with the <head> tags a standalone page needs on
 iPhone (the Artifact viewer adds its own, so the builds leave them out) and a ‹ button in its HUD
 that goes back to the hub, since a Home Screen app has no browser back button.
@@ -26,8 +27,9 @@ ENTRIES = {  # key: (folder, source build, page title)
     'sandbox': ('sandbox', root / 'workshop/index.html', 'Cytostorm Sandbox'),
     'v2': ('v2', root / 'prototype/v2/index.html', 'Cytostorm v2'),
     'ost': ('ost', root / 'audio/ost/index.html', 'Cytostorm Soundtrack'),
+    'campaign': ('campaign', root / 'campaign/index.html', 'Cytostorm Campaign'),
 }
-GAMES = {'play', 'sandbox', 'v2'}  # pages with the game HUD; other pages get the back button above their content
+GAMES = {'play', 'sandbox', 'v2', 'campaign'}  # pages with the game HUD; other pages get the back button above their content
 ART = ['neutrophil.svg', 'storm.svg', 'lymph-node.svg', 'bacterium.svg', 'heart-healthy.svg']
 
 # key=chip sets a hub card's version chip; key:path builds that entry from another file, e.g. the
@@ -105,7 +107,7 @@ for name in ('apple-touch-icon.png', 'icon-512.png'):
     'icons': [{'src': '/icon-512.png', 'sizes': '512x512', 'type': 'image/png'}],
 }, indent=2))
 # Short links, like Sonterra's: /workshop and /v3 land on the right page.
-(site / '_redirects').write_text('/workshop  /sandbox/  302\n/v3  /play/  302\n/ost  /ost/  302\n')
+(site / '_redirects').write_text('/workshop  /sandbox/  302\n/v3  /play/  302\n/ost  /ost/  302\n/campaign  /campaign/  302\n')
 
 with zipfile.ZipFile(here / 'cytostorm-site.zip', 'w', zipfile.ZIP_DEFLATED) as z:
     for f in sorted(site.rglob('*')):

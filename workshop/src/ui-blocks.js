@@ -81,8 +81,15 @@
     [WS, 'toxheart', 'perBurst', 'Heart: per toxin burst', 0, 20, 0.5],
   ];
   // spawn rates are stored as groups per 10 s (combos use that); the sliders show antigens per second
-  const apsMax = sp => (sp.k === 'worm' ? 0.5 : 30);
+  const apsMax = sp => (sp.k === 'worm' ? 0.5 : 90); // x3 since V28
   const toAps = sp => +((dev.rates[sp.k] || 0) * sp.size / 10).toFixed(2);
+  const MAIN_SLIDERS = [ // the sim's own rules, so the same numbers as the Tune list
+    [CONFIG, 'fever', 'tired', 'Division speed when Tired', 0.1, 1, 0.05], [CONFIG, 'fever', 'feverish', 'When Feverish', 0.1, 1, 0.05], [CONFIG, 'fever', 'exhausted', 'When Exhausted', 0.1, 1, 0.05],
+    [CONFIG, 'quorum', 'n', 'Quorum: germs in one crowd', 4, 40, 1], [CONFIG, 'quorum', 'fuse', 'Quorum: seconds of glow before it pops', 1, 15, 0.5], [CONFIG, 'quorum', 'pop', 'Quorum: pop kills your cells within', 20, 200, 5],
+    [CONFIG, 'wall', 'soft', 'Vessel wall softness', 0.02, 1, 0.02], [CONFIG, 'trickle', 'mul', 'Trickle between waves ×', 0, 5, 0.25],
+    [CONFIG, 'output', 'curve', 'Stress curve (1 = straight line)', 0.2, 1, 0.005], [CONFIG, 'pseudo', 'shield', 'Slime dome lets through', 0, 1, 0.05],
+    [CONFIG, 'evolve', 'share', 'Evolution: one kill method’s share', 0.3, 1, 0.05], [CONFIG, 'evolve', 'wall', 'Evolved thick wall: plain shot damage', 0.1, 1, 0.05],
+  ];
   const ORGAN_SLIDERS = [
     [WS, 'organs', 'kidneyToxAt', 'Kidneys hurt above toxin', 0, 100, 1], [WS, 'organs', 'kidneyToxBars', 'Kidney bars lost per second there', 0, 0.2, 0.005],
     [WS, 'organs', 'liverShare', 'Liver share of toxin clearing', 0, 1, 0.05], [WS, 'organs', 'minClear', 'Clearance floor', 0, 1, 0.05],
@@ -110,13 +117,18 @@
       <div class="grp">
         <div class="ghead"><span>Your cells</span></div>
         <label class="row" for="wsMarrow"><span>Marrow makes cells (production cards)</span><input type="checkbox" id="wsMarrow"></label>
-        <small class="note">Extra cells per 10 s on top of the marrow, spread across the zones. +5 drops five now.</small>
-        ${FRIENDLY.map(u => `<div class="srow"><img data-art="${UNIT[u].art}" alt=""><div class="st2"><b>${UNIT[u].name}</b><small>${UNIT[u].what}</small></div><output id="fv-${u}"></output><button type="button" data-plus="${u}">+5</button><input type="range" id="fr-${u}" min="0" max="30" step="0.5" aria-label="${UNIT[u].name} per 10 s"></div>`).join('')}
+        <small class="note">Extra cells per 10 s on top of the marrow, spread across the zones. +15 drops fifteen now.</small>
+        ${FRIENDLY.map(u => `<div class="srow"><img data-art="${UNIT[u].art}" alt=""><div class="st2"><b>${UNIT[u].name}</b><small>${UNIT[u].what}</small></div><output id="fv-${u}"></output><button type="button" data-plus="${u}">+15</button><input type="range" id="fr-${u}" min="0" max="90" step="0.5" aria-label="${UNIT[u].name} per 10 s"></div>`).join('')}
+      </div>
+      <div class="grp">
+        <div class="ghead"><span>Main-game rules</span></div>
+        <label class="row" for="ch-fever"><span>Fever slows division <small>On in the main game. Bacteria divide slower while you're Tired, Feverish or Exhausted. Viruses don't care.</small></span><input type="checkbox" id="ch-fever"></label>
+        <label class="row" for="ch-evolve"><span>Evolution <small>Before each wave of a level, a germ kind evolves against the way you've mostly been killing it. The open Sandbox has no waves, so it only shows up when you play a level here.</small></span><input type="checkbox" id="ch-evolve"></label>
+        ${MAIN_SLIDERS.map(([, g, k, n, lo, hi, st]) => `<label class="row" for="tx-${g}-${k}"><span>${n}</span><output id="txv-${g}-${k}"></output></label><input type="range" id="tx-${g}-${k}" min="${lo}" max="${hi}" step="${st}">`).join('')}
+        <small class="note">A quorum burst needs that many Staph-family germs in one crowd (main-game levels set their own: Papercut 14, Flu and Sore throat 18). The vessel wall decides how much output you lose with sectors switched off. Trickle only matters on scripted levels. Everything else is under Tune.</small>
       </div>
       <div class="grp">
         <div class="ghead"><span>New mechanics</span></div>
-        <label class="row" for="ch-feverDivision"><span>Fever slows division <small>Bacteria divide slower while you're Tired, Feverish or Exhausted. Viruses don't care.</small></span><input type="checkbox" id="ch-feverDivision"></label>
-        ${[['tired', 'Division speed when Tired'], ['feverish', 'When Feverish'], ['exhausted', 'When Exhausted']].map(([k, n]) => `<label class="row" for="fv2-${k}"><span>${n}</span><output id="fvv-${k}"></output></label><input type="range" id="fv2-${k}" min="0.1" max="1" step="0.05">`).join('')}
         <small class="note">Measles (in the Antigens list) hijacks macrophages: they go dark, then burst into more Measles. Swallowing one infects the macrophage too. NK cells pop hijacked ones.</small>
       </div>
       <div class="grp">
@@ -132,7 +144,7 @@
         <div class="ghead"><span>Organs</span></div>
         <label class="row" for="wsOrgans"><span><b>Leaks hurt organs</b> <small>Each Hepatitis that reaches the blood adds to the liver's breach clock, each E. coli to the kidneys' (the main game's "leak" number, Every number &gt; Lymph). With Toxin load on, toxin over the mark also wears the kidneys down.</small></span><input type="checkbox" id="wsOrgans"></label>
         <label class="row" for="wsLastBar"><span>Toxin can take the last bar <small>Off: toxin stops at 1 kidney bar. On: it can finish the kidneys (Host failure). Breach clocks and Overload can always take the last bar.</small></span><input type="checkbox" id="wsLastBar"></label>
-        <label class="row" for="wsLeakZone"><span>Leakers cross</span><select id="wsLeakZone"><option value="random">Random zone</option><option value="0">Wound</option><option value="1">Tissue</option><option value="2">Lymph node</option></select></label>
+        <label class="row" for="wsLeakZone"><span>Leakers cross</span><select id="wsLeakZone"><option value="random">Random zone</option><option value="0">Wound</option><option value="1">Tissue</option><option value="2">Deep tissue</option><option value="3">Lymph node</option></select></label>
         <div class="devbtns orgbtns">${ORGANS.map(o => `<span class="mini">${o.name}</span>${[1, 0.5, 0.25].map(h => `<button type="button" data-org="${o.k}" data-h="${h}" aria-label="${o.name} to ${h * 4} bars">${h * 4}</button>`).join('')}`).join('')}<button type="button" id="wsHeal">Heal all organs</button></div>
         ${ORGAN_SLIDERS.map(([, g, k, n, lo, hi, st]) => `<label class="row" for="tx-${g}-${k}"><span>${n}</span><output id="txv-${g}-${k}"></output></label><input type="range" id="tx-${g}-${k}" min="${lo}" max="${hi}" step="${st}">`).join('')}
         <small class="note">Hepatitis and E. coli (in the Antigens list) skip the Lymph node and swim for the vessel. Hepatitis hurts the liver, which also sets how fast new cells are made and heals when you're Fine. E. coli hurts the kidneys, which never heal in a match; shooting it dumps toxin, swallowing it doesn't. The organ buttons set bars directly (they never end the match).</small>
@@ -159,7 +171,7 @@
     host.querySelectorAll('[data-send]').forEach(b => b.addEventListener('click', () => ws.spawnGroup(b.dataset.send)));
     $('#wsMarrow').addEventListener('change', e => { dev.marrowOn = e.target.checked; saveDev(); });
     for (const u of FRIENDLY) $(`#fr-${u}`).addEventListener('input', e => { dev.friendly[u] = +e.target.value; saveDev(); syncWorkshop(); });
-    host.querySelectorAll('[data-plus]').forEach(b => b.addEventListener('click', () => ws.spawnFriendly(b.dataset.plus, 5)));
+    host.querySelectorAll('[data-plus]').forEach(b => b.addEventListener('click', () => ws.spawnFriendly(b.dataset.plus, 15)));
     $('#wsTox').addEventListener('change', e => { dev.toxinLoad = e.target.checked; saveDev(); hud(); });
     $('#wsHeart').addEventListener('change', e => { dev.toxinSimple = e.target.checked; saveDev(); hud(); });
     $('#wsOrgans').addEventListener('change', e => { dev.organs = e.target.checked; saveDev(); });
@@ -168,13 +180,13 @@
     host.querySelectorAll('[data-org]').forEach(b => b.addEventListener('click', () => ws.setOrgan(b.dataset.org, +b.dataset.h)));
     $('#wsHeal').addEventListener('click', () => { for (const o of ORGANS) ws.setOrgan(o.k, 1); });
     $('#wsPuddles').addEventListener('change', e => { dev.puddles = e.target.checked; saveDev(); hud(); });
-    for (const [obj, g, k] of [...TOX_SLIDERS, ...HEART_SLIDERS, ...ORGAN_SLIDERS]) $(`#tx-${g}-${k}`).addEventListener('input', e => {
+    for (const [obj, g, k] of [...TOX_SLIDERS, ...HEART_SLIDERS, ...ORGAN_SLIDERS, ...MAIN_SLIDERS]) $(`#tx-${g}-${k}`).addEventListener('input', e => {
       obj[g][k] = +e.target.value; saveTuning(); syncTune();
       const t = $(`#t-${g}-${k}`); if (t) { t.value = obj[g][k]; t.classList.toggle('changed', obj[g][k] !== wsDef(obj, g, k)); }
     });
     for (const [k] of CHEATS) $(`#ch-${k}`).addEventListener('change', e => { dev[k] = e.target.checked; saveDev(); });
-    $('#ch-feverDivision').addEventListener('change', e => { dev.feverDivision = e.target.checked; saveDev(); });
-    for (const k of ['tired', 'feverish', 'exhausted']) $(`#fv2-${k}`).addEventListener('input', e => { WS.fever[k] = +e.target.value; saveTuning(); syncTune(); const t = $(`#t-fever-${k}`); if (t) t.value = WS.fever[k]; });
+    $('#ch-evolve').addEventListener('change', e => { CONFIG.evolve.on = e.target.checked ? 1 : 0; saveTuning(); const t = $('#t-evolve-on'); if (t) { t.value = CONFIG.evolve.on; t.classList.toggle('changed', CONFIG.evolve.on !== DEFAULTS.evolve.on); } });
+    $('#ch-fever').addEventListener('change', e => { CONFIG.fever.on = e.target.checked ? 1 : 0; saveTuning(); const t = $('#t-fever-on'); if (t) { t.value = CONFIG.fever.on; t.classList.toggle('changed', CONFIG.fever.on !== DEFAULTS.fever.on); } });
     $('#wsBurst').addEventListener('click', () => ws.toxinBurstNow());
     // Reset (top bar): restart the current level or combo from zero, same settings, no menus
     $('#wsReset').onclick = () => { closeModal(); newGame(); syncWorkshop(); };
@@ -200,12 +212,9 @@
     });
   }
   function syncTune() {
-    for (const k of ['tired', 'feverish', 'exhausted']) {
-      const el = $(`#fv2-${k}`); if (!el) continue;
-      if (document.activeElement !== el) el.value = WS.fever[k];
-      const o = $(`#fvv-${k}`); o.textContent = `${Math.round(WS.fever[k] * 100)}%`; o.classList.toggle('changed', WS.fever[k] !== WS_DEFAULTS.fever[k]);
-    }
-    for (const [obj, g, k] of [...TOX_SLIDERS, ...HEART_SLIDERS, ...ORGAN_SLIDERS]) {
+    { const el = $('#ch-fever'); if (el) el.checked = !!CONFIG.fever.on; }
+    { const el = $('#ch-evolve'); if (el) el.checked = !!CONFIG.evolve.on; }
+    for (const [obj, g, k] of [...TOX_SLIDERS, ...HEART_SLIDERS, ...ORGAN_SLIDERS, ...MAIN_SLIDERS]) {
       const el = $(`#tx-${g}-${k}`); if (!el) continue;
       if (document.activeElement !== el) el.value = obj[g][k];
       const o = $(`#txv-${g}-${k}`); o.textContent = obj[g][k]; o.classList.toggle('changed', obj[g][k] !== wsDef(obj, g, k));
@@ -229,7 +238,7 @@
     }
     $('#wsMarrow').checked = dev.marrowOn; $('#wsTox').checked = dev.toxinLoad; $('#wsPuddles').checked = !!dev.puddles; $('#wsHeart').checked = !!dev.toxinSimple; $('#wsOrgans').checked = !!dev.organs; $('#wsLastBar').checked = CONFIG.organs.otherFloor <= 0; $('#wsLeakZone').value = String(dev.leakZone == null ? 'random' : dev.leakZone);
     for (const [k] of CHEATS) $(`#ch-${k}`).checked = !!dev[k];
-    $('#ch-feverDivision').checked = !!dev.feverDivision;
+    $('#ch-fever').checked = !!CONFIG.fever.on; $('#ch-evolve').checked = !!CONFIG.evolve.on;
     syncTune();
     if (ws) wsReadout();
   }
@@ -279,9 +288,14 @@
     if ($('#dev').hidden === false) wsReadout();
 //@@ newmech
       <div class="grp">
+        <div class="ghead"><span>Main-game rules</span></div>
+        <label class="row" for="ch-fever"><span>Fever slows division <small>On in the main game. Bacteria divide slower while you're Tired, Feverish or Exhausted. Viruses don't care.</small></span><input type="checkbox" id="ch-fever"></label>
+        <label class="row" for="ch-evolve"><span>Evolution <small>Before each wave of a level, a germ kind evolves against the way you've mostly been killing it. The open Sandbox has no waves, so it only shows up when you play a level here.</small></span><input type="checkbox" id="ch-evolve"></label>
+        ${MAIN_SLIDERS.map(([, g, k, n, lo, hi, st]) => `<label class="row" for="tx-${g}-${k}"><span>${n}</span><output id="txv-${g}-${k}"></output></label><input type="range" id="tx-${g}-${k}" min="${lo}" max="${hi}" step="${st}">`).join('')}
+        <small class="note">A quorum burst needs that many Staph-family germs in one crowd (main-game levels set their own: Papercut 14, Flu and Sore throat 18). The vessel wall decides how much output you lose with sectors switched off. Trickle only matters on scripted levels. Everything else is under Tune.</small>
+      </div>
+      <div class="grp">
         <div class="ghead"><span>New mechanics</span></div>
-        <label class="row" for="ch-feverDivision"><span>Fever slows division <small>Bacteria divide slower while you're Tired, Feverish or Exhausted. Viruses don't care.</small></span><input type="checkbox" id="ch-feverDivision"></label>
-        ${[['tired', 'Division speed when Tired'], ['feverish', 'When Feverish'], ['exhausted', 'When Exhausted']].map(([k, n]) => `<label class="row" for="fv2-${k}"><span>${n}</span><output id="fvv-${k}"></output></label><input type="range" id="fv2-${k}" min="0.1" max="1" step="0.05">`).join('')}
         <small class="note">Measles (in the Antigens list) hijacks macrophages: they go dark, then burst into more Measles. Swallowing one infects the macrophage too. NK cells pop hijacked ones.</small>
       </div>
 //@@ organs

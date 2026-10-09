@@ -1,0 +1,12 @@
+level     idle         random       smart        supportHeavy offenseHeavy gunner       
+papercut  0/4 s4 100%  0/4 s4 0%    0/4 s4 100%  1/4 s3 100%  0/4 s4 100%  0/4 s4 100%  
+hospital  0/4 s4 100%  0/4 s4 0%    3/4 s1 25%   4/4 0%       1/4 s3 78%   0/4 s4 100%  
+pool      0/4 s4 100%  0/4 s4 0%    3/4 s1 25%   4/4 0%       2/4 s2 50%   1/4 s3 75%   
+flu       0/4 s4 100%  0/4 s4 25%   0/4 s4 100%  1/4 s3 100%  0/4 s4 100%  0/4 s4 100%  
+soil      0/4 s4 100%  0/4 s4 0%    4/4 0%       4/4 0%       0/4 s4 100%  1/4 s3 100%  
+foot      0/4 s4 100%  0/4 s4 0%    0/4 s4 100%  0/4 s4 100%  0/4 s4 100%  0/4 s4 100%  
+lungs     0/4 s4 100%  0/4 s4 0%    0/4 s4 100%  2/4 s2 50%   0/4 s4 100%  1/4 s3 75%   
+throat    0/4 s4 100%  0/4 s4 0%    0/4 s4 100%  4/4 0%       0/4 s4 100%  0/4 s4 100%  
+coldsore  0/4 s4 100%  0/4 s4 0%    0/4 s4 100%  0/4 s4 100%  0/4 s4 100%  0/4 s4 100%  
+gut       0/4 s4 100%  0/4 s4 0%    0/4 s4 100%  0/4 s4 100%  0/4 s4 100%  0/4 s4 100%  
+(wins/seeds, s = host-failure losses, then mean peak lymph timer)  315 s

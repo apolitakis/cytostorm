@@ -12,6 +12,7 @@ Live: https://cytostorm.pages.dev (Pages project `cytostorm`, Alex's Cloudflare 
 | `/sandbox/` | mechanics workshop | `workshop/index.html` |
 | `/v2/` | earlier build | `prototype/v2/index.html` |
 | `/ost/` | soundtrack (music synthesized live, no audio files; back button sits above the page, not in a HUD) | `audio/ost/index.html` (Artifact 3iTN41i6ZkdAHyiGmDS4R5) |
+| `/campaign/` | campaign (built on v3's sim; republished whenever v3 moves) | `campaign/index.html` (Artifact So5dsH9Ess5Q3EgKJG2Zdn) |
 | `/workshop`, `/v3` | short links | `_redirects` |
 
 `make.py` wraps each build with the iPhone head tags (viewport, Home Screen app tags, icon, manifest) and adds a ‹ button to
@@ -81,6 +82,17 @@ local server in Playwright's Chromium (iPhone 13 profile).
 - 2026-10-08 01:33 preview: Play = v3 Version 22 (id 1791422970-e8e1, second vessel on the right edge, rail outside it); Sandbox workshop V21 and /ost/ V2 unchanged. Checked 375x667, 375x812, 402x874, 430x932: vessel and rail side by side, no overflow.
 - 2026-10-08 01:39 preview (SHIP SET): Play = v3 Version 23 (id 1791423270-9c94, clips V17), Sandbox = workshop Version 22 (id 1791423316-1cb6, second vessel), /ost/ V2 unchanged. Both checked at 375x667, 375x812, 402x874, 430x932: no overflow. https://1226ff0f.cytostorm.pages.dev
 - 2026-10-08 01:45 PRODUCTION (Alex: "ship" 01:43 in this thread): promoted the preview bytes. Play = v3 Version 23 (id 1791423270-9c94), Sandbox = workshop Version 22 (id 1791423316-1cb6), /ost/ = OST V2 (id 1791420864-997e). https://8a3ba1b1.cytostorm.pages.dev. Live verified: hashes, pages, back buttons, feedback form, zoom, OST playback, Play at 375/402/430 px.
+- 2026-10-08 11:12 preview: Play = v3 Version 25 (id 1791457381-bbcd), Sandbox = workshop Version 24 (id 1791457564-5bfb): Deep tissue 4th sector, 10% Lymph node strip, MRSA slow death, clips V18. /ost/ V2 unchanged. Checked 375x667, 375x812, 390x844, 402x874, 430x932: no overflow; lymph strip is one row (label, count, stance, breach clock, power), stance pill shrinks to its icon at 375. https://da6dcd63.cytostorm.pages.dev
+- 2026-10-08 12:30 preview: Play = v3 Version 26 (id 1791462154-7f24, clips V20, quorum bursts, sector output labels), NEW /campaign/ = Campaign V1 (id 1791461920-1de9) with the hub's Campaign card un-dimmed (make.py entry 'campaign', /campaign short link); Sandbox workshop V24 and OST V2 unchanged. Play checked at 375/390/402/430; Campaign map, Clinic, Papercut battle checked at 375/390/430, no overflow.
+- 2026-10-08 12:33 preview: /campaign/ = Campaign V2 (id 1791462466-e2e4, built on Play V26, shop section renamed Production; no visible "marrow" text left). Play V26, Sandbox V24, OST V2 unchanged.
+- 2026-10-08 12:36 preview (SHIP SET): Play = v3 V26 (id 1791462154-7f24), Sandbox = workshop V25 (id 1791462645-a2d6, on Play V26 + clips V20), Campaign V2 (id 1791462466-e2e4), OST V2. Sandbox checked at 375/390/402/430, no overflow.
+- 2026-10-08 13:04 preview (CLEAN SHIP SET): Play v3 V26 (1791462154-7f24) + Sandbox V26 (1791464376-41fd) + Campaign V4 (1791464415-2768) + OST V2 (1791420864-997e); no evolve in any page; deploy https://96536051.cytostorm.pages.dev. Production unchanged (01:45).
+- 2026-10-08 13:06 PRODUCTION (Alex "Ship!" 13:05 in thread): promoted the 13:04 preview bytes unchanged = Play v3 V26 + Sandbox V26 + Campaign V4 (card live) + OST V2; deploy https://adc463bb.cytostorm.pages.dev; live hashes match, phone tests pass.
+- 2026-10-08 13:3x preview: Play v3 V27 (1791466115-dad1, clips V22, Evolution) + Sandbox V26 + Campaign V4 + OST V2 (others byte-identical); Sandbox/Campaign rebuilds on V27 to follow. Production unchanged (13:06).
+- 2026-10-08 13:38 preview (V27 SHIP SET): Play v3 V27 (1791466115-dad1) + Sandbox V27 (1791466547-b87f) + Campaign V5 (1791466540-24fd, Stress wording) + OST V2; deploy https://1b830f5f.cytostorm.pages.dev. Production unchanged (13:06).
+- 2026-10-08 14:3x preview: Play v3 V29 (1791469230-7229, 3x units, clips V23) + Sandbox V28 (1791469435-32ad) + Campaign V5 (still V27-based) + OST V2. Flu season local run peaked 2109 germs, headless fps 6-7 at peaks (software rendering). Production unchanged (13:06).
+- 2026-10-08 14:3x preview (3x SHIP SET): Play v3 V29 (1791469230-7229) + Sandbox V28 (1791469435-32ad) + Campaign V6 (1791469731-704b, on V28 sources) + OST V2. Production unchanged (13:06).
+- 2026-10-09 01:28 PRODUCTION (Alex "Ship and publish" 01:27 via coordinator): Play v3 V29 + Sandbox V28 + Campaign V6 + OST V2, game pages byte-identical to preview 2bb39015 (hub date only changed); deploy https://6f05f3ca.cytostorm.pages.dev; live hashes match.
 
 ## Friends
 Open the link in Safari, Share > Add to Home Screen. It launches full screen with the neutrophil icon, like an app.

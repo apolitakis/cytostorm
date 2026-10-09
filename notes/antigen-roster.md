@@ -1,6 +1,6 @@
 # Antigen roster: enemy types and their counters
 
-Written 2026-10-07. Built on the v2 rules (Wound > Tissue > Lymph node, scripted waves, per-zone macrophage Offense/Support, Body output slider). **Alex approved all of it on 2026-10-07 and wants it all built, plus the Cytokine storm ability below.** Where an open question at the end isn't answered yet, the builder uses the recommendation given there.
+Written 2026-10-07. Built on the v2 rules (Wound > Tissue > Lymph node; since main game Version 24 the map is Wound > Tissue > Deep tissue > Lymph node, split 30/30/30/10, scripted waves, per-zone macrophage Offense/Support, Body output slider). **Alex approved all of it on 2026-10-07 and wants it all built, plus the Cytokine storm ability below.** Where an open question at the end isn't answered yet, the builder uses the recommendation given there.
 
 ## The idea
 
@@ -39,9 +39,9 @@ Proposed new tools, only if we like the antigens that need them:
 Already in v2. 3 hits, divides every 10 s. Every other antigen is defined against it.
 
 ### 2. MRSA (the tank) — Today
-Armored, and also too slippery to swallow: Offense macrophages spit it out. **Only tuned shots kill it.**
+Armored, and also too slippery to swallow: Offense macrophages spit it out. **Tuned shots kill it in one hit.**
 - Counter: Support mode in whichever zone it's reaching.
-- Fallback: none by design. This is the one hard-lock enemy, so levels cap its share and warn early on the progress bar.
+- Fallback (changed 2026-10-08, main game Version 24): plain neutrophil fire wears it down slowly. It takes 12 hits and heals back to full whenever it divides (every 20 s), so plain fire only wins where enough gunners focus it. Alex's reason: Support macrophages don't chase MRSA, so a hard lock left "frustrating unsalvageable situations". It used to be a hard lock (only tuned shots), and levels still cap its share and warn early on the progress bar.
 - Look: today's armored bacterium with a hazard-stripe shell.
 
 ### 3. Influenza (zerglings) — New tool (Net neutrophil)
@@ -52,9 +52,9 @@ Tiny, fast, one hit kills, arrives in swarms of 40+ all at once. Doesn't divide;
 - Look: small pale spheres with spikes, swarming like a school of fish.
 
 ### 4. Pseudomonas (the builder) — Today
-Stops in a zone and grows a slime dome (biofilm). Bacteria under the dome are immune to shots, plain or tuned. Domes keep spreading if left alone.
+Stops in a zone and grows a slime dome (biofilm). The dome works like MRSA's armor: shots into it, plain or tuned, do only a small fraction of their damage, so a focused gunline still grinds bacteria under it down, just slowly. It never blocks damage completely (changed 2026-10-08 after Alex's Pool playtest; it used to make them immune). Domes keep spreading if left alone.
 - Counter: Offense macrophages tear domes down (each gulp chews a chunk).
-- Fallback: none for the dome itself, but neutrophils can keep the bacteria around it thin while macrophages arrive.
+- Fallback: concentrated neutrophil fire wears down the bacteria under a dome slowly, and keeps the ones around it thin while macrophages arrive.
 - Why it's fun: it's the reason to keep Offense on. It pulls directly against MRSA, which wants Support.
 - Look: green-tinted bacterium; the dome is a translucent bubble over the zone floor.
 
@@ -105,9 +105,9 @@ One huge segmented worm, about 400 hits, crawls Wound to Lymph node over two min
 | Antigen | Plain fire | Support (tuned) | Offense (swallow) | Body output | New tool |
 |---|---|---|---|---|---|
 | Staph | ✓ | ✓ | ✓ | ~ | |
-| MRSA | ✗ | ✓ | ✗ | ~ | |
+| MRSA | ~ (12 hits, heals on division) | ✓ | ✗ | ~ | |
 | Influenza | ~ | ~ | ✗ (too many) | ~ | Net ✓ |
-| Pseudomonas | ~ | ~ | ✓ (domes) | ~ | |
+| Pseudomonas | ~ (domed: heavily reduced) | ~ (domed: heavily reduced) | ✓ (domes) | ~ | |
 | Tuberculosis | ✓ | ✓ | ✗ (infects) | ~ | NK ✓ (infected macrophages) |
 | Clostridium | ✓ after hatch | ✓ | ✓ | ✓ timing | |
 | Toxic-shock Staph | ✓ | ✓ | ✓ in Wound | ✗ (drain) | |
@@ -171,6 +171,6 @@ A sample early arc:
 
 1. Is a third marrow option (Net neutrophil) okay, or should area damage come from an existing unit instead (for example, Offense macrophages that gulp a whole cluster of tiny things at once)?
 2. Keep Herpes and the NK cell, or cut them as too complex for now?
-3. MRSA as a true hard-lock (only tuned shots), or should macrophages be able to swallow it slowly as a fallback?
+3. ~~MRSA as a true hard-lock (only tuned shots), or should macrophages be able to swallow it slowly as a fallback?~~ Answered 2026-10-08 (Alex): plain neutrophil fire kills it slowly; macrophages still can't swallow it.
 4. Should the progress bar show which antigen is coming in each wave, or only that a new one is coming?
 5. Which one or two would you want to try first in the prototype? My pick: MRSA's swallow immunity plus Pseudomonas, since both are pure enemy changes and together they make the zone-mode choice matter.
