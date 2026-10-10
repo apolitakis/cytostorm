@@ -1,0 +1,427 @@
+<title>Cytostorm Campaign Planner</title>
+<meta name="description" content="Plan a Cytostorm campaign: buy upgrades and see each stage's win chance and Samples, measured with the game's own bots.">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Instrument+Sans:wdth,wght@75..100,400..700&family=IBM+Plex+Mono:wght@400;500;600&display=swap">
+<style>
+/* Layout: the game's own night-blue world. Wide: stage track left, Clinic right, campaign forecast under both. Phone: one column. */
+:root {
+  --void: #04050A; --panel: #0A0D18; --panel2: #10152A; --line: #1E2540;
+  --ink: #DDE6F5; --dim: #7A86A0;
+  --cell: #3FE6FF; --gold: #FFD23F; --germ: #FF3DCB; --good: #5CFFA1; --bad: #FF3B4E; --warn: #FF7A3D;
+  --display: "Instrument Sans", "Helvetica Neue", Arial, sans-serif;
+  --mono: "IBM Plex Mono", ui-monospace, Menlo, monospace;
+  color-scheme: dark;
+}
+* { box-sizing: border-box; }
+body { background: var(--void); color: var(--ink); font: 14px/1.45 var(--display); padding-inline: 16px; padding-block: 18px 40px; }
+.wrap { max-width: 1120px; margin: 0 auto; display: grid; gap: 16px; }
+h1, h2, h3 { margin: 0; text-wrap: balance; }
+h1 { font-size: 22px; font-weight: 700; font-stretch: 85%; letter-spacing: .01em; }
+h2 { font-size: 13px; font-weight: 600; text-transform: uppercase; letter-spacing: .09em; color: var(--dim); }
+p { margin: 0; }
+small, .dim { color: var(--dim); }
+button { font: inherit; color: inherit; cursor: pointer; }
+button:focus-visible, input:focus-visible, select:focus-visible { outline: 2px solid var(--cell); outline-offset: 2px; }
+.num { font-family: var(--mono); font-variant-numeric: tabular-nums; }
+
+/* top bar */
+.top { display: flex; flex-wrap: wrap; align-items: center; gap: 12px 20px; justify-content: space-between; }
+.top .title { display: grid; gap: 2px; min-width: 0; }
+.bank { display: flex; flex-wrap: wrap; align-items: center; gap: 10px 18px; }
+.smp { display: inline-flex; align-items: center; gap: 6px; font: 600 20px var(--mono); color: var(--gold); font-variant-numeric: tabular-nums; }
+.smp i { width: 10px; height: 10px; background: var(--gold); transform: rotate(45deg); box-shadow: 0 0 8px rgba(255,210,63,.6); flex: none; }
+.smp.sm { font-size: 13px; gap: 4px; } .smp.sm i { width: 7px; height: 7px; }
+.skill { display: grid; gap: 2px; min-width: 200px; }
+.skill label { font-size: 12px; color: var(--dim); display: flex; justify-content: space-between; gap: 8px; }
+.skill input { width: 100%; accent-color: var(--cell); }
+.btn { background: var(--panel2); border: 1px solid var(--line); border-radius: 8px; padding: 6px 12px; font-weight: 600; font-size: 13px; }
+.btn:hover:not(:disabled) { border-color: var(--dim); }
+.btn:disabled { opacity: .4; cursor: default; }
+.btn.go { border-color: var(--cell); color: var(--cell); }
+.btn.gold { border-color: var(--gold); color: var(--gold); }
+
+.cols { display: grid; grid-template-columns: minmax(0, 1.15fr) minmax(0, 1fr); gap: 16px; align-items: start; }
+@media (max-width: 820px) { .cols { grid-template-columns: minmax(0, 1fr); } }
+.panel { background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 14px; display: grid; gap: 10px; min-width: 0; }
+.panel > header { display: flex; justify-content: space-between; align-items: baseline; gap: 10px; flex-wrap: wrap; }
+
+/* stage track */
+.track { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; }
+.stage { display: grid; grid-template-columns: 2em minmax(0, 1fr) 7.5em auto; gap: 10px; align-items: center; padding: 8px 10px; border: 1px solid var(--line); border-radius: 9px; background: var(--panel2); }
+.stage .n { font: 600 13px var(--mono); color: var(--dim); text-align: center; }
+.stage .nm { min-width: 0; }
+.stage .nm b { font-weight: 600; }
+.stage .nm small { display: block; font-size: 12px; }
+.stage.done { border-color: rgba(255,210,63,.35); }
+.stage.done .n { color: var(--gold); }
+.stage.next { border-color: var(--cell); box-shadow: 0 0 0 1px rgba(63,230,255,.15) inset; }
+.stage.next .n { color: var(--cell); }
+.stage.locked { opacity: .78; }
+.odds { display: grid; gap: 3px; }
+.odds .pct { font: 600 13px var(--mono); text-align: right; font-variant-numeric: tabular-nums; }
+.bar { height: 6px; border-radius: 3px; background: var(--line); overflow: hidden; }
+.bar span { display: block; height: 100%; border-radius: 3px; }
+.stage .act { display: flex; gap: 6px; justify-content: flex-end; }
+.stage .act .btn { padding: 4px 10px; }
+@media (max-width: 480px) {
+  .stage { grid-template-columns: 1.6em minmax(0, 1fr) 5.5em; }
+  .stage .act { grid-column: 2 / -1; justify-content: flex-start; }
+}
+
+/* clinic */
+.tabs { display: flex; gap: 6px; flex-wrap: wrap; }
+.tabs button { background: var(--panel2); border: 1px solid var(--line); border-radius: 8px; padding: 6px 12px; font-weight: 600; font-size: 13px; color: var(--dim); }
+.tabs button[aria-selected="true"] { border-color: var(--cell); color: var(--cell); }
+.tabs button:disabled { opacity: .45; cursor: default; }
+.shop { display: grid; gap: 6px; }
+.item { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 4px 10px; align-items: center; padding: 8px 10px; border: 1px solid var(--line); border-radius: 9px; background: var(--panel2); }
+.item .nm { min-width: 0; display: grid; gap: 1px; }
+.item .nm b { font-weight: 600; display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.item .nm small { font-size: 12px; }
+.pips { display: inline-flex; gap: 3px; }
+.pips i { width: 9px; height: 9px; border-radius: 2px; border: 1px solid var(--dim); }
+.pips i.on { background: var(--cell); border-color: var(--cell); }
+.gain { font: 500 12px var(--mono); font-variant-numeric: tabular-nums; }
+.up { color: var(--good); } .down { color: var(--bad); } .flat { color: var(--dim); }
+.item .buy { display: grid; justify-items: end; gap: 3px; }
+.grp { font-size: 11px; text-transform: uppercase; letter-spacing: .08em; color: var(--dim); margin-top: 6px; }
+.note { font-size: 12.5px; color: var(--dim); border-left: 2px solid var(--line); padding-left: 10px; }
+.treat { display: grid; gap: 6px; }
+.treat label { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; gap: 10px; align-items: start; padding: 8px 10px; border: 1px solid var(--line); border-radius: 9px; background: var(--panel2); cursor: pointer; }
+.treat label:has(input:checked) { border-color: var(--cell); }
+.treat input { accent-color: var(--cell); margin-top: 3px; }
+.treat small { display: block; font-size: 12px; }
+.treat .minus { color: var(--warn); }
+
+/* log */
+.log { list-style: none; margin: 0; padding: 0; display: grid; gap: 4px; max-height: 260px; overflow: auto; font-size: 13px; }
+.log li { display: grid; grid-template-columns: 4.5em minmax(0, 1fr) auto; gap: 8px; padding: 4px 0; border-bottom: 1px solid var(--line); }
+.log .tag { font: 600 11px var(--mono); text-transform: uppercase; letter-spacing: .05em; }
+.tag.won { color: var(--good); } .tag.lost { color: var(--bad); } .tag.buy { color: var(--cell); }
+
+/* forecast */
+.fc { overflow-x: auto; }
+table { border-collapse: collapse; width: 100%; font-size: 13px; }
+th, td { padding: 6px 8px; text-align: right; border-bottom: 1px solid var(--line); white-space: nowrap; }
+th:first-child, td:first-child { text-align: left; }
+th { font-weight: 600; color: var(--dim); font-size: 12px; }
+td { font-family: var(--mono); font-variant-numeric: tabular-nums; }
+td:first-child { font-family: var(--display); }
+.heat { display: inline-block; min-width: 3.2em; padding: 1px 6px; border-radius: 5px; }
+.legend { display: flex; gap: 14px; flex-wrap: wrap; font-size: 12px; color: var(--dim); }
+.about { font-size: 13px; }
+.about #about { display: grid; gap: 8px; }
+.about p, .about ul { max-width: 75ch; }
+.about ul { margin: 0; padding-left: 18px; display: grid; gap: 4px; }
+.flash { animation: flash .9s ease-out; }
+@keyframes flash { from { background: rgba(63,230,255,.18); } to { background: var(--panel2); } }
+@media (prefers-reduced-motion: reduce) { .flash { animation: none; } }
+</style>
+
+<div class="wrap">
+  <div class="top">
+    <div class="title">
+      <h1>Cytostorm Campaign Planner</h1>
+      <small id="sub">Win chances measured with the game's own bots.</small>
+    </div>
+    <div class="bank">
+      <div><small>Samples</small><div class="smp" id="bank"><i></i><span>0</span></div></div>
+      <div class="skill">
+        <label for="skill"><span>Casual</span><span id="skillName">Player skill</span><span>Good player</span></label>
+        <input type="range" id="skill" min="0" max="1" step="0.05" value="0.5">
+      </div>
+      <div style="display:flex;gap:6px">
+        <button class="btn" id="undo" type="button">Undo</button>
+        <button class="btn" id="reset" type="button">New campaign</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="cols">
+    <section class="panel" aria-labelledby="h-track">
+      <header><h2 id="h-track">Stages</h2><small id="trackNote">Win chance with your build and that stage's treatment</small></header>
+      <ol class="track" id="track"></ol>
+      <h2>What happened</h2>
+      <ul class="log" id="log"></ul>
+    </section>
+
+    <section class="panel" aria-labelledby="h-clinic">
+      <header><h2 id="h-clinic">Clinic</h2><small id="clinicFor"></small></header>
+      <div class="tabs" role="tablist" id="tabs"></div>
+      <div id="pane"></div>
+    </section>
+  </div>
+
+  <section class="panel" aria-labelledby="h-fc">
+    <header><h2 id="h-fc">Play the rest out 1,000 times</h2>
+      <div style="display:flex;gap:6px;flex-wrap:wrap"><button class="btn go" id="runFc" type="button">Run forecast</button></div></header>
+    <p class="dim" style="font-size:13px">From where you are now, three spending habits play every remaining stage until each is cleared (a loss means a replay). <b>My buy order</b> keeps buying what you bought, in the order you bought it, as Samples allow. <b>Best value</b> buys whatever adds the most win chance per Sample on the next stage. <b>Never buy</b> banks everything.</p>
+    <div class="fc" id="fc"><p class="dim">Running…</p></div>
+    <div class="legend"><span>Cells: chance to clear that stage on the first try</span><span>Tries: average plays to clear the whole campaign (10 is perfect)</span><span>Spends: Samples spent from here on</span></div>
+  </section>
+
+  <section class="panel about" aria-labelledby="h-about">
+    <h2 id="h-about">Where the numbers come from</h2>
+    <div id="about"></div>
+  </section>
+</div>
+
+<script>
+/*CAMPAIGN*/
+</script>
+<script>
+const MODEL = /*MODEL*/null;
+</script>
+<script>
+'use strict';
+const C = CAMPAIGN, M = MODEL, LV = M.levels, ORDER = LV.map(l => l.key), NST = LV.length;
+const $ = s => document.querySelector(s);
+const esc = s => String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+const fmt = n => Math.round(n).toLocaleString('en-US');
+const KEY = 'cytostormPlanner.v1';
+const SK = Object.keys(M.skills); // casual, smart
+
+// ---------- campaign state ----------
+const fresh = () => ({ samples: 0, cleared: {}, played: {}, upgrades: {}, vaccines: {}, treat: {}, log: [], buys: [], skill: 0.5, tab: 'shop' });
+let st = load(), undoStack = [];
+function load() { try { const s = JSON.parse(localStorage.getItem(KEY)); if (s && s.upgrades) return Object.assign(fresh(), s); } catch (e) {} return fresh(); }
+function save() { try { localStorage.setItem(KEY, JSON.stringify(st)); } catch (e) {} }
+function snap() { undoStack.push(JSON.stringify(st)); if (undoStack.length > 60) undoStack.shift(); }
+const reached = s => { let i = 0; while (i < NST - 1 && s.cleared[ORDER[i]]) i++; return s.cleared[ORDER[NST - 1]] ? NST : i; };
+const clinicAt = { shop: 1, treat: 2, vax: 3 };
+const opened = (s, part) => Math.min(reached(s), NST - 1) >= clinicAt[part] || reached(s) >= NST;
+// Specialists come free when you reach their stage; Net and NK fill the two loadout slots, so the loadout is always "everything unlocked".
+const unlocked = (s, i) => { const out = new Set(); for (let j = 0; j <= i; j++) for (const u of LV[j].units) out.add(u); return out; };
+const metKinds = s => { const out = new Set(); ORDER.forEach((k, i) => { if (s.played[k] || s.cleared[k]) for (const x of LV[i].kinds) out.add(C.VACCINE_OF[x]); }); return [...out]; };
+const kindName = k => k === 'clos' ? 'Clostridium' : k === 'worm' ? 'Tapeworm' : (M.names[k] || k);
+
+// ---------- the measured model ----------
+function logitFor(s, i, treat, w) {
+  const key = ORDER[i];
+  let z = 0;
+  for (const [sk, f] of [[SK[0], 1 - w], [SK[SK.length - 1], w]]) {
+    if (!f) continue;
+    const m = M.skills[sk];
+    let q = m.A[key];
+    const un = unlocked(s, i), inert = (M.inert && M.inert[sk]) || [];
+    for (const u in s.upgrades) { const need = (C.UPGRADES.find(x => x.id === u) || {}).need; if ((!need || un.has(need)) && !inert.includes(u)) q += (m.B[u] || 0) * s.upgrades[u]; }
+    let cov = 0; for (const [k, sh] of Object.entries(LV[i].shares)) if (s.vaccines[k]) cov += sh;
+    q += m.V * cov;
+    if (treat && treat !== 'none') q += (m.T[key] && m.T[key][treat]) || 0;
+    z += f * q;
+  }
+  return z;
+}
+const chance = (s, i, treat, w = st.skill) => 1 / (1 + Math.exp(-logitFor(s, i, treat, w)));
+function payBase(i, win, w = st.skill) {
+  const key = ORDER[i]; let v = 0;
+  for (const [sk, f] of [[SK[0], 1 - w], [SK[SK.length - 1], w]]) { const q = M.skills[sk].per[key]; v += f * (win ? q.payWin : q.payLoss); }
+  return v;
+}
+const pay = (s, i, win, w) => { const b = payBase(i, win, w); return win && !s.cleared[ORDER[i]] ? Math.round(b * (1 + C.FIRST_BONUS)) : Math.round(b * C.REPEAT); };
+const treatOf = (s, i) => (opened(s, 'treat') && s.treat[ORDER[i]]) || 'none';
+
+// ---------- actions ----------
+function buyUp(id) {
+  const u = C.UPGRADES.find(x => x.id === id), r = st.upgrades[id] || 0;
+  if (r >= 3 || st.samples < u.cost[r]) return;
+  snap(); st.samples -= u.cost[r]; st.upgrades[id] = r + 1; st.buys.push({ t: 'u', id });
+  st.log.unshift({ tag: 'buy', text: `${u.name} rank ${r + 1}`, amt: -u.cost[r] }); render(id);
+}
+function buyVax(k) {
+  if (st.vaccines[k] || st.samples < C.VACCINE_COST) return;
+  snap(); st.samples -= C.VACCINE_COST; st.vaccines[k] = true; st.buys.push({ t: 'v', id: k });
+  st.log.unshift({ tag: 'buy', text: `${kindName(k)} vaccine`, amt: -C.VACCINE_COST }); render('vax-' + k);
+}
+function play(i) {
+  snap();
+  const key = ORDER[i], tr = treatOf(st, i), p = chance(st, i, tr), win = Math.random() < p, first = win && !st.cleared[key];
+  const got = pay(st, i, win);
+  st.samples += got; st.played[key] = true; if (win) st.cleared[key] = true;
+  const what = `Stage ${i + 1} ${LV[i].where}${first ? '' : win ? ' (replay)' : ''}${tr !== 'none' ? `, ${C.treatment(tr).name.toLowerCase()}` : ''}: ${Math.round(p * 100)}% chance`;
+  st.log.unshift({ tag: win ? 'won' : 'lost', text: what, amt: got });
+  render();
+}
+
+// ---------- rendering ----------
+const hue = p => p >= 0.85 ? 'var(--good)' : p >= 0.55 ? 'var(--gold)' : p >= 0.3 ? 'var(--warn)' : 'var(--bad)';
+function render(flash) {
+  save();
+  const w = st.skill, R = reached(st);
+  $('#bank span').textContent = fmt(st.samples);
+  $('#skill').value = w;
+  $('#skillName').textContent = w <= 0.15 ? 'Casual' : w >= 0.85 ? 'Good player' : `In between (${Math.round(w * 100)}%)`;
+  $('#undo').disabled = !undoStack.length;
+  // track
+  $('#track').innerHTML = LV.map((l, i) => {
+    const done = !!st.cleared[l.key], next = i === R, locked = i > R;
+    const tr = treatOf(st, i), p = chance(st, i, tr);
+    const ev = p * pay(st, i, true) + (1 - p) * pay(st, i, false);
+    const status = done ? 'Cleared' : next ? 'Next' : '';
+    return `<li class="stage ${done ? 'done' : next ? 'next' : 'locked'}">
+      <span class="n">${i + 1}</span>
+      <span class="nm"><b>${esc(l.where)}</b> <span class="dim">· ${esc(l.name)}</span>
+        <small>${status ? `<span style="color:${done ? 'var(--gold)' : 'var(--cell)'}">${status}</span> · ` : ''}win pays <span class="num">${fmt(pay(st, i, true))}</span>, loss <span class="num">${fmt(pay(st, i, false))}</span>${tr !== 'none' ? ` · ${esc(C.treatment(tr).name)}` : ''}${locked ? '' : ` · about <span class="num">${fmt(ev)}</span> a try`}</small></span>
+      <span class="odds"><span class="pct" style="color:${hue(p)}">${Math.round(p * 100)}%</span><span class="bar"><span style="width:${Math.max(2, p * 100)}%;background:${hue(p)}"></span></span></span>
+      <span class="act">${next && R < NST ? `<button class="btn go" type="button" data-play="${i}">Play</button>` : done ? `<button class="btn" type="button" data-play="${i}">Replay</button>` : ''}</span>
+    </li>`;
+  }).join('');
+  // clinic
+  const nextI = Math.min(R, NST - 1);
+  $('#clinicFor').textContent = R >= NST ? 'Campaign cleared. Replays pay a quarter.' : `Gains shown for Stage ${nextI + 1}: ${LV[nextI].where}`;
+  const tabs = [['shop', 'Shop'], ['treat', 'Treatment'], ['vax', 'Vaccines'], ['loadout', 'Loadout']];
+  if (!['shop', 'treat', 'vax', 'loadout'].includes(st.tab)) st.tab = 'shop';
+  $('#tabs').innerHTML = tabs.map(([id, name]) => {
+    const open = id === 'loadout' ? reached(st) >= 4 : opened(st, id);
+    return `<button type="button" role="tab" data-tab="${id}" aria-selected="${st.tab === id}">${name}${open ? '' : ` <span class="num" style="font-size:11px">S${(id === 'loadout' ? 4 : clinicAt[id]) + 1}</span>`}</button>`;
+  }).join('');
+  $('#pane').innerHTML = st.tab === 'shop' ? shopPane(nextI) : st.tab === 'treat' ? treatPane(nextI) : st.tab === 'vax' ? vaxPane(nextI) : loadoutPane();
+  // log
+  $('#log').innerHTML = st.log.length ? st.log.slice(0, 80).map(e => `<li><span class="tag ${e.tag}">${e.tag === 'buy' ? 'Bought' : e.tag === 'won' ? 'Won' : 'Lost'}</span><span>${esc(e.text)}</span><span class="smp sm"><i></i>${e.amt > 0 ? '+' : ''}${fmt(e.amt)}</span></li>`).join('')
+    : '<li><span></span><span class="dim">Nothing yet. Stage 1 has no Clinic, so press Play on Finger to start.</span><span></span></li>';
+  if (flash) { const el = document.getElementById('it-' + flash); if (el) el.classList.add('flash'); }
+  forecastSoon();
+}
+function gainText(d) { const pts = d * 100; return Math.abs(pts) < 0.5 ? `<span class="gain flat">±0 pts</span>` : `<span class="gain ${pts > 0 ? 'up' : 'down'}">${pts > 0 ? '+' : ''}${pts.toFixed(pts < 9.95 && pts > -9.95 ? 1 : 0)} pts</span>`; }
+function shopPane(i) {
+  if (!opened(st, 'shop')) return `<p class="note">The Shop opens at Stage 2. Clear Finger first.</p>`;
+  const tr = treatOf(st, i), base = chance(st, i, tr), un = unlocked(st, i);
+  let g = '', out = '';
+  for (const u of C.UPGRADES) {
+    if (u.group !== g) { g = u.group; out += `<div class="grp">${esc(g)}</div>`; }
+    const r = st.upgrades[u.id] || 0, max = r >= 3, cost = u.cost[r], locked = u.need && !un.has(u.need);
+    let gain = '';
+    if (!max) { const t = { ...st, upgrades: { ...st.upgrades, [u.id]: r + 1 } }; gain = gainText(chance(t, i, tr) - base); }
+    const lk = locked ? `Comes with ${esc(M.units[u.need])} at Stage ${ORDER.findIndex((k, j) => LV[j].units.includes(u.need)) + 1}.` : '';
+    out += `<div class="item" id="it-${u.id}"><div class="nm"><b>${esc(u.name)} <span class="pips">${[0, 1, 2].map(k => `<i class="${k < r ? 'on' : ''}"></i>`).join('')}</span></b>
+      <small>${lk || (r ? `Now: ${esc(u.what(r))}${max ? '' : ` Next: ${esc(u.what(r + 1))}`}` : esc(u.what(1)))}</small></div>
+      <div class="buy">${max ? '<small>Maxed</small>' : `${locked ? '' : gain}<button class="btn gold" type="button" data-up="${u.id}" ${st.samples < cost || locked ? 'disabled' : ''}><span class="smp sm"><i></i>${fmt(cost)}</span></button>`}</div></div>`;
+  }
+  return `<div class="shop">${out}</div><p class="note">Green and red show how buying changes the win chance on the next stage at your skill. Upgrades never refund; Undo takes a buy back.</p>`;
+}
+function treatPane(i) {
+  if (!opened(st, 'treat')) return `<p class="note">Treatment opens at Stage 3.</p>`;
+  const cur = st.treat[ORDER[i]] || 'none', base = chance({ ...st }, i, 'none');
+  return `<div class="treat">${C.TREATMENTS.map(t => {
+    const d = chance(st, i, t.id) - base, measured = t.id === 'none' || SK.some(s => M.skills[s].T[ORDER[i]] && t.id in M.skills[s].T[ORDER[i]]);
+    return `<label><input type="radio" name="treat" value="${t.id}" ${cur === t.id ? 'checked' : ''}><span><b>${esc(t.name)}</b><small>${esc(t.plus)}${t.minus ? ` <span class="minus">${esc(t.minus)}</span>` : ''}</small></span>
+      <span>${t.id === 'none' ? '' : measured ? gainText(d) : '<span class="gain flat">not measured</span>'}</span></label>`;
+  }).join('')}</div><p class="note">For Stage ${i + 1} only, as in the game. The change is measured on this stage with bots.</p>`;
+}
+function vaxPane(i) {
+  if (!opened(st, 'vax')) return `<p class="note">Vaccines open at Stage 4.</p>`;
+  const tr = treatOf(st, i), base = chance(st, i, tr), met = metKinds(st);
+  if (!met.length) return `<p class="note">No germs met yet.</p>`;
+  return `<div class="shop">${met.map(k => {
+    const t = { ...st, vaccines: { ...st.vaccines, [k]: true } }, d = chance(t, i, tr) - base;
+    const later = LV.map((l, j) => j > i && l.shares[k] ? l.where : null).filter(Boolean);
+    return `<div class="item" id="it-vax-${k}"><div class="nm"><b>${esc(kindName(k))}</b><small>${esc(C.vaccineWhat(k))}${later.length ? ` Comes back at ${esc(later.join(', '))}.` : i < NST && LV[i].shares[k] ? '' : ' Not on any stage ahead.'}</small></div>
+      <div class="buy">${st.vaccines[k] ? '<small>Vaccinated</small>' : `${gainText(d)}<button class="btn gold" type="button" data-vax="${k}" ${st.samples < C.VACCINE_COST ? 'disabled' : ''}><span class="smp sm"><i></i>${C.VACCINE_COST}</span></button>`}</div></div>`;
+  }).join('')}</div>`;
+}
+function loadoutPane() {
+  return `<p class="note">Neutrophils and macrophages always come, plus up to ${C.SLOTS} specialists. The campaign has two (Net neutrophils from Stage 4, NK cells from Stage 7), so every stage brings everything you've unlocked and there's no choice to plan yet.</p>`;
+}
+
+// ---------- forecast (Monte Carlo) ----------
+function allItems(s) {
+  const out = [];
+  for (const u of C.UPGRADES) for (let r = (s.upgrades[u.id] || 0); r < 3; r++) out.push({ t: 'u', id: u.id, r });
+  return out;
+}
+function bestValueBuys(s, i, w) {
+  for (let guard = 0; guard < 40; guard++) {
+    const tr = treatOf(s, i), p0 = chance(s, i, tr, w); let best = null, bv = 0.00002;
+    if (opened(s, 'shop')) { const un = unlocked(s, i);
+      for (const u of C.UPGRADES) { const r = s.upgrades[u.id] || 0; if (r >= 3 || u.cost[r] > s.samples || (u.need && !un.has(u.need))) continue;
+        s.upgrades[u.id] = r + 1; const v = (chance(s, i, tr, w) - p0) / u.cost[r]; s.upgrades[u.id] = r; if (v > bv) { bv = v; best = () => { s.samples -= u.cost[r]; s.upgrades[u.id] = r + 1; }; } } }
+    if (opened(s, 'vax') && s.samples >= C.VACCINE_COST) for (const k of metKinds(s)) { if (s.vaccines[k]) continue;
+      s.vaccines[k] = true; const v = (chance(s, i, tr, w) - p0) / C.VACCINE_COST; delete s.vaccines[k]; if (v > bv) { bv = v; best = () => { s.samples -= C.VACCINE_COST; s.vaccines[k] = true; }; } }
+    if (!best) return; best();
+  }
+}
+function orderBuys(s, plan, i) {
+  const un = unlocked(s, i);
+  for (const b of plan) {
+    if (b.t === 'u') { const u = C.UPGRADES.find(x => x.id === b.id), r = s.upgrades[b.id] || 0; if (r >= 3 || b.n <= r) continue; if (!opened(s, 'shop') || (u.need && !un.has(u.need)) || s.samples < u.cost[r]) return; s.samples -= u.cost[r]; s.upgrades[b.id] = r + 1; }
+    else { if (s.vaccines[b.id]) continue; if (!opened(s, 'vax') || !metKinds(s).includes(b.id) || s.samples < C.VACCINE_COST) return; s.samples -= C.VACCINE_COST; s.vaccines[b.id] = true; }
+  }
+}
+function simulate(habit, runs) {
+  const w = st.skill, R0 = reached(st);
+  // my buy order: each buy remembers which rank it was, so repeats line up
+  const seen = {}, plan = st.buys.map(b => ({ ...b, n: b.t === 'u' ? (seen[b.id] = (seen[b.id] || 0) + 1) : 1 }));
+  const first = new Array(NST).fill(0), tries = [], end = [], builds = {};
+  for (let k = 0; k < runs; k++) {
+    const s = JSON.parse(JSON.stringify({ samples: st.samples, cleared: st.cleared, played: st.played, upgrades: st.upgrades, vaccines: st.vaccines, treat: st.treat }));
+    let n = 0;
+    for (let i = R0; i < NST; i++) {
+      let att = 0;
+      for (;;) {
+        if (habit === 'best') bestValueBuys(s, i, w); else if (habit === 'order') orderBuys(s, plan, i);
+        const p = chance(s, i, treatOf(s, i), w), win = Math.random() < p;
+        s.samples += pay(s, i, win, w); s.played[ORDER[i]] = true; att++; n++;
+        if (win) { s.cleared[ORDER[i]] = true; break; }
+        if (att >= 40) break;
+      }
+      if (att === 1) first[i]++;
+      if (!s.cleared[ORDER[i]]) { n = Infinity; break; }
+    }
+    tries.push(n); end.push(s.samples);
+    const spent = Object.entries(s.upgrades).reduce((a, [id, r]) => a + C.UPGRADES.find(u => u.id === id).cost.slice(0, r).reduce((x, y) => x + y, 0), 0) + Object.keys(s.vaccines).length * C.VACCINE_COST;
+    builds.spent = (builds.spent || 0) + spent / runs;
+  }
+  const spentNow = Object.entries(st.upgrades).reduce((a, [id, r]) => a + C.UPGRADES.find(u => u.id === id).cost.slice(0, r).reduce((x, y) => x + y, 0), 0) + Object.keys(st.vaccines).length * C.VACCINE_COST;
+  const fin = tries.filter(Number.isFinite);
+  return { first: first.map(x => x / runs), tries: fin.length ? fin.reduce((a, b) => a + b, 0) / fin.length + R0 : Infinity, stuck: 1 - fin.length / runs, end: end.reduce((a, b) => a + b, 0) / runs, spent: builds.spent - spentNow };
+}
+let fcTimer = 0;
+function forecastSoon() { clearTimeout(fcTimer); fcTimer = setTimeout(forecast, 250); }
+function forecast() {
+  const R0 = reached(st);
+  if (R0 >= NST) { $('#fc').innerHTML = '<p class="dim">Every stage is cleared. Start a new campaign to forecast again.</p>'; return; }
+  const runs = 1000, H = [['order', 'My buy order'], ['best', 'Best value'], ['none', 'Never buy']];
+  const res = H.map(([h, name]) => [name, simulate(h, runs)]);
+  const cell = p => `<span class="heat" style="color:${hue(p)}">${Math.round(p * 100)}%</span>`;
+  $('#fc').innerHTML = `<table><thead><tr><th>Habit</th>${LV.map((l, i) => i >= R0 ? `<th title="${esc(l.name)}">${i + 1} ${esc(l.where)}</th>` : '').join('')}<th>Tries</th><th>Spends</th><th>Banked at end</th></tr></thead><tbody>
+    ${res.map(([name, r]) => `<tr><td>${name}</td>${r.first.map((p, i) => i >= R0 ? `<td>${cell(p)}</td>` : '').join('')}<td>${Number.isFinite(r.tries) ? r.tries.toFixed(1) : '∞'}${r.stuck > 0.005 ? ` <small>(${Math.round(r.stuck * 100)}% stuck)</small>` : ''}</td><td>${fmt(r.spent)}</td><td>${fmt(r.end)}</td></tr>`).join('')}
+  </tbody></table>`;
+}
+
+// ---------- about ----------
+function about() {
+  const s = M.skills, n = SK.reduce((a, k) => a + s[k].games, 0);
+  const row = k => `<tr><td>${esc(LV[ORDER.indexOf(k)].where)}</td>${SK.map(sk => { const q = s[sk].per[k]; return `<td>${q.wins}/${q.games}</td><td>${q.predicted}</td>`; }).join('')}</tr>`;
+  const best = sk => Object.entries(s[sk].B).sort((a, b) => b[1] - a[1]);
+  $('#about').innerHTML = `
+    <p>Every number on this page comes from <b>${fmt(n)}</b> headless games of Play ${esc(M.release.toUpperCase())} with the campaign's real rules: the pressure ramp, Samples payout, upgrades, vaccines and treatments, all at Normal. Each game is one bot playing one stage with a randomly bought build of the size you could afford by then. The bots are the game's own: <b>Casual</b> looks every 1.5 s, counters what shows up and leaves Stress in the middle; <b>Good player</b> looks every 0.5 s, paces Stress and storms only in a pinch. The skill slider blends the two.</p>
+    <p>The page fits a win model per skill: a difficulty for each stage, plus a fixed boost per upgrade rank, plus a boost for vaccines in proportion to how much of the stage's germs they cover, plus a measured effect for each treatment on each stage. A win pays the average Samples the bots earned on wins there; a loss pays a quarter of what they earned before losing.</p>
+    ${SK.every(k => s[k].cv) ? `<p>Checked on games held back from the fit: knowing the build makes the model's guesses clearly better than knowing the stage alone (average log loss ${SK.map(k => `${k === 'smart' ? 'Good player' : 'Casual'} ${s[k].cv.model} vs ${s[k].cv.stageOnly}`).join(', ')}; lower is better).</p>` : ''}
+    <ul>
+      <li>Treatments: two games per stage, treatment and skill (one with no build, one with a mid build), so a treatment's number says which way it pushes more than how far.</li>
+      <li>Strongest upgrades per rank, Casual: ${best(SK[0]).slice(0, 4).map(([u, v]) => `${esc(C.UPGRADES.find(x => x.id === u).name)} (${v.toFixed(2)})`).join(', ')}.</li>
+      <li>Strongest upgrades per rank, Good player: ${best(SK[SK.length - 1]).slice(0, 4).map(([u, v]) => `${esc(C.UPGRADES.find(x => x.id === u).name)} (${v.toFixed(2)})`).join(', ')}.</li>
+      <li>The casual bot never storms, so Cool head does nothing for it. Wide nets and Hardy NK cells count only once Net neutrophils and NK cells have joined.</li>
+      <li>Limits: one bot game per build, so a single stage's odds can be off by 10 to 15 points. Where the bots won every game, the model can only say "very likely". Replays use the same odds as a first visit.</li>
+    </ul>
+    <div class="fc"><table><thead><tr><th>Stage</th>${SK.map(sk => `<th>${sk === 'smart' ? 'Good' : 'Casual'} won</th><th>model expects</th>`).join('')}</tr></thead><tbody>${ORDER.map(row).join('')}</tbody></table></div>
+    <p class="dim">Model fitted ${esc(M.made.slice(0, 16).replace('T', ' '))} UTC. Code: tools/campaign-sim/ in the project files.</p>`;
+}
+
+// ---------- events ----------
+document.addEventListener('click', e => {
+  const b = e.target.closest('button'); if (!b || b.disabled) return;
+  if (b.dataset.play != null) play(+b.dataset.play);
+  else if (b.dataset.up) buyUp(b.dataset.up);
+  else if (b.dataset.vax) buyVax(b.dataset.vax);
+  else if (b.dataset.tab) { st.tab = b.dataset.tab; render(); }
+  else if (b.id === 'undo' && undoStack.length) { const tab = st.tab, sk = st.skill; st = JSON.parse(undoStack.pop()); st.tab = tab; st.skill = sk; render(); }
+  else if (b.id === 'reset') { snap(); const sk = st.skill; st = fresh(); st.skill = sk; render(); }
+  else if (b.id === 'runFc') forecast();
+});
+document.addEventListener('change', e => {
+  if (e.target.name === 'treat') { snap(); st.treat[ORDER[Math.min(reached(st), NST - 1)]] = e.target.value; render(); }
+});
+$('#skill').addEventListener('input', e => { st.skill = +e.target.value; render(); });
+about();
+render();
+</script>
