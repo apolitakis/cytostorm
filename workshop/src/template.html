@@ -3,7 +3,8 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Instrument+Sans:wdth,wght@75..100,400..700&family=IBM+Plex+Mono:wght@400;500&display=swap">
 <style>
-/* v3 layout: progress bar on top, the three-zone map in the middle, per-zone production cards and controls at the bottom.
+/* v3 layout (2026-10-09): a narrow vertical map with the progress rail and each sector's numbers on its left and its
+   controls on its right; stress, cells and the storm at the bottom.
    Deliberately single-theme: the art is fluorescence microscopy, glowing cells on black. */
 :root {
   color-scheme: dark;
@@ -49,9 +50,8 @@ img.ico { width: 18px; height: 18px; flex: none; }
 .fatigue { display: flex; align-items: baseline; gap: 8px; font-size: 11.5px; color: var(--dim); min-width: 0; white-space: nowrap; }
 #fTier { flex: none; font: 600 12px var(--display); color: #FF8FB1; }
 #cellCount { font: 500 11px var(--mono); font-variant-numeric: tabular-nums; }
-#cellCount { margin-left: auto; }
 /* The fatigue heart sits left of the stress slider */
-#heart { grid-row: 1 / span 3; width: 54px; height: 50px; align-self: center; }
+#heart { grid-row: 1 / span 4; width: 54px; height: 50px; align-self: center; }
 .fatigue[data-tier="1"] #fTier { color: #FF9A4D; }
 .fatigue[data-tier="2"] #fTier { color: var(--kill); }
 .fatigue[data-tier="3"] #fTier { color: #C77DFF; }
@@ -59,7 +59,7 @@ img.ico { width: 18px; height: 18px; flex: none; }
 /* Organs: five mini organs with 4 pips each, by the fatigue label; tap for Organ status */
 .fatigue { align-items: center; }
 .bodybtn { flex: none; display: flex; gap: 3px; padding: 1px 4px 2px; background: var(--panel2); border: 1px solid var(--line); border-radius: 7px; cursor: pointer; }
-#cellCount { margin-left: auto; } #cellCount.cut { color: var(--damage); }
+#cellCount.cut { color: var(--damage); }
 .bodybtn.over { border-color: var(--damage); box-shadow: 0 0 6px var(--damage); }
 .bodybtn .org { display: grid; justify-items: center; gap: 1px; }
 .bodybtn img { width: 19px; height: 14px; }
@@ -131,6 +131,51 @@ img.ico { width: 18px; height: 18px; flex: none; }
 .mlabel b { color: var(--ink); font: 600 12.5px var(--display); }
 .mlabel span.cut { color: #C77DFF; }
 .mlabel span { font: 500 11px var(--mono); font-variant-numeric: tabular-nums; }
+/* Side columns: each sector's numbers (left of the map) and its controls (right) */
+#sideL, #sideR { position: absolute; inset: 0; pointer-events: none; z-index: 2; }
+.sinfo { position: absolute; width: 46px; display: grid; justify-items: center; align-content: center; gap: 0; text-align: center; }
+.sinfo img { width: 18px; height: 18px; opacity: .85; }
+.sinfo .n { font: 650 17px/1.1 var(--display); font-variant-numeric: tabular-nums; color: #FF7FE0; margin-bottom: 6px; }
+.sinfo .o { font: 500 11.5px/1.2 var(--mono); font-variant-numeric: tabular-nums; color: var(--ink); }
+.sinfo.none .n { color: var(--dim); opacity: .55; } .sinfo.none img:first-child { opacity: .3; }
+.sinfo.off .o { color: var(--dim); }
+.sinfo.thin { gap: 0; } .sinfo.thin .n { font-size: 13px; margin: 0; } .sinfo.thin .o { font-size: 10px; }
+.sctl { position: absolute; width: 72px; display: grid; gap: 6px; align-content: center; pointer-events: auto; }
+.sctl.done { visibility: hidden; }
+.sresp { display: grid; gap: 4px; padding: 6px 7px 5px; background: var(--panel); border: 1px solid var(--line); border-radius: 9px; text-align: left; }
+.sresp .mix { height: 7px; }
+.sresp .rl { font: 600 10.5px/1 var(--display); color: var(--dim); }
+.sresp.open { border-color: var(--cell); } .sresp.open .rl { color: var(--cell); }
+.sresp.off { border-style: dashed; } .sresp.off .mix i { filter: grayscale(1) brightness(.6); }
+.sresp.copied { animation: copied .7s ease-out; }
+.srow { display: flex; justify-content: space-between; }
+.sstance { width: 33px; height: 33px; display: grid; place-items: center; padding: 0; border-radius: 50%; background: rgba(10,13,24,.82); border: 1.5px solid var(--kill); box-shadow: 0 0 8px rgba(255,122,61,.35); }
+.sstance img { width: 19px; height: 19px; pointer-events: none; }
+.sstance.support { border-color: var(--repair); box-shadow: 0 0 8px rgba(92,255,161,.35); }
+.sctl .zpwr { position: static; margin: 0; width: 33px; height: 33px; }
+/* the thin Lymph node row: three small buttons side by side */
+.sctl.thin { grid-template-columns: 1fr auto; gap: 3px; align-items: center; }
+.sctl.thin .sresp { padding: 0 4px; height: 26px; align-content: center; }
+.sctl.thin .srow { gap: 3px; }
+.sctl.thin .sstance, .sctl.thin .zpwr { width: 23px; height: 26px; border-radius: 8px; }
+.sctl.thin .sresp { min-width: 20px; }
+.sctl.thin .sstance img { width: 15px; height: 15px; } .sctl.thin .zpwr svg { width: 13px; height: 13px; }
+/* Stress presets beside the slider (Alex, 2026-10-09) */
+.spresets { display: grid; grid-template-columns: repeat(4, 1fr); gap: 4px; }
+.spresets button { background: var(--panel2); border: 1px solid var(--line); border-radius: 7px; padding: 3px 0; font: 500 11.5px var(--mono); font-variant-numeric: tabular-nums; color: var(--dim); }
+.spresets button[aria-pressed="true"] { border-color: var(--gold); color: var(--gold); }
+.spresets button:disabled { opacity: .35; text-decoration: line-through; }
+/* Your cells against the cell limit (Alex, 2026-10-09): the dark end of the bar is what the spleen has cut */
+.cells { grid-column: 1 / -1; display: flex; align-items: center; gap: 6px; font-size: 11.5px; color: var(--dim); }
+.cells img { width: 15px; height: 15px; }
+.cells .cl { font-weight: 600; color: var(--ink); }
+.cbar { flex: 1; position: relative; height: 7px; border-radius: 4px; background: var(--panel2); overflow: hidden; }
+.cbar i { position: absolute; top: 0; bottom: 0; }
+#cellFill { left: 0; background: var(--cell); box-shadow: 0 0 6px var(--cell); }
+#cellCut { right: 0; background: repeating-linear-gradient(45deg, rgba(255,59,78,.55) 0 3px, rgba(255,59,78,.15) 3px 6px); }
+.cells.full #cellFill { background: var(--gold); box-shadow: 0 0 6px var(--gold); }
+.cells.full .cl::after { content: ' · full'; color: var(--gold); font-weight: 600; }
+#cellCount { font: 500 11px var(--mono); font-variant-numeric: tabular-nums; color: var(--ink); }
 /* Production cards: one per zone, a stacked bar of the mix */
 .zones { flex: 1.4 1 0; min-width: 0; display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; }
 .zcard { min-width: 0; display: grid; gap: 4px; align-content: center; text-align: left; background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 6px 8px; }
@@ -160,6 +205,8 @@ img.ico { width: 18px; height: 18px; flex: none; }
 .zcard.off .zt b, .zcard.off .zsub { color: var(--dim); }
 .zcard.off .mix i { filter: grayscale(1) brightness(.6); }
 .urow.dim { opacity: .45; }
+.diffrow { border-top: 0; padding-top: 0; color: var(--ink); font-weight: 600; }
+.seg2 button[data-diff][aria-pressed="true"] { border-color: var(--gold); color: var(--gold); }
 .prow { border-top: 0; padding-top: 0; color: var(--ink); font-weight: 600; }
 .seg2 button[data-on="1"][aria-pressed="true"] { border-color: var(--cell); color: var(--cell); }
 .seg2 button[data-on="0"][aria-pressed="true"] { border-color: var(--dim); color: var(--ink); background: var(--panel); }
@@ -272,6 +319,7 @@ img { -webkit-touch-callout: none; -webkit-user-drag: none; user-drag: none; }
 .lvl .nm { font-weight: 600; font-size: 13px; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .lvl .new { display: flex; gap: 2px; }
 .lvl .new img { width: 20px; height: 20px; }
+.shint .rough { font: normal 500 11px var(--mono); color: var(--gold); }
 .lvl .rough { font: normal 500 10.5px var(--mono); color: var(--gold); margin-left: 4px; }
 .lvl .st { font-size: 12px; color: var(--gold); letter-spacing: 1px; }
 .lvl .st span { color: var(--line); }
@@ -378,8 +426,7 @@ img { -webkit-touch-callout: none; -webkit-user-drag: none; user-drag: none; }
 
 /* Narrower screens: production cards take a full row, controls below */
 @media (max-width: 900px) {
-  #bar { flex-wrap: wrap; }
-  .zones { flex-basis: 100%; }
+  #bar { flex-wrap: nowrap; }
 }
 @media (max-width: 420px) {
   .zt .mode { display: none; } /* four cards: the zone names need the room; stances show on the map */
@@ -394,7 +441,7 @@ img { -webkit-touch-callout: none; -webkit-user-drag: none; user-drag: none; }
   .bodybtn img { width: 16px; height: 12px; }
   .fatigue { gap: 6px; }
   .output { grid-template-columns: 44px minmax(0, 1fr); column-gap: 8px; }
-  #heart { grid-row: 1 / span 2; width: 44px; height: 44px; }
+  #heart { grid-row: 1 / span 3; width: 44px; height: 44px; }
   .output .fatigue { grid-column: 1 / -1; } /* full width, so the cell count never clips */
   #pauseBtn { min-width: 40px; }
   #stormBtn { min-width: 52px; }
@@ -412,7 +459,6 @@ img { -webkit-touch-callout: none; -webkit-user-drag: none; user-drag: none; }
   #stage { grid-column: 1; grid-row: 1 / span 4; margin-block: 10px; }
   #hud { grid-column: 2; grid-row: 1; }
   #bar { grid-column: 2; grid-row: 4; flex-wrap: wrap; align-content: end; }
-  .zones { flex-basis: 100%; grid-template-columns: 1fr; }
   .output { flex-basis: 100%; }
   #stormBtn { flex: 1; min-height: 52px; }
   #sheet { left: 0; right: 0; }
@@ -435,7 +481,8 @@ img { -webkit-touch-callout: none; -webkit-user-drag: none; user-drag: none; }
   <main id="stage">
     <canvas id="prog" aria-label="Level progress, top to bottom: waves and toxin bursts still to come"></canvas>
     <canvas id="cv" aria-label="The map: Wound, Tissue, Deep tissue and Lymph node. Tap a zone to flip its stance between Offense and Support; double-tap to zoom in on it."></canvas>
-    <div id="pwrs" aria-label="Cell production per zone"><button type="button" class="zpwr" data-pz="0" hidden><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v8"/><path d="M6.3 6.6a8 8 0 1 0 11.4 0"/></svg></button><button type="button" class="zpwr" data-pz="1" hidden><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v8"/><path d="M6.3 6.6a8 8 0 1 0 11.4 0"/></svg></button><button type="button" class="zpwr" data-pz="2" hidden><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v8"/><path d="M6.3 6.6a8 8 0 1 0 11.4 0"/></svg></button><button type="button" class="zpwr" data-pz="3" hidden><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v8"/><path d="M6.3 6.6a8 8 0 1 0 11.4 0"/></svg></button></div>
+    <div id="sideL" aria-label="Germs and cell output per sector"></div>
+    <div id="sideR" aria-label="Controls per sector"></div>
     <button id="zoomOut" class="zoomout" type="button" hidden>Watching <b>Tissue</b> · zoom out</button>
     <div id="toasts"></div>
     <div id="sheet" hidden></div>
@@ -443,13 +490,14 @@ img { -webkit-touch-callout: none; -webkit-user-drag: none; user-drag: none; }
   </main>
 
   <footer id="bar">
-    <div id="zones" class="zones"></div>
     <div class="output">
       <canvas id="heart" role="img" aria-label="Fatigue: the heart fills and beats faster as your body tires"></canvas>
       <div class="mlabel"><img class="ico" data-art="body-output" alt=""><b>Stress</b><span id="outVal">100%</span></div>
       <input type="range" id="output" min="0" max="100" step="5" value="50" aria-label="Stress: how hard your body pushes to make cells">
-      <div class="fatigue" id="fatigue" data-tier="0"><span id="fTier">Fine</span><button id="bodyBtn" class="bodybtn" type="button" aria-label="Organ status"></button><span id="cellCount">0 cells</span></div>
-      <div class="fatigue toxrow" id="toxRow"><span>Toxin</span><div class="toxbar"><i id="toxFill"></i><b id="toxMark"></b></div><span id="toxVal">0</span></div>
+      <div class="spresets" role="group" aria-label="Stress presets"><button type="button" data-stress="0.5">50%</button><button type="button" data-stress="1">100%</button><button type="button" data-stress="1.5">150%</button><button type="button" data-stress="2">200%</button></div>
+      <div class="fatigue" id="fatigue" data-tier="0"><span id="fTier">Fine</span><button id="bodyBtn" class="bodybtn" type="button" aria-label="Organ status"></button></div>
+      <div class="fatigue toxrow" id="toxRow" hidden><span>Toxin</span><div class="toxbar"><i id="toxFill"></i><b id="toxMark"></b></div><span id="toxVal">0</span></div>
+      <div class="cells" id="cells" title="Your cells on the field, against the most you can have"><img class="ico" data-art="neutrophil" alt=""><span class="cl">Cells</span><span class="cbar" aria-hidden="true"><i id="cellFill"></i><i id="cellCut"></i></span><span id="cellCount">0/540</span></div>
     </div>
     <button id="stormBtn" type="button" aria-label="Cytokine storm: hold 5 seconds to charge, release to fire"><img id="stormIcon" alt="" draggable="false"><span id="stormLbl">Storm</span></button>
     <button id="pauseBtn" class="hbtn" type="button" aria-label="Pause"><img data-art="pause" alt=""></button>

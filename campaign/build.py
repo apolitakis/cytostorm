@@ -20,6 +20,7 @@ def rep(text, a, b, count=1):
 # ---- v3's ui.js with the campaign hooks ----
 ui = (v3 / 'ui.js').read_text()
 ui = ui.replace("'immuneRtsV3.", "'cytostormCampaign.")  # own saved settings, so the campaign never changes the main game's
+ui = ui.replace("'cytostormV3.difficulty'", "'cytostormCampaign.difficulty'")  # the campaign plays at Normal even if Play is set to Hard on the same site
 ui = rep(ui, "  function showStart() {\n", "  function showStart() {\n    if (window.CampaignHooks) return CampaignHooks.showMap(); // campaign: body map and Clinic\n")
 ui = rep(ui, "    game = new Game(levelKey, seed);\n",
          "    if (window.CampaignHooks) CampaignHooks.beforeGame(levelKey); // campaign: upgrades, treatment, loadout\n"

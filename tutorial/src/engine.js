@@ -298,8 +298,11 @@ const CYT = (function () {
   const MAP_BG = { dividers: [120, 240, 360], lymph: [380, 175] };
   // Names (and germ counts) for the three big sectors, and the Lymph node's one-row strip: name, count, stance chip
   // and its breach clock, like v3's nodeLayer. o: { counts: [4], frac, busy, organ, lv, mode, t }
+  // V30 (2026-10-09): germ counts and output % moved to the info column left of the map (sideInfo), so counts
+  // passed here are handed to it; the map itself keeps only the sector names and the Lymph strip's breach ring.
   function mapLabels(o = {}) {
-    MAP.slice(0, 3).forEach(([u0, u1, name], z) => { zoneName(u0, u1, name); if (o.counts) zoneCount(u0, u1, o.counts[z]); });
+    MAP.slice(0, 3).forEach(([u0, u1, name]) => zoneName(u0, u1, name));
+    if (o.counts) R.infoReq = Object.assign(R.infoReq || {}, { counts: o.counts });
     return nodeRow(o);
   }
   function nodeRow(o = {}) {
@@ -308,17 +311,17 @@ const CYT = (function () {
     ctx.globalAlpha = 0.9; ctx.fillStyle = PAL.ui; ctx.font = `600 12px ${FONT}`; ctx.textAlign = 'left'; ctx.textBaseline = 'middle';
     ctx.fillText('Lymph node', x + 28, my);
     let left = x + 28 + ctx.measureText('Lymph node').width + 6;
-    if (n != null) { ctx.font = `600 16px ${FONT}`; ctx.globalAlpha = n ? 0.9 : 0.3; ctx.fillStyle = n ? PAL.germHi : PAL.ui; ctx.fillText(String(n), left, my + 0.5); left += ctx.measureText(String(n)).width + 8; }
-    if (o.off) { ctx.font = `500 9.5px ${MONO}`; ctx.fillStyle = PAL.ui; ctx.globalAlpha = 0.55; ctx.fillText('OFF', left, my); left += ctx.measureText('OFF').width + 8; }
+    if (n != null && o.legacy) { ctx.font = `600 16px ${FONT}`; ctx.globalAlpha = n ? 0.9 : 0.3; ctx.fillStyle = n ? PAL.germHi : PAL.ui; ctx.fillText(String(n), left, my + 0.5); left += ctx.measureText(String(n)).width + 8; }
+    if (o.off && o.legacy) { ctx.font = `500 9.5px ${MONO}`; ctx.fillStyle = PAL.ui; ctx.globalAlpha = 0.55; ctx.fillText('OFF', left, my); left += ctx.measureText('OFF').width + 8; }
     ctx.globalAlpha = 1;
     const sup = o.mode === 'support', col = sup ? PAL.repair : PAL.kill, cw = 74, ch = 20, chx = Math.max(left, x + w / 2 - cw / 2);
-    if (o.mode !== null && chx + cw < x + w - 80) {
+    if (o.legacy && o.mode !== null && chx + cw < x + w - 80) {
       ctx.fillStyle = 'rgba(10,13,24,0.85)'; ctx.strokeStyle = col; ctx.lineWidth = 1.5; rrect(chx, my - ch / 2, cw, ch, ch / 2); ctx.fill(); ctx.stroke();
       icon(sup ? 'mode-support' : 'mode-offense', chx + 12, my, 16);
       ctx.fillStyle = col; ctx.font = `600 11px ${FONT}`; ctx.fillText(sup ? 'Support' : 'Offense', chx + 22, my + 0.5);
     }
     // breach clock, left of the power button: the organ in a ring, an empty ring when the node is clear
-    const r = Math.min(13, h * 0.36), tx = x + w - 46 - r, frac = o.frac || 0, live = !!o.busy, organ = o.organ || 'spleen';
+    const r = Math.min(13, h * 0.36), tx = x + w - 12 - r, frac = o.frac || 0, live = !!o.busy, organ = o.organ || 'spleen';
     ART.drawTimer(ctx, tx, my, r, frac, { beating: live, t: o.t || 0 });
     if (frac > 0.001 || live) organImg(`${organ === 'kidney' ? 'kidneys' : organ}-${ORGAN_STATE[o.lv == null ? 4 : o.lv]}`, tx - r * 0.75, my - r * 0.56, r * 1.5, r * 1.12, live ? 1 : 0.55);
     return [tx, my, r];
@@ -339,7 +342,17 @@ const CYT = (function () {
     ctx.fillText(n === 1 ? 'antigen' : 'antigens', x + 16 + nw, y + 54); ctx.globalAlpha = 1;
   }
   // The Offense / Support chip at the bottom of a zone; flip = 0..1 just after a flip (a pop)
+  // V30: a sector's stance is the round button right of it. Clips call this from frame(); the button is drawn
+  // after the stage (R.ctlReq) in the right column. Returns the button's centre for fingers.
   function zoneChip(u0, u1, mode, flip = 0) {
+    if (R.right) {
+      const q = R.ctlReq || (R.ctlReq = { zones: [], mode: [], flip: [] }), z = q.zones.length;
+      q.zones.push([u0, u1]); q.mode.push(mode); q.flip.push(flip);
+      return ctlLayout(q.zones)[z].mode;
+    }
+    return zoneChipOld(u0, u1, mode, flip);
+  }
+  function zoneChipOld(u0, u1, mode, flip = 0) {
     const [x, y, w, h] = zoneRect(u0, u1), sup = mode === 'support', col = sup ? PAL.repair : PAL.kill;
     const s = 1 + 0.15 * Math.sin(clamp(flip) * Math.PI), cw = 92 * s, ch = 24 * s, cx = x + w / 2 - cw / 2, cy = y + h - 24 - 8 - (ch - 24) / 2;
     ctx.fillStyle = 'rgba(10,13,24,0.85)'; ctx.strokeStyle = col; ctx.lineWidth = 1.5;
@@ -363,6 +376,108 @@ const CYT = (function () {
   }
   // A sector's power button, as in v3: 30 px round, bottom-right of the sector. On: green ring and glow;
   // off: dashed grey. shake 0..1 wobbles it sideways (the "last zone" refusal). Returns its centre.
+  // ---- V30 side columns (2026-10-09) ----
+  // Left of the map: each sector's germ count and output %. Right of it: each sector's Response button (a mini bar
+  // of its mix), stance button and power button; the thin Lymph strip gets one compact row. A vertical level rail
+  // (waves, hatches) runs down the far left.
+  const UNIT_ORDER = ['neut', 'net', 'nk', 'mac'];
+  function miniMix(x, y, w, h, mix) {
+    ctx.fillStyle = '#10152A'; rrect(x, y, w, h, h / 2); ctx.fill();
+    let ax = x; ctx.save(); rrect(x, y, w, h, h / 2); ctx.clip();
+    for (const k of UNIT_ORDER) if (mix && mix[k] > 0.004) { ctx.fillStyle = COLORS[k]; ctx.fillRect(ax, y, w * mix[k], h); ax += w * mix[k]; }
+    ctx.restore();
+  }
+  function powerBtn(cx, cy, r, on, shake = 0) {
+    cx += Math.sin(shake * 40) * 4 * shake;
+    ctx.save();
+    ctx.fillStyle = 'rgba(10,13,24,.9)'; ctx.beginPath(); ctx.arc(cx, cy, r, 0, 6.283); ctx.fill();
+    ctx.lineWidth = 1.5; ctx.strokeStyle = on ? '#7BE0A0' : '#5A6070';
+    if (on) { ctx.shadowColor = 'rgba(123,224,160,.55)'; ctx.shadowBlur = 8; } else ctx.setLineDash([3, 2.5]);
+    ctx.stroke(); ctx.shadowBlur = 0; ctx.setLineDash([]);
+    const s = r / 15;
+    ctx.strokeStyle = on ? '#7BE0A0' : '#6B7180'; ctx.lineWidth = 1.8 * Math.max(0.8, s); ctx.lineCap = 'round';
+    ctx.beginPath(); ctx.arc(cx, cy + 0.5 * s, 6.5 * s, -Math.PI / 2 + 0.75, -Math.PI / 2 - 0.75 + 6.283); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(cx, cy - 8 * s); ctx.lineTo(cx, cy - 1.5 * s); ctx.stroke();
+    ctx.restore();
+    return [cx, cy];
+  }
+  function stanceBtn(cx, cy, r, mode, flip = 0) {
+    const sup = mode === 'support', col = sup ? PAL.repair : PAL.kill, sc = 1 + 0.2 * Math.sin(clamp(flip) * Math.PI);
+    ctx.save();
+    ctx.fillStyle = 'rgba(10,13,24,.9)'; ctx.strokeStyle = col; ctx.lineWidth = 1.5; ctx.shadowColor = col; ctx.shadowBlur = flip > 0 && flip < 1 ? 10 : 0;
+    ctx.beginPath(); ctx.arc(cx, cy, r * sc, 0, 6.283); ctx.fill(); ctx.stroke(); ctx.shadowBlur = 0;
+    ctx.restore();
+    icon(sup ? 'mode-support' : 'mode-offense', cx, cy, r * 1.35 * sc);
+    return [cx, cy];
+  }
+  // Where each zone's controls sit in the right column: { resp: [x, y, w, h] | null, mode: [x, y], pwr: [x, y], r, pill }
+  function ctlLayout(zones) {
+    if (!R.right) return zones.map(() => ({ resp: null, mode: [0, 0], pwr: [0, 0], r: 10 }));
+    const [rx, , rw] = R.right;
+    return zones.map(([u0, u1]) => {
+      const [, y, , h] = zoneRect(u0, u1);
+      if (h < 70) { // the Lymph strip: pill, stance, power in one row
+        const r = Math.max(7, Math.min(10, h * 0.28)), cy = y + h / 2;
+        return { resp: null, pill: [rx + 3, cy - 3, rw - 6 - 4 * r - 8, 6], mode: [rx + rw - 4 - 3 * r - 4, cy], pwr: [rx + rw - 3 - r, cy], r };
+      }
+      const r = 12, top = y + h / 2 - 32;
+      return { resp: [rx + 4, top, rw - 8, 32], mode: [rx + rw / 2 - 14, top + 48], pwr: [rx + rw / 2 + 14, top + 48], r };
+    });
+  }
+  // o: { zones, mix (one or per zone), mode, on, flip, shake, open (zone index whose sheet is open), press: { resp|mode|pwr: z } }
+  function sideCtl(o = {}) {
+    const zones = o.zones || MAP.map(z => [z[0], z[1]]), L = ctlLayout(zones), at = (v, z, d) => (Array.isArray(v) ? (v[z] === undefined ? d : v[z]) : v === undefined ? d : v);
+    R.hud.ctl = { resp: [], mode: [], pwr: [] };
+    zones.forEach((zz, z) => {
+      const l = L[z], mix = at(o.mix, z, { neut: 0.7, mac: 0.3 }), mode = at(o.mode, z, 'offense'), on = at(o.on, z, true);
+      if (l.resp) {
+        const [x, y, w, h] = l.resp, open = o.open === z, press = o.press && o.press.resp === z;
+        ctx.fillStyle = press ? 'rgba(63,230,255,0.18)' : '#0A0D18'; ctx.strokeStyle = open ? PAL.cell : '#1E2540'; ctx.lineWidth = open ? 1.5 : 1;
+        if (open) { ctx.shadowColor = PAL.cell; ctx.shadowBlur = 8; }
+        rrect(x, y, w, h, 7); ctx.fill(); ctx.stroke(); ctx.shadowBlur = 0;
+        miniMix(x + 6, y + 7, w - 12, 5, on ? mix : null);
+        ctx.fillStyle = on ? '#9AA4BC' : '#5A6070'; ctx.font = `600 ${w < 60 ? 9.5 : 10.5}px ${FONT}`; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+        ctx.fillText('Response', x + w / 2, y + 22.5);
+        R.hud.ctl.resp.push([x + w / 2, y + h / 2]);
+      } else { if (l.pill) miniMix(l.pill[0], l.pill[1], l.pill[2], l.pill[3], on ? mix : null); R.hud.ctl.resp.push(l.pill ? [l.pill[0] + l.pill[2] / 2, l.pill[1] + 3] : [0, 0]); }
+      R.hud.ctl.mode.push(stanceBtn(l.mode[0], l.mode[1], l.r, mode, at(o.flip, z, 0)));
+      R.hud.ctl.pwr.push(powerBtn(l.pwr[0], l.pwr[1], l.r, on, at(o.shake, z, 0)));
+    });
+  }
+  // o: { zones, counts, pct (number % or string), off }
+  function sideInfo(o = {}) {
+    if (!R.left) return;
+    const zones = o.zones || MAP.map(z => [z[0], z[1]]), [lx, , lw] = R.left, cx = lx + lw / 2;
+    zones.forEach(([u0, u1], z) => {
+      const [, y, , h] = zoneRect(u0, u1), my = y + h / 2, small = h < 70, n = o.counts ? o.counts[z] : 0;
+      const off = o.off && o.off[z], p = o.pct ? o.pct[z] : 100, ptxt = off ? '0%' : typeof p === 'number' ? Math.round(p) + '%' : p;
+      ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+      if (!small) icon('bacterium', cx, my - 23, 13, n ? 0.9 : 0.4);
+      ctx.font = `600 ${small ? 13 : 18}px ${FONT}`; ctx.fillStyle = n ? PAL.germHi : PAL.ui; ctx.globalAlpha = n ? 1 : 0.35;
+      ctx.fillText(String(n), cx, small ? my - 6 : my - 4); ctx.globalAlpha = 1;
+      if (!small) icon('neutrophil', cx, my + 13, 11, 0.85);
+      ctx.font = `500 ${small ? 8.5 : 10}px ${MONO}`; ctx.fillStyle = off ? '#5A6070' : typeof p === 'number' && p > 100.5 ? '#FFD23F' : '#9AA4BC';
+      ctx.fillText(ptxt, cx, small ? my + 8 : my + 26);
+    });
+  }
+  // The level rail down the far left (V30): fills top to bottom; events [{ at, kind, ring }] use the art kit's markers
+  function rail(frac, events = [], ringCol) {
+    if (!R.rail) return;
+    const [x, y, w, h] = R.rail, cx = x + w / 2, y0 = y + 8, y1 = y + h - 8, f = clamp(frac);
+    ctx.fillStyle = 'rgba(221,230,245,0.08)'; ctx.strokeStyle = 'rgba(221,230,245,0.3)'; ctx.lineWidth = 1;
+    rrect(cx - 4, y0, 8, y1 - y0, 4); ctx.fill(); ctx.stroke();
+    const g = ctx.createLinearGradient(0, y0, 0, y0 + (y1 - y0) * f); g.addColorStop(0, 'rgba(63,230,255,0.15)'); g.addColorStop(1, 'rgba(63,230,255,0.55)');
+    ctx.fillStyle = g; rrect(cx - 4, y0, 8, Math.max(8, (y1 - y0) * f), 4); ctx.fill();
+    ctx.fillStyle = PAL.cellHi || '#BFF6FF'; ctx.fillRect(cx - 7, y0 + (y1 - y0) * f - 1, 14, 2);
+    for (const e of events) {
+      const img = ART.ready['marker-' + e.kind]; if (!img) continue;
+      const sz = (e.kind === 'wave-final' ? 22 : 18), ey = y0 + (y1 - y0) * e.at;
+      ctx.globalAlpha = e.at <= f ? 0.3 : 1; ctx.drawImage(img, cx - sz / 2, ey - sz / 2, sz, sz);
+      if (e.ring) { ctx.strokeStyle = e.ring; ctx.lineWidth = 1.8; ctx.beginPath(); ctx.arc(cx, ey, 12, 0, 6.283); ctx.stroke(); }
+      ctx.globalAlpha = 1;
+    }
+    R.hud.rail = { x: cx, y0, y1 };
+  }
   function zonePower(u0, u1, on, shake = 0) {
     const [x, y, w, h] = zoneRect(u0, u1), cx = x + w - 26 + Math.sin(shake * 40) * 4 * shake, cy = h < 60 ? y + h / 2 : y + h - 26, r = 15;
     ctx.save();
@@ -439,12 +554,27 @@ const CYT = (function () {
   }
   // The production sheet over the bottom of the stage: one slider per unit, with 100% and 0% buttons
   function hudSheet(st) {
-    const rows = st.units, rh = 40, w = Math.min(R.w - 16, 330), ph = (st.power ? 40 : 0) + (st.apply ? 40 : 0) + (st.loadouts ? 52 : 0), h = 34 + rows.length * rh + 8 + ph, x = (R.w - w) / 2, y = R.sy + R.sh - h - 6; // HUD layer: may overhang a narrow letterboxed stage
+    // V30: the sheet opens from a sector's Response button, with tabs for every zone and a Done button on top
+    const TB = st.tabs ? 38 : 0, rows = st.units, rh = 40, w = Math.min(R.w - 16, 340), ph = (st.power ? 40 : 0) + (st.apply ? 40 : 0) + (st.loadouts ? 52 : 0) + (st.stance ? 40 : 0), h = TB + 34 + rows.length * rh + 8 + ph, x = (R.w - w) / 2, y = Math.max(4, R.sy + R.sh - h - 6); // HUD layer: may overhang a narrow letterboxed stage
     const pop = ease(clamp(st.show));
     if (pop <= 0) return;
     ctx.save(); ctx.globalAlpha = pop; ctx.translate(0, (1 - pop) * 30);
     ctx.fillStyle = 'rgba(10,13,24,0.96)'; ctx.strokeStyle = '#1E2540'; ctx.lineWidth = 1;
     rrect(x, y, w, h, 12); ctx.fill(); ctx.stroke();
+    if (TB) {
+      const names = ['Wound', 'Tissue', 'Deep tissue', 'Lymph node'], dw = 44, gg = 4, tw = (w - 24 - dw - gg * 4) / 4;
+      ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+      names.forEach((nm, i) => {
+        const bx = x + 12 + i * (tw + gg), on = nm === st.zone;
+        ctx.fillStyle = on ? 'rgba(63,230,255,0.14)' : '#10152A'; ctx.strokeStyle = on ? PAL.cell : '#1E2540'; ctx.lineWidth = on ? 1.5 : 1;
+        rrect(bx, y + 8, tw, 26, 6); ctx.fill(); ctx.stroke();
+        ctx.fillStyle = on ? PAL.cell : PAL.ui; ctx.font = `600 ${tw < 62 ? 10 : 11}px ${FONT}`; ctx.fillText(nm, bx + tw / 2, y + 21.5);
+      });
+      const bx = x + w - 12 - dw; ctx.fillStyle = '#10152A'; ctx.strokeStyle = '#1E2540'; ctx.lineWidth = 1; rrect(bx, y + 8, dw, 26, 6); ctx.fill(); ctx.stroke();
+      ctx.fillStyle = PAL.ui; ctx.font = `600 11px ${FONT}`; ctx.fillText('Done', bx + dw / 2, y + 21.5);
+      R.hud.done = [bx + dw / 2, y + 21 + (1 - pop) * 30];
+    }
+    ctx.translate(0, TB);
     ctx.fillStyle = PAL.ui; ctx.font = `600 13px ${FONT}`; ctx.textAlign = 'left'; ctx.textBaseline = 'middle';
     ctx.fillText(`${st.zone} response`, x + 12, y + 17);
     ctx.font = `500 11px ${MONO}`; ctx.fillStyle = '#7A86A0'; ctx.textAlign = 'right'; ctx.fillText('adds up to 100%', x + w - 12, y + 17);
@@ -462,14 +592,14 @@ const CYT = (function () {
         ctx.fillStyle = on ? col : '#10152A'; ctx.strokeStyle = on ? col : '#1E2540'; ctx.lineWidth = 1;
         rrect(px, ty - 10, pw, 20, 6); ctx.fill(); ctx.stroke();
         ctx.fillStyle = on ? '#04050A' : PAL.ui; ctx.font = `600 11px ${MONO}`; ctx.textAlign = 'center'; ctx.fillText(lab, px + pw / 2, ty + 0.5);
-        R.hud.pills[u][at ? 'full' : 'zero'] = [px + pw / 2, ty + (1 - pop) * 30];
+        R.hud.pills[u][at ? 'full' : 'zero'] = [px + pw / 2, ty + TB + (1 - pop) * 30];
       });
       ctx.fillStyle = '#10152A'; rrect(tx0, ty - 3, tx1 - tx0, 6, 3); ctx.fill();
       ctx.fillStyle = col; rrect(tx0, ty - 3, (tx1 - tx0) * val, 6, 3); ctx.fill();
       const kx = tx0 + (tx1 - tx0) * val;
       ctx.shadowColor = col; ctx.shadowBlur = 8; ctx.fillStyle = col; ctx.beginPath(); ctx.arc(kx, ty, 8, 0, 6.283); ctx.fill(); ctx.shadowBlur = 0;
       ctx.strokeStyle = '#04050A'; ctx.lineWidth = 2; ctx.stroke();
-      R.hud.sliders[u] = { x0: tx0, x1: tx1, y: ty + (1 - pop) * 30 };
+      R.hud.sliders[u] = { x0: tx0, x1: tx1, y: ty + TB + (1 - pop) * 30 };
     });
     // "Use this mix everywhere" with an "Apply to all zones" button: copies this zone's mix to the others
     let rowY = y + 34 + rows.length * rh + 4;
@@ -490,7 +620,7 @@ const CYT = (function () {
         if (mix) { let ax = mx; for (const k of Object.keys(mix).filter(k => mix[k] > 0.004)) { const ww = mw * mix[k]; ctx.fillStyle = COLORS[k]; ctx.fillRect(ax, cy - 2.5, ww, 5); ax += ww; } }
         else { ctx.strokeStyle = '#3A4360'; ctx.setLineDash([2, 2]); ctx.strokeRect(mx + 0.5, cy - 2.5, mw - 1, 5); ctx.setLineDash([]); }
         ctx.fillStyle = hot ? PAL.cell : '#7A86A0'; ctx.font = `500 10px ${FONT}`; ctx.fillText('Save', sx + sw / 2, cy + 23);
-        R.hud.slots.push([sx + sw / 2, cy + (1 - pop) * 30]); R.hud.saves.push([sx + sw / 2, cy + 23 + (1 - pop) * 30]);
+        R.hud.slots.push([sx + sw / 2, cy + TB + (1 - pop) * 30]); R.hud.saves.push([sx + sw / 2, cy + 23 + TB + (1 - pop) * 30]);
       }
       rowY += 52;
     }
@@ -500,7 +630,7 @@ const CYT = (function () {
       ctx.fillStyle = PAL.ui; ctx.font = `600 12px ${FONT}`; ctx.textAlign = 'left'; ctx.textBaseline = 'middle'; ctx.fillText('Use this response everywhere', x + 12, cy);
       ctx.fillStyle = hot ? '#FFD23F' : '#10152A'; ctx.strokeStyle = '#FFD23F'; rrect(bx, cy - 11, bw, 22, 6); ctx.fill(); ctx.stroke();
       ctx.fillStyle = hot ? '#04050A' : '#FFD23F'; ctx.font = `600 12px ${FONT}`; ctx.textAlign = 'center'; ctx.fillText('Apply to all zones', bx + bw / 2, cy + 0.5);
-      R.hud.apply = [bx + bw / 2, cy + (1 - pop) * 30];
+      R.hud.apply = [bx + bw / 2, cy + TB + (1 - pop) * 30];
       rowY += 40;
     }
     // "Make cells for the <zone>" with On / Off (switching a zone off stops new cells there)
@@ -514,7 +644,20 @@ const CYT = (function () {
         ctx.fillStyle = on ? col : '#10152A'; ctx.strokeStyle = on ? col : '#1E2540';
         rrect(px + 1, cy - 11, bw - 2, 22, 6); ctx.fill(); ctx.stroke();
         ctx.fillStyle = on ? '#04050A' : PAL.ui; ctx.font = `600 12px ${FONT}`; ctx.textAlign = 'center'; ctx.fillText(lab, px + bw / 2, cy + 0.5);
-        R.hud.power[key] = [px + bw / 2, cy + (1 - pop) * 30];
+        R.hud.power[key] = [px + bw / 2, cy + TB + (1 - pop) * 30];
+      });
+      rowY += 40;
+    }
+    // "Macrophages in the <zone>" with Offense / Support (V30)
+    if (st.stance) {
+      const cy = rowY + 16, bw = 72, bx = x + w - 12 - bw * 2 - 4;
+      ctx.strokeStyle = '#1E2540'; ctx.lineWidth = 1; ctx.beginPath(); ctx.moveTo(x + 12, rowY - 2); ctx.lineTo(x + w - 12, rowY - 2); ctx.stroke();
+      ctx.fillStyle = PAL.ui; ctx.font = `600 12px ${FONT}`; ctx.textAlign = 'left'; ctx.textBaseline = 'middle'; ctx.fillText(`Macrophages in the ${st.zone}`, x + 12, cy);
+      [['Offense', 'offense', PAL.kill], ['Support', 'support', PAL.repair]].forEach(([lab, key, col], j) => {
+        const on = st.stance === key, px = bx + j * (bw + 4);
+        ctx.fillStyle = on ? 'rgba(10,13,24,1)' : '#10152A'; ctx.strokeStyle = on ? col : '#1E2540'; ctx.lineWidth = on ? 1.5 : 1;
+        rrect(px, cy - 11, bw, 22, 6); ctx.fill(); ctx.stroke();
+        ctx.fillStyle = on ? col : PAL.ui; ctx.font = `600 12px ${FONT}`; ctx.textAlign = 'center'; ctx.fillText(lab, px + bw / 2, cy + 0.5);
       });
     }
     ctx.restore();
@@ -634,27 +777,43 @@ const CYT = (function () {
   function hudOutput(rect, st, t, o = {}) {
     const [x, y, w, h] = rect;
     ctx.fillStyle = '#0A0D18'; ctx.strokeStyle = '#1E2540'; ctx.lineWidth = 1; rrect(x, y, w, h, 10); ctx.fill(); ctx.stroke();
-    heart(x + 30, y + h / 2 + 2, Math.min(40, h - 12), st.f, t, st, o);
-    const lx = x + 58, rw = x + w - 10 - lx;
+    heart(x + 30, y + 34, 38, st.f, t, st, o);
+    const lx = x + 58, rx = x + w - 10, mul = 0.5 * Math.pow(4, st.out), pct = Math.round(mul * 20) * 5;
     ctx.textBaseline = 'middle'; ctx.textAlign = 'left'; ctx.font = `600 12px ${FONT}`; ctx.fillStyle = PAL.ui;
     ctx.fillText('Stress', lx, y + 13);
-    const mul = 0.5 * Math.pow(4, st.out);
-    // the game's label (V27): "Stress 100%", from 50% to 200%
-    const bw = ctx.measureText('Stress').width; ctx.font = `500 11px ${MONO}`; ctx.fillStyle = '#9AA4BC'; ctx.fillText(`${Math.round(mul * 20) * 5}%`, lx + bw + 6, y + 13.5);
-    const ty = y + h / 2 + 1, tx0 = lx, tx1 = x + w - 12, rest = 0.6;
+    // the game's label (V27+): "Stress 100%", from 50% to 200%
+    ctx.font = `500 11px ${MONO}`; ctx.fillStyle = '#9AA4BC'; ctx.textAlign = 'right'; ctx.fillText(`${pct}%`, rx, y + 13.5);
+    const ty = y + 31, tx0 = lx, tx1 = rx - 2, rest = 0.6;
     const gr = ctx.createLinearGradient(tx0, 0, tx1, 0);
     gr.addColorStop(0, 'rgba(63,230,255,.15)'); gr.addColorStop(rest, 'rgba(63,230,255,.45)'); gr.addColorStop(rest + 0.001, '#FFD23F'); gr.addColorStop(rest + (1 - rest) / 2, '#FF7A3D'); gr.addColorStop(1, '#FF3B4E');
     ctx.fillStyle = gr; rrect(tx0, ty - 3, tx1 - tx0, 6, 3); ctx.fill();
     const kx = tx0 + (tx1 - tx0) * st.out;
-    ctx.shadowColor = 'rgba(255,210,63,.6)'; ctx.shadowBlur = 8; ctx.fillStyle = PAL.ui; ctx.beginPath(); ctx.arc(kx, ty, 9, 0, 6.283); ctx.fill(); ctx.shadowBlur = 0;
+    ctx.shadowColor = 'rgba(255,210,63,.6)'; ctx.shadowBlur = 8; ctx.fillStyle = PAL.ui; ctx.beginPath(); ctx.arc(kx, ty, 8, 0, 6.283); ctx.fill(); ctx.shadowBlur = 0;
     ctx.strokeStyle = '#04050A'; ctx.lineWidth = 2; ctx.stroke();
+    // presets, as in V30: the one matching the current Stress lights gold
+    const pg = 5, pw = (rx - lx - 3 * pg) / 4, py = y + 50;
+    R.hud.presets = {};
+    [50, 100, 150, 200].forEach((v, i) => {
+      const px = lx + i * (pw + pg), on = Math.abs(pct - v) < 3;
+      ctx.fillStyle = on ? 'rgba(255,210,63,0.12)' : '#10152A'; ctx.strokeStyle = on ? '#FFD23F' : '#1E2540'; ctx.lineWidth = 1;
+      rrect(px, py - 9, pw, 18, 5); ctx.fill(); ctx.stroke();
+      ctx.fillStyle = on ? '#FFD23F' : '#9AA4BC'; ctx.font = `500 10.5px ${MONO}`; ctx.textAlign = 'center'; ctx.fillText(`${v}%`, px + pw / 2, py + 0.5);
+      R.hud.presets[v] = [px + pw / 2, py];
+    });
     const tier = TIER(st.f);
-    ctx.font = `600 11.5px ${FONT}`; ctx.fillStyle = TIER_COL[tier]; ctx.textAlign = 'left'; ctx.fillText(tier, lx, y + h - 11);
-    const tw = ctx.measureText('Exhausted').width, obx = lx + tw + 8;
-    if (obx + organButtonW() <= x + w - (o.mulTag ? 70 : 6)) organButton(obx, y + h - 24, st.organs || [4, 4, 4, 4, 4], st.f > 100, t, st.organHit);
-    if (o.mulTag) { ctx.fillStyle = PAL.kill; ctx.textAlign = 'right'; ctx.font = `600 11px ${MONO}`; ctx.fillText(o.mulTag, x + w - 10, y + h - 11); }
+    ctx.font = `600 11.5px ${FONT}`; ctx.fillStyle = TIER_COL[tier]; ctx.textAlign = 'left'; ctx.fillText(tier, x + 12, y + 70);
+    const tw = Math.min(ctx.measureText('Exhausted').width, 58), obx = x + 12 + tw + 6;
+    if (obx + organButtonW() <= x + w - (o.mulTag ? 70 : 6)) organButton(obx, y + 58, st.organs || [4, 4, 4, 4, 4], st.f > 100, t, st.organHit);
+    if (o.mulTag) { ctx.fillStyle = PAL.kill; ctx.textAlign = 'right'; ctx.font = `600 11px ${MONO}`; ctx.fillText(o.mulTag, x + w - 10, y + 70); }
+    // Cells meter (V30): cells alive out of the cell limit
+    const cells = typeof st.cellCount === 'number' ? st.cellCount : 190, cap = st.cellCap || 540, cy = y + h - 12, bx0 = x + 54, bx1 = x + w - 64;
+    icon('neutrophil', x + 16, cy, 10, 0.85);
+    ctx.fillStyle = PAL.ui; ctx.font = `600 11px ${FONT}`; ctx.textAlign = 'left'; ctx.fillText('Cells', x + 24, cy + 0.5);
+    ctx.fillStyle = '#10152A'; rrect(bx0, cy - 3, bx1 - bx0, 6, 3); ctx.fill();
+    ctx.fillStyle = PAL.cell; rrect(bx0, cy - 3, (bx1 - bx0) * clamp(cells / cap), 6, 3); ctx.fill();
+    ctx.fillStyle = '#9AA4BC'; ctx.font = `500 10.5px ${MONO}`; ctx.textAlign = 'right'; ctx.fillText(`${Math.round(cells)}/${cap}`, x + w - 10, cy + 0.5);
     R.hud.slider = { x0: tx0, x1: tx1, y: ty };
-    R.hud.heart = [x + 30, y + h / 2];
+    R.hud.heart = [x + 30, y + 34];
   }
   // Storm button: state 'idle' | 'held' | 'risky' (organs would lose bars) | 'lethal' (an organ would fail) | 'burning'. charge 0..1: the 5 s press-and-hold
   // fills a ring around the icon and the button from the bottom; full charge pulses (fires on release)
@@ -733,7 +892,7 @@ const CYT = (function () {
   function toast(text, a) {
     if (a <= 0) return;
     ctx.font = `600 12.5px ${FONT}`;
-    const w = Math.min(R.sw - 24, ctx.measureText(text).width + 28), h = 30, x = R.sx + (R.sw - w) / 2, y = R.sy + 40;
+    const w = Math.min(R.w - 16, ctx.measureText(text).width + 28), h = 30, x = (R.w - w) / 2, y = R.sy + 40; // may overhang the side columns, like the game's banners
     ctx.globalAlpha = clamp(a); ctx.fillStyle = 'rgba(10,13,24,0.94)'; ctx.strokeStyle = '#FFD23F'; ctx.lineWidth = 1;
     rrect(x, y, w, h, h / 2); ctx.fill(); ctx.stroke();
     ctx.fillStyle = PAL.ui; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText(text, x + w / 2, y + h / 2 + 0.5); ctx.globalAlpha = 1;
@@ -745,14 +904,19 @@ const CYT = (function () {
   // Lays out the stage and HUD strips for a clip, then runs the clip's frame
   function render(c2d, clip, t, w, h, dpr, dt) {
     ctx = c2d;
-    const hudB = clip.hud && clip.hud.bottom ? 64 : 0, hudT = clip.hud && clip.hud.top ? 28 : 0, gap = 6;
-    const sx = 0, sy = hudT, sw = w, sh = h - hudT - hudB - (hudB ? gap : 0);
+    // V30 layout: hud.side 'map' = info column left + controls right for the four sectors; 'ctl' = controls right only
+    // (a zoomed sector); hud.rail = the level rail down the far left; hud.bottom = the Stress panel
+    const H = clip.hud || {}, narrow = w < 480, side = H.side, gap = 6;
+    const LW = side === 'map' ? (narrow ? 44 : 54) : 0, RAILW = H.rail ? 24 : 0, RW = side ? (narrow ? 62 : 74) : 0;
+    const hudB = H.bottom ? 100 : 0, hudT = H.top ? 28 : 0;
+    const sx = LW + RAILW, sy = hudT, sw = w - sx - RW, sh = h - hudT - hudB - (hudB ? gap : 0);
     const portrait = true, VW = V, VH = U; // vertical everywhere, like the game
-    const k = Math.min(sw / VW, sh / VH), ox = sx + (sw - VW * k) / 2, oy = sy + (sh - VH * k) / 2;
-    // HUD strips span the stage, widened a little on a letterboxed canvas so the cards stay readable
-    const hw = Math.min(w, Math.max(VW * k, 340)), hx = (w - hw) / 2;
-    R = { w, h, dpr, dt: Math.max(0, Math.min(0.1, dt || 0)), portrait, k, ox, oy, sx: ox, sy: oy, sw: VW * k, sh: VH * k, hud: {},
-      bottom: hudB ? [hx, h - hudB, hw, hudB] : null, top: hudT ? [hx, 0, hw, hudT] : null };
+    const k = Math.min(sw / VW, sh / VH), ox = sx + (sw - VW * k) / 2, oy = sy + (sh - VH * k) / 2, SW = VW * k, SH = VH * k;
+    // HUD strips span the stage and its columns, widened a little on a letterboxed canvas so they stay readable
+    const hw = Math.min(w, Math.max(SW + LW + RW + RAILW, 340)), hx = (w - hw) / 2;
+    R = { w, h, dpr, dt: Math.max(0, Math.min(0.1, dt || 0)), portrait, k, ox, oy, sx: ox, sy: oy, sw: SW, sh: SH, hud: {},
+      left: LW ? [ox - LW, oy, LW, SH] : null, right: RW ? [ox + SW, oy, RW, SH] : null, rail: RAILW ? [ox - LW - RAILW, oy, RAILW, SH] : null,
+      bottom: hudB ? [hx, h - hudB, hw, hudB] : null, top: hudT ? [hx, 0, hw, hudT] : null, infoReq: null, ctlReq: null };
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
     ctx.globalCompositeOperation = 'source-over'; ctx.globalAlpha = 1;
     ctx.fillStyle = PAL.void; ctx.fillRect(0, 0, w, h);
@@ -768,6 +932,9 @@ const CYT = (function () {
     background(clip.bg || {});
     clip.frame(t, clip.state, api);
     ctx.restore();
+    const so = clip.side ? clip.side(t, clip.state, api) || {} : {};
+    if (side === 'map') { const o = Object.assign({}, R.infoReq || {}, so); sideInfo(o); sideCtl(o); }
+    else if (side === 'ctl') { const q = R.ctlReq || { zones: [[0, U]] }; sideCtl(Object.assign({ zones: q.zones, mode: q.mode, flip: q.flip }, so)); }
     if (clip.hudFrame) clip.hudFrame(t, clip.state, api);
     if (clip.overlay) clip.overlay(t, clip.state, api);
     if (clip.fingers) clip.fingers(t, clip.state, api);
@@ -789,7 +956,7 @@ const CYT = (function () {
     P, ang, spr, icon, glow, blinkGlow, ringFx, burst, dots,
     ent, divide, gulp, shot, volley, alive, scene, drawEnt,
     zoneRect, zoneName, zoneCount, zoneChip, lymphTimer, tag, flowArrow, flash, rrect,
-    MAP, MAP_BG, NODE_U, mapLabels, nodeRow, zonePower, hudCards, hudSheet, hudOutput, hudStorm, hudProgress, heart, finger, toast, spotlight, vesselRect, organPanel, organLevel, TIER,
+    MAP, MAP_BG, NODE_U, mapLabels, nodeRow, zonePower, sideCtl, sideInfo, rail, ctlLayout, powerBtn, stanceBtn, miniMix, hudCards, hudSheet, hudOutput, hudStorm, hudProgress, heart, finger, toast, spotlight, vesselRect, organPanel, organLevel, TIER,
     get ctx() { return ctx; }, get R() { return R; },
   };
   return { render, api, U, V };

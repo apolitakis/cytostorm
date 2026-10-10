@@ -35,6 +35,7 @@
   };
   CYT_CLIPS.mrsa = {
     id: 'mrsa', title: 'MRSA', dur: 13.5,
+    hud: { side: 'ctl' }, // V30: the sector's Response, stance and power buttons sit right of it
     cap: [[0, 'MRSA is armored. Like every germ, it blinks when it divides.'], [0.9, 'Plain shots only chip its armor. It takes 12 hits to kill one.'], [3.1, 'And every time it divides, it heals right back to full.'], [5.0, 'Macrophages can\'t swallow it. They spit it back out.'], [7.2, 'Flip the zone to Support. A tuned shot from the ring kills MRSA in one hit.']],
     bg: { tile: 1.2 },
     divAt: 3.4,
@@ -70,6 +71,7 @@
   // ---- Pseudomonas (Pool water) ----
   CYT_CLIPS.pseudo = {
     id: 'pseudo', title: 'Pseudomonas', dur: 12.5,
+    hud: { side: 'ctl' }, // V30: the sector's Response, stance and power buttons sit right of it
     cap: [[0, 'Pseudomonas swims in, settles, and grows a slime dome over itself.'], [3.2, 'Shots still get through the dome, but it soaks up most of each hit. Plain shots do a quarter of the damage.'], [5.6, 'Offense macrophages tear domes down, bite by bite.'], [9.6, 'With the dome gone, every shot hits at full strength.']],
     bg: { tile: 1.2 },
     domeR(t) { const grow = A.seg(t, 2.3, 4.0) * 46, bites = [6.2, 7.2, 8.2, 9.2].filter(b => t > b + 0.3).length; return bites >= 4 ? 0 : grow * (1 - 0.12 * bites); },
@@ -151,8 +153,8 @@
   // ---- Clostridium spores (Soil cut) ----
   CYT_CLIPS.spore = {
     id: 'spore', title: 'Clostridium spores', dur: 12,
-    cap: [[0, 'Clostridium spores drift in and sit still.'], [1.8, 'Nothing can hurt a spore. Shots, nets and storms do nothing.'], [4.6, 'The bar on top shows when they hatch. They all crack at once...'], [7.0, '...into bacteria that divide every 6 seconds. Rest before the hatch, then push hard on it.']],
-    hud: { top: true },
+    cap: [[0, 'Clostridium spores drift in and sit still.'], [1.8, 'Nothing can hurt a spore. Shots, nets and storms do nothing.'], [4.6, 'The bar on the left shows when they hatch. They all crack at once...'], [7.0, '...into bacteria that divide every 6 seconds. Rest before the hatch, then push hard on it.']],
+    hud: { rail: true },
     bg: { tile: 1.2 },
     hatch: 6.4,
     build(st) {
@@ -180,14 +182,14 @@
     },
     hudFrame(t, st) {
       const frac = 0.3 + t * 0.022, at = 0.3 + this.hatch * 0.022;
-      A.hudProgress(A.R.top, frac, [{ at: 0.05, kind: 'wave' }, { at: 0.18, kind: 'wave' }, { at, kind: 'spore' }, { at: 0.72, kind: 'wave' }, { at: 0.9, kind: 'wave-final' }]);
-      if (t > 4.6 && t < this.hatch) { const p = A.R.hud.prog, x = A.lerp(p.x0, p.x1, at), c = A.ctx; c.globalAlpha = 0.6 + 0.4 * Math.sin(t * 8); c.strokeStyle = A.PAL.wax; c.lineWidth = 1.5; c.beginPath(); c.arc(x, p.y, 14, 0, 6.283); c.stroke(); c.globalAlpha = 1; }
+      A.rail(frac, [{ at: 0.05, kind: 'wave' }, { at: 0.18, kind: 'wave' }, { at, kind: 'spore', ring: t > 4.6 && t < this.hatch ? A.PAL.wax : null }, { at: 0.72, kind: 'wave' }, { at: 0.9, kind: 'wave-final' }]);
     },
   };
 
   // ---- Candida (Athlete's foot) ----
   CYT_CLIPS.yeast = {
     id: 'yeast', title: 'Candida', dur: 13.5,
+    hud: { side: 'ctl' }, // V30: the sector's Response, stance and power buttons sit right of it
     cap: [[0, 'Candida settles and grows a thread toward the Lymph node.'], [3.4, 'Germs ride the thread 2.5 times faster. A thread in the Lymph node fills the spleen\'s breach clock too.'], [6.2, 'Shots pass straight through threads.'], [7.8, 'A Net neutrophil cuts the thread, and everything past the cut withers.'], [10.4, 'Offense macrophages chew the tips too, slowly.']],
     bg: { tile: 1.2, dividers: [360], lymph: [380, 175] }, // close-up of Deep tissue and the Lymph node strip
     build(st) {
@@ -264,6 +266,7 @@
   // ---- Tuberculosis (Lungs) ----
   CYT_CLIPS.tb = {
     id: 'tb', title: 'Tuberculosis', dur: 14.2,
+    hud: { side: 'ctl' }, // V30: the sector's Response, stance and power buttons sit right of it
     cap: [[0, 'Tuberculosis is slow and tough: 12 plain hits.'], [1.4, 'A macrophage that swallows it gets infected and starts spitting out new TB.'], [6.6, 'Neutrophils ignore an infected macrophage. Meet the NK cell: it hunts infected cells and kills them.'], [8.8, 'Only NK cells can do it, so add them on the production card wherever TB gets swallowed.'], [10.8, 'Or keep TB zones on Support, so your macrophages ring it instead of swallowing it.']],
     bg: { tile: 1.2 },
     build(st) {
@@ -304,6 +307,7 @@
   // ---- Strep chains (Sore throat) ----
   CYT_CLIPS.strep = {
     id: 'strep', title: 'Strep chains', dur: 12,
+    hud: { side: 'ctl' }, // V30: the sector's Response, stance and power buttons sit right of it
     cap: [[0, 'Strep chains sprint for the Lymph node.'], [2.4, 'A plain shot splits a chain in two, and both halves keep running.'], [5.4, 'Tuned shots from a Support ring kill links without splitting. Swallows don\'t split chains either.']],
     bg: { tile: 1.2 },
     build(st) {
@@ -400,6 +404,7 @@
   // ---- Tapeworm (Gut) ----
   CYT_CLIPS.worm = {
     id: 'worm', title: 'Tapeworm', dur: 13.5,
+    hud: { side: 'ctl' }, // V30: the sector's Response, stance and power buttons sit right of it
     cap: [[0, 'The Tapeworm is the boss. It\'s far too big to swallow.'], [2.4, 'Every segment you break off runs away as a small, fast worm.'], [6.2, 'Tuned shots hit it five times harder. Put a Support ring in its path.']],
     bg: { tile: 1.1 },
     build(st) {

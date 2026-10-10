@@ -25,10 +25,10 @@ It wraps the main game without editing it. At build time it reads prototype/v3/s
 - **Loadout:** neutrophils and macrophages always come, plus up to 2 specialists. Net and NK unlock free when you reach Flu season and Lungs.
 - **Treatments:** passive, cost on that map only. Antibiotics (shots and nets do x2 to bacteria; 1 in 5 arriving bacteria turn MRSA). Antifungals (threads creep and bud a third as fast, yeast hp halved; fatigue recovers 1% slower). Antivirals (no Herpes hiding, no flu split; bacteria divide 20% faster). Steroids (fatigue builds half as fast, storm costs 30; marrow x0.7). Fever reducer (tiers +10; cost: CONFIG.fever.on = 0, so fever stops slowing bacterial division).
 
-## Bot check (2026-10-08, Play V28 from releases/v28, campaign pressure ramp on, 2 seeds per map)
+## Bot check (2026-10-09, Play V30 from releases/v30 at Normal, campaign pressure ramp on, 2 seeds per map)
 
 - Random mashing loses every map with no build and with a late build.
-- With no upgrades: idle loses every map. Smart wins about 4 or 5 of 10: it loses Nose and Neck and wins half of Foot, Chest, Lip and Belly.
-- With a late build (about 2,000 Samples), doing nothing still wins about 7 of 10 maps. Flagged as not balanced yet. Options: a steeper ramp, weaker upgrades, or upgrades that only pay off with active play.
-- First-clear Samples match V27 (Papercut 251, Nose 356), so the shop prices still fit.
-- One pass of `check.js all` takes about 6 minutes on V28.
+- With no upgrades: idle loses every map. Smart wins 10 of 20 runs: both seeds on Finger, Elbow and Knee, one on Ear, Nose, Neck and Belly, none on Foot, Chest and Lip.
+- With a late build (about 2,000 Samples), doing nothing still wins 6 of 10 maps. Flagged as not balanced yet. Options: a steeper ramp, weaker upgrades, or upgrades that only pay off with active play.
+- First-clear Samples match V27/V28 (Finger 251, Nose 356), so the shop prices still fit.
+- The campaign always plays Normal: build.py gives it its own `cytostormCampaign.difficulty` key, so Hard picked in Play on the same site doesn't carry over.

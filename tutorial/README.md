@@ -33,3 +33,10 @@ A clip can point at UI with `A.spotlight(rect, alpha, label, t)` from its `overl
 - Reproduction blink matches the game (sim.js `BLINK` 0.6 s, `BLINK_WARN` 0.7 s; ui.js white radial strobe at 7 Hz, radius r x 2.4): parent warns before dividing, parent and offspring blink after. Used for division, flu splitting, spore hatching, Candida budding, TB spat out, Herpes bursting, strep chain splits, tapeworm pieces.
 - Numbers in captions follow sim.js DEFAULTS (Staph 3 hits, doubles every 10 s; storm 70% / 40%, +50 fatigue, 8 s afterburn, 5 s press-and-hold charge that fires on release (shown in real time); flu splits in 3; tuned shots x5 on the tapeworm). Clip timing is compressed, not to scale.
 - Candida uses ui.js's stand-in `yeast` sprite until the art kit has one.
+
+## V30 layout (clips Version 24, 2026-10-09)
+- `hud.side: 'map'` draws the game's info column left of the map (germ count, output %) and the controls column right of it (Response button, stance button, power button per sector). A clip's `side(t, st, A)` returns `{ counts, pct, off, mix, mode, on, flip, shake, open, press }`; `mapLabels({ counts })` feeds counts too. Finger targets: `R.hud.ctl.resp / mode / pwr [zone]`.
+- `hud.side: 'ctl'` is a zoomed sector with only its controls on the right; `zoneChip()` now draws its stance button there (no on-map chips in V30).
+- `hud.rail` puts the level rail down the far left (`A.rail(frac, events)`, event `ring` colour). The old top bar (`hud.top`, `hudProgress`) is unused.
+- `hud.bottom` is the V30 Stress panel (100 px): heart, Stress %, slider, 50/100/150/200 presets, tier + organs, Cells meter (`st.cellCount`).
+- `hudSheet({ tabs, stance, power, ... })` matches V30's Response sheet (zone tabs + Done, On/Off, Offense/Support rows).

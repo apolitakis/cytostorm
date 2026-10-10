@@ -93,6 +93,10 @@ local server in Playwright's Chromium (iPhone 13 profile).
 - 2026-10-08 14:3x preview: Play v3 V29 (1791469230-7229, 3x units, clips V23) + Sandbox V28 (1791469435-32ad) + Campaign V5 (still V27-based) + OST V2. Flu season local run peaked 2109 germs, headless fps 6-7 at peaks (software rendering). Production unchanged (13:06).
 - 2026-10-08 14:3x preview (3x SHIP SET): Play v3 V29 (1791469230-7229) + Sandbox V28 (1791469435-32ad) + Campaign V6 (1791469731-704b, on V28 sources) + OST V2. Production unchanged (13:06).
 - 2026-10-09 01:28 PRODUCTION (Alex "Ship and publish" 01:27 via coordinator): Play v3 V29 + Sandbox V28 + Campaign V6 + OST V2, game pages byte-identical to preview 2bb39015 (hub date only changed); deploy https://6f05f3ca.cytostorm.pages.dev; live hashes match.
+- 2026-10-09 12:5x preview: Play v3 V30 (1791550509-e3d7, difficulty, new side layout) + Sandbox V28 + Campaign V6 + OST V2 (others byte-identical). Sandbox/Campaign on V30 to follow. Production unchanged (2026-10-09 01:28).
+- 2026-10-09 13:0x preview: + Campaign V7 (1791550672-50ac, on V30, always Normal; checked a Hard pick in /play/ does not carry over). Set = Play V30 + Sandbox V28 + Campaign V7 + OST V2. Production unchanged.
+- 2026-10-09 13:0x preview (V30 SHIP SET): Play v3 V30 (1791550509-e3d7) + Sandbox V29 (1791550976-5cdf) + Campaign V7 (1791550672-50ac) + OST V2. deploy https://5587277a.cytostorm.pages.dev (first try hit a transient wrangler error). Production unchanged (01:28).
+- 2026-10-09 13:14 preview (V31 SHIP SET, clips V24): Play v3 V31 (1791551319-3a9a) + Sandbox V30 (1791551487-a9af) + Campaign V8 (1791551388-c143) + OST V2; deploy https://1d7f8f59.cytostorm.pages.dev. Production unchanged (01:28).
 
 ## Friends
 Open the link in Safari, Share > Add to Home Screen. It launches full screen with the neutrophil icon, like an app.
