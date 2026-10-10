@@ -10,6 +10,8 @@ const V3 = process.env.V3, CAMP = process.env.CAMP;
 Object.assign(global, require(path.join(V3, 'sim.js')));
 Object.assign(global, require(path.join(V3, 'bots.js')));
 const CAMPAIGN = require(path.join(CAMP, 'campaign.js'));
+// The campaign's UI fills the specialist list from the sim's unit table at boot (Campaign V13 on); do the same
+if (CAMPAIGN.setUnits) CAMPAIGN.setUnits(['neut', 'net', 'nk', 'mac', ...Object.keys(global.SPECIAL || {})]);
 const BASE = JSON.parse(JSON.stringify(CONFIG));
 const ORIG = JSON.parse(JSON.stringify(LEVELS));
 const N = LEVEL_ORDER.length;
@@ -20,14 +22,18 @@ function metBy(i) {
   for (let j = 0; j <= i; j++) for (const k of CAMPAIGN.kindsIn(ORIG[LEVEL_ORDER[j]])) s.add(CAMPAIGN.VACCINE_OF[k]);
   return [...s];
 }
+// What's open on a first visit to map i: Clinic parts and unlocked units
+const firstVisit = i => ({ ...CAMPAIGN.fresh(), cleared: Object.fromEntries(LEVEL_ORDER.slice(0, i).map(k => [k, true])) });
+const clinicHas = (i, id) => CAMPAIGN.clinicOpen(firstVisit(i), LEVEL_ORDER, ORIG).some(c => c.id === id);
+const unlockedBy = i => new Set(LEVEL_ORDER.slice(0, i + 1).flatMap(k => ORIG[k].units));
 // A random build costing about `budget` Samples, as the shop allows at map i
 function sampleBuild(i, budget, rnd) {
   const up = {}, vax = {};
   let left = budget, spent = 0;
-  const kinds = i >= 3 ? metBy(i) : [];
+  const kinds = clinicHas(i, 'vax') ? metBy(i) : [], un = unlockedBy(i);
   for (let tries = 0; tries < 200; tries++) {
     const opts = [];
-    for (const u of CAMPAIGN.UPGRADES) { const r = up[u.id] || 0; if (r < 3 && u.cost[r] <= left) opts.push(['u', u, u.cost[r]]); }
+    for (const u of CAMPAIGN.UPGRADES) { const r = up[u.id] || 0; if (r < 3 && u.cost[r] <= left && (!u.need || un.has(u.need))) opts.push(['u', u, u.cost[r]]); }
     for (const k of kinds) if (!vax[k] && CAMPAIGN.VACCINE_COST <= left) opts.push(['v', k, CAMPAIGN.VACCINE_COST]);
     if (!opts.length) break;
     const [t, x, c] = opts[Math.floor(rnd() * opts.length)];
@@ -49,7 +55,8 @@ function run(job) {
   const st = stateFor(level, job);
   CAMPAIGN.applyConfig(CONFIG, BASE, st, treat);
   LEVELS[level] = CAMPAIGN.scaleLevel(ORIG[level], CAMPAIGN.pressure(i, N));
-  LEVELS[level].units = CAMPAIGN.unitsFor(CAMPAIGN.loadout(st, LEVELS, LEVEL_ORDER));
+  LEVELS[level].units = CAMPAIGN.unitsFor(CAMPAIGN.loadout(st, LEVELS, LEVEL_ORDER, level)); // the stage's default loadout
+  const units = LEVELS[level].units.slice();
   const m = startMatch(level, policy, seed);
   const lv = LEVELS[level];
   const tr = CAMPAIGN.instrument(m.game, st, treat);
@@ -57,7 +64,7 @@ function run(job) {
   const g = m.game, budget = CAMPAIGN.budget(lv, CONFIG);
   const organs = ORGAN_KEYS.map(k => g.organs[k]);
   LEVELS[level] = ORIG[level];
-  return { ...job, win: s.win, cause: s.cause, t: +s.t.toFixed(1), dur: lv.duration, peak: +s.peakTimer.toFixed(3), minOrgan: +Math.min(...organs).toFixed(2), organSum: +organs.reduce((a, b) => a + b, 0).toFixed(2),
+  return { ...job, units, win: s.win, cause: s.cause, t: +s.t.toFixed(1), dur: lv.duration, peak: +s.peakTimer.toFixed(3), minOrgan: +Math.min(...organs).toFixed(2), organSum: +organs.reduce((a, b) => a + b, 0).toFixed(2),
     fatiguePeak: Math.round(s.fatiguePeak || 0), storms: s.storms, value: +tr.value.toFixed(1), stormKills: tr.storm, budget: +budget.toFixed(1), base: Math.round(Math.min(tr.value, budget) * CAMPAIGN.RATE) };
 }
 
@@ -91,7 +98,7 @@ else if (process.argv[2] === '--worker') {
 } else {
   const out = process.argv[3];
   const done = new Set(fs.existsSync(out) ? fs.readFileSync(out, 'utf8').split('\n').filter(Boolean).map(l => JSON.parse(l).id) : []);
-  const jobs = plan(process.argv[2]).filter(j => !done.has(j.id));
+  const jobs = plan(process.argv[2]).filter(j => !done.has(j.id)).slice(0, +(process.env.MAXJOBS || 1e9)); // MAXJOBS: stop after this many (run in chunks)
   console.log(`${jobs.length} games to play (${done.size} already in ${out})`);
   const n = Math.min(+(process.env.CORES || os.cpus().length), jobs.length);
   let next = 0, fin = 0; const t0 = Date.now();

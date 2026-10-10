@@ -187,10 +187,12 @@ function load() { try { const s = JSON.parse(localStorage.getItem(KEY)); if (s &
 function save() { try { localStorage.setItem(KEY, JSON.stringify(st)); } catch (e) {} }
 function snap() { undoStack.push(JSON.stringify(st)); if (undoStack.length > 60) undoStack.shift(); }
 const reached = s => { let i = 0; while (i < NST - 1 && s.cleared[ORDER[i]]) i++; return s.cleared[ORDER[NST - 1]] ? NST : i; };
-const clinicAt = { shop: 1, treat: 2, vax: 3 };
+const clinicAt = M.clinic || { shop: 1, treat: 2, vax: 3, loadout: 4 };
 const opened = (s, part) => Math.min(reached(s), NST - 1) >= clinicAt[part] || reached(s) >= NST;
-// Specialists come free when you reach their stage; Net and NK fill the two loadout slots, so the loadout is always "everything unlocked".
+// Specialists come free when you reach their stage. Each stage brings the campaign's default loadout for it (its own new unit plus a counter);
+// a unit's shop line only counts on stages that pack that unit.
 const unlocked = (s, i) => { const out = new Set(); for (let j = 0; j <= i; j++) for (const u of LV[j].units) out.add(u); return out; };
+const packed = i => new Set(LV[i].pack || LV[i].units);
 const metKinds = s => { const out = new Set(); ORDER.forEach((k, i) => { if (s.played[k] || s.cleared[k]) for (const x of LV[i].kinds) out.add(C.VACCINE_OF[x]); }); return [...out]; };
 const kindName = k => k === 'clos' ? 'Clostridium' : k === 'worm' ? 'Tapeworm' : (M.names[k] || k);
 
@@ -202,7 +204,7 @@ function logitFor(s, i, treat, w) {
     if (!f) continue;
     const m = M.skills[sk];
     let q = m.A[key];
-    const un = unlocked(s, i), inert = (M.inert && M.inert[sk]) || [];
+    const un = packed(i), inert = (M.inert && M.inert[sk]) || [];
     for (const u in s.upgrades) { const need = (C.UPGRADES.find(x => x.id === u) || {}).need; if ((!need || un.has(need)) && !inert.includes(u)) q += (m.B[u] || 0) * s.upgrades[u]; }
     let cov = 0; for (const [k, sh] of Object.entries(LV[i].shares)) if (s.vaccines[k]) cov += sh;
     q += m.V * cov;
@@ -271,8 +273,8 @@ function render(flash) {
   const tabs = [['shop', 'Shop'], ['treat', 'Treatment'], ['vax', 'Vaccines'], ['loadout', 'Loadout']];
   if (!['shop', 'treat', 'vax', 'loadout'].includes(st.tab)) st.tab = 'shop';
   $('#tabs').innerHTML = tabs.map(([id, name]) => {
-    const open = id === 'loadout' ? reached(st) >= 4 : opened(st, id);
-    return `<button type="button" role="tab" data-tab="${id}" aria-selected="${st.tab === id}">${name}${open ? '' : ` <span class="num" style="font-size:11px">S${(id === 'loadout' ? 4 : clinicAt[id]) + 1}</span>`}</button>`;
+    const open = opened(st, id);
+    return `<button type="button" role="tab" data-tab="${id}" aria-selected="${st.tab === id}">${name}${open ? '' : ` <span class="num" style="font-size:11px">S${clinicAt[id] + 1}</span>`}</button>`;
   }).join('');
   $('#pane').innerHTML = st.tab === 'shop' ? shopPane(nextI) : st.tab === 'treat' ? treatPane(nextI) : st.tab === 'vax' ? vaxPane(nextI) : loadoutPane();
   // log
@@ -292,8 +294,9 @@ function shopPane(i) {
     let gain = '';
     if (!max) { const t = { ...st, upgrades: { ...st.upgrades, [u.id]: r + 1 } }; gain = gainText(chance(t, i, tr) - base); }
     const lk = locked ? `Comes with ${esc(M.units[u.need])} at Stage ${ORDER.findIndex((k, j) => LV[j].units.includes(u.need)) + 1}.` : '';
+    const away = !locked && u.need && !packed(i).has(u.need) ? ` <span class="dim">(not in Stage ${i + 1}'s loadout)</span>` : '';
     out += `<div class="item" id="it-${u.id}"><div class="nm"><b>${esc(u.name)} <span class="pips">${[0, 1, 2].map(k => `<i class="${k < r ? 'on' : ''}"></i>`).join('')}</span></b>
-      <small>${lk || (r ? `Now: ${esc(u.what(r))}${max ? '' : ` Next: ${esc(u.what(r + 1))}`}` : esc(u.what(1)))}</small></div>
+      <small>${lk || (r ? `Now: ${esc(u.what(r))}${max ? '' : ` Next: ${esc(u.what(r + 1))}`}` : esc(u.what(1)))}${away}</small></div>
       <div class="buy">${max ? '<small>Maxed</small>' : `${locked ? '' : gain}<button class="btn gold" type="button" data-up="${u.id}" ${st.samples < cost || locked ? 'disabled' : ''}><span class="smp sm"><i></i>${fmt(cost)}</span></button>`}</div></div>`;
   }
   return `<div class="shop">${out}</div><p class="note">Green and red show how buying changes the win chance on the next stage at your skill. Upgrades never refund; Undo takes a buy back.</p>`;
@@ -319,7 +322,10 @@ function vaxPane(i) {
   }).join('')}</div>`;
 }
 function loadoutPane() {
-  return `<p class="note">Neutrophils and macrophages always come, plus up to ${C.SLOTS} specialists. The campaign has two (Net neutrophils from Stage 4, NK cells from Stage 7), so every stage brings everything you've unlocked and there's no choice to plan yet.</p>`;
+  if (!opened(st, 'loadout')) return `<p class="note">Loadout opens at Stage ${clinicAt.loadout + 1}. Until then each stage brings its default.</p>`;
+  const R = Math.min(reached(st), NST - 1), sp = u => u !== 'neut' && u !== 'mac';
+  return `<div class="shop">${LV.map((l, i) => i < R ? '' : `<div class="item"><div class="nm"><b>Stage ${i + 1}: ${esc(l.where)}</b><small>${(l.pack || l.units).filter(sp).map(u => esc(M.units[u] || u)).join(' + ') || 'No specialists yet'}</small></div><div class="buy">${i === R ? '<small style="color:var(--cell)">Next</small>' : ''}</div></div>`).join('')}</div>
+    <p class="note">Neutrophils and macrophages always come, plus ${C.SLOTS} specialists. The planner uses the campaign's default pick for each stage (that stage's new unit plus a counter for its germs), which is what the bots played. Other picks aren't measured yet.</p>`;
 }
 
 // ---------- forecast (Monte Carlo) ----------
@@ -400,7 +406,7 @@ function about() {
       <li>Treatments: two games per stage, treatment and skill (one with no build, one with a mid build), so a treatment's number says which way it pushes more than how far.</li>
       <li>Strongest upgrades per rank, Casual: ${best(SK[0]).slice(0, 4).map(([u, v]) => `${esc(C.UPGRADES.find(x => x.id === u).name)} (${v.toFixed(2)})`).join(', ')}.</li>
       <li>Strongest upgrades per rank, Good player: ${best(SK[SK.length - 1]).slice(0, 4).map(([u, v]) => `${esc(C.UPGRADES.find(x => x.id === u).name)} (${v.toFixed(2)})`).join(', ')}.</li>
-      <li>The casual bot never storms, so Cool head does nothing for it. Wide nets and Hardy NK cells count only once Net neutrophils and NK cells have joined.</li>
+      <li>The casual bot never storms, so Cool head does nothing for it. A unit's shop line (Wide nets, Big clouds and so on) counts only on stages whose loadout packs that unit.</li>
       <li>Limits: one bot game per build, so a single stage's odds can be off by 10 to 15 points. Where the bots won every game, the model can only say "very likely". Replays use the same odds as a first visit.</li>
     </ul>
     <div class="fc"><table><thead><tr><th>Stage</th>${SK.map(sk => `<th>${sk === 'smart' ? 'Good' : 'Casual'} won</th><th>model expects</th>`).join('')}</tr></thead><tbody>${ORDER.map(row).join('')}</tbody></table></div>

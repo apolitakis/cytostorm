@@ -8,6 +8,7 @@ const path = require('path'), fs = require('fs');
 const V3 = process.env.V3, CAMP = process.env.CAMP;
 Object.assign(global, require(path.join(V3, 'sim.js')));
 const CAMPAIGN = require(path.join(CAMP, 'campaign.js'));
+if (CAMPAIGN.setUnits) CAMPAIGN.setUnits(['neut', 'net', 'nk', 'mac', ...Object.keys(global.SPECIAL || {})]);
 const [out, ...files] = process.argv.slice(2);
 const rows = files.flatMap(f => fs.readFileSync(f, 'utf8').split('\n').filter(Boolean).map(l => JSON.parse(l)));
 const N = LEVEL_ORDER.length, UP = CAMPAIGN.UPGRADES.map(u => u.id), TR = CAMPAIGN.TREATMENTS.map(t => t.id).filter(t => t !== 'none');
@@ -52,12 +53,13 @@ function newton(X, y, lam, n) {
   }
   return w;
 }
-// An upgrade only counts where it can act: Wide nets needs Net neutrophils, Hardy NK needs NK cells (unlocked by that stage),
-// and Cool head (shorter storm afterburn) does nothing for the casual bot, which never storms
+// An upgrade only counts where it can act: a unit's line (Wide nets, Hardy NK, Big clouds...) only when that unit is in
+// the stage's loadout, and Cool head (shorter storm afterburn) does nothing for the casual bot, which never storms
 const NEED = Object.fromEntries(CAMPAIGN.UPGRADES.filter(u => u.need).map(u => [u.id, u.need]));
 const INERT = { casual: ['cool'] };
-const unlockedAt = key => { const i = LEVEL_ORDER.indexOf(key), s = new Set(); for (let j = 0; j <= i; j++) for (const u of LEVELS[LEVEL_ORDER[j]].units) s.add(u); return s; };
-const counts = (u, key, sk) => !(INERT[sk] || []).includes(u) && (!NEED[u] || unlockedAt(key).has(NEED[u]));
+const firstVisit = i => ({ ...CAMPAIGN.fresh(), cleared: Object.fromEntries(LEVEL_ORDER.slice(0, i).map(k => [k, true])) });
+const packOf = key => CAMPAIGN.unitsFor(CAMPAIGN.loadout(firstVisit(LEVEL_ORDER.indexOf(key)), LEVELS, LEVEL_ORDER, key));
+const counts = (u, r, sk) => !(INERT[sk] || []).includes(u) && (!NEED[u] || (r.units || packOf(r.level)).includes(NEED[u]));
 function fitSkill(sk) {
   const R = rows.filter(r => r.policy === sk);
   // parameters: A[map] x N, B[upgrade] x 12, V, T[map][treatment]
@@ -69,7 +71,7 @@ function fitSkill(sk) {
   const lam = Object.keys(idx).map(k => k[0] === 'A' ? 0.15 : k[0] === 'T' ? 1.0 : k === 'V' ? 0.5 : 2.0); // ridge per parameter
   const X = R.map(r => {
     const x = new Map([[idx['A.' + r.level], 1]]);
-    for (const u of UP) if (r.up[u] && counts(u, r.level, sk)) x.set(idx['B.' + u], r.up[u]);
+    for (const u of UP) if (r.up[u] && counts(u, r, sk)) x.set(idx['B.' + u], r.up[u]);
     const c = cover(r); if (c) x.set(idx.V, c);
     if (r.treat !== 'none') x.set(idx[`T.${r.level}.${r.treat}`], 1);
     return x;
@@ -121,7 +123,8 @@ function fitSkill(sk) {
 }
 const model = {
   made: new Date().toISOString(), inert: INERT, release: path.basename(V3), games: rows.length,
-  levels: LEVEL_ORDER.map((k, i) => ({ key: k, name: LEVELS[k].name, where: CAMPAIGN.PLACES[k].where, pressure: +CAMPAIGN.pressure(i, N).toFixed(3), units: LEVELS[k].units, kinds: [...CAMPAIGN.kindsIn(LEVELS[k])].filter(x => x !== 'spore' && x !== 'wormlet'), shares: SH[k] })),
+  clinic: Object.fromEntries(['shop', 'treat', 'loadout', 'vax'].map(id => [id, LEVEL_ORDER.findIndex((k, i) => CAMPAIGN.clinicOpen(firstVisit(i), LEVEL_ORDER, LEVELS).some(c => c.id === id))])),
+  levels: LEVEL_ORDER.map((k, i) => ({ key: k, name: LEVELS[k].name, where: CAMPAIGN.PLACES[k].where, pressure: +CAMPAIGN.pressure(i, N).toFixed(3), units: LEVELS[k].units, pack: packOf(k), kinds: [...CAMPAIGN.kindsIn(LEVELS[k])].filter(x => x !== 'spore' && x !== 'wormlet'), shares: SH[k] })),
   names: Object.fromEntries(Object.entries(KINDS).map(([k, v]) => [k, v.name])), units: UNIT_NAMES,
   skills: Object.fromEntries(SKILLS.filter(s => rows.some(r => r.policy === s)).map(s => [s, fitSkill(s)])),
 };
