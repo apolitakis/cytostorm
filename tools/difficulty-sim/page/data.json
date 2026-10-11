@@ -1,0 +1,4515 @@
+{
+ "made": "2026-10-10T17:34:30.577Z",
+ "release": "v35",
+ "diff": "normal",
+ "games": 750,
+ "components": [
+  {
+   "key": "mustLose",
+   "name": "Must-lose bots lose",
+   "w": 3
+  },
+  {
+   "key": "trivial",
+   "name": "No trivial wins",
+   "w": 2
+  },
+  {
+   "key": "breadth",
+   "name": "Many ways to win",
+   "w": 2
+  },
+  {
+   "key": "good",
+   "name": "Good player wins",
+   "w": 2
+  },
+  {
+   "key": "variety",
+   "name": "Variety",
+   "w": 1
+  },
+  {
+   "key": "skill",
+   "name": "Skill matters",
+   "w": 1
+  },
+  {
+   "key": "close",
+   "name": "Feels close",
+   "w": "varies"
+  }
+ ],
+ "levels": [
+  {
+   "key": "papercut",
+   "name": "Papercut",
+   "i": 0,
+   "units": [
+    "neut",
+    "mac"
+   ],
+   "score": 71,
+   "comps": [
+    {
+     "key": "mustLose",
+     "name": "Must-lose bots lose",
+     "w": 3,
+     "u": 1,
+     "lost": 0,
+     "detail": "idle, random, storm spam and chill won 0% (idle 0/2, random 0/2, stormSpam 0/2, chill 0/2)"
+    },
+    {
+     "key": "trivial",
+     "name": "No trivial wins",
+     "w": 2,
+     "u": 0,
+     "lost": 2,
+     "detail": "best set-and-forget setup won 100%: every sector, counter-heavy, all Support, stress 71%"
+    },
+    {
+     "key": "breadth",
+     "name": "Many ways to win",
+     "w": 2,
+     "u": null,
+     "lost": 0,
+     "detail": "strategy sweep not run yet"
+    },
+    {
+     "key": "good",
+     "name": "Good player wins",
+     "w": 2,
+     "u": 1,
+     "lost": 0,
+     "detail": "the good bot won 100%"
+    },
+    {
+     "key": "variety",
+     "name": "Variety",
+     "w": 1,
+     "u": null,
+     "lost": 0,
+     "detail": "strategy sweep not run yet"
+    },
+    {
+     "key": "skill",
+     "name": "Skill matters",
+     "w": 1,
+     "u": 1,
+     "lost": 0,
+     "detail": "good bot 100% vs beginner 50%"
+    },
+    {
+     "key": "close",
+     "name": "Feels close",
+     "w": 0.5,
+     "u": 0,
+     "lost": 0.5,
+     "detail": "median winner closeness 0.00 (organ bars lost / 4, or peak breach clock)"
+    }
+   ],
+   "m": {
+    "mustLose": 0,
+    "mustLoseTxt": "idle 0/2, random 0/2, stormSpam 0/2, chill 0/2",
+    "trivial": 1,
+    "trivialDesc": "every sector, counter-heavy, all Support, stress 71%",
+    "breadth": null,
+    "good": 1,
+    "casual": 0.5,
+    "beginner": 0.5,
+    "styles": 0,
+    "styleTxt": "",
+    "close": 0
+   },
+   "bots": {
+    "idle": {
+     "w": 0,
+     "n": 2
+    },
+    "random": {
+     "w": 0,
+     "n": 2
+    },
+    "stormSpam": {
+     "w": 0,
+     "n": 2
+    },
+    "chill": {
+     "w": 0,
+     "n": 2
+    },
+    "beginner": {
+     "w": 1,
+     "n": 2
+    },
+    "casual": {
+     "w": 1,
+     "n": 2
+    },
+    "coast": {
+     "w": 2,
+     "n": 2
+    },
+    "smart": {
+     "w": 2,
+     "n": 2
+    }
+   },
+   "setups": [
+    {
+     "key": "counter/support/all/0.5",
+     "desc": "every sector, counter-heavy, all Support, stress 71%",
+     "wins": 2,
+     "n": 2,
+     "score": 1.25
+    },
+    {
+     "key": "even/support/all/0.5",
+     "desc": "every sector, even split, all Support, stress 71%",
+     "wins": 2,
+     "n": 2,
+     "score": 1.25
+    },
+    {
+     "key": "even/support/front2/0.5",
+     "desc": "Wound + Tissue only, even split, all Support, stress 71%",
+     "wins": 2,
+     "n": 2,
+     "score": 1.25
+    },
+    {
+     "key": "even/frontS/front2/0.5",
+     "desc": "Wound + Tissue only, even split, front Support, back Offense, stress 71%",
+     "wins": 1,
+     "n": 1,
+     "score": 1.25
+    },
+    {
+     "key": "balanced/support/all/0.5",
+     "desc": "every sector, 60/40 neutrophils/macrophages, all Support, stress 71%",
+     "wins": 1,
+     "n": 1,
+     "score": 1.25
+    },
+    {
+     "key": "macs/support/all/0.5",
+     "desc": "every sector, 30/70 neutrophils/macrophages, all Support, stress 71%",
+     "wins": 1,
+     "n": 1,
+     "score": 1.25
+    },
+    {
+     "key": "counter/support/front2/0.5",
+     "desc": "Wound + Tissue only, counter-heavy, all Support, stress 71%",
+     "wins": 1,
+     "n": 1,
+     "score": 1.25
+    },
+    {
+     "key": "counter/frontS/all/0.5",
+     "desc": "every sector, counter-heavy, front Support, back Offense, stress 71%",
+     "wins": 1,
+     "n": 1,
+     "score": 1.25
+    }
+   ],
+   "setupsTried": 56,
+   "setupWins": 14,
+   "strategies": 0,
+   "strategyWinners": 0,
+   "habits": [
+    {
+     "key": "look",
+     "bins": [
+      {
+       "label": "0.5",
+       "n": 0,
+       "rate": 0
+      },
+      {
+       "label": "1",
+       "n": 0,
+       "rate": 0
+      },
+      {
+       "label": "1.5",
+       "n": 0,
+       "rate": 0
+      },
+      {
+       "label": "2",
+       "n": 0,
+       "rate": 0
+      },
+      {
+       "label": "3",
+       "n": 0,
+       "rate": 0
+      },
+      {
+       "label": "5",
+       "n": 0,
+       "rate": 0
+      }
+     ],
+     "spread": 0
+    },
+    {
+     "key": "macs",
+     "bins": [
+      {
+       "label": "0–18",
+       "n": 0,
+       "rate": 0
+      },
+      {
+       "label": "18–36",
+       "n": 0,
+       "rate": 0
+      },
+      {
+       "label": "36–54",
+       "n": 0,
+       "rate": 0
+      }
+     ],
+     "spread": 0
+    },
+    {
+     "key": "macShare",
+     "bins": [
+      {
+       "label": "0.2–0.4",
+       "n": 0,
+       "rate": 0
+      },
+      {
+       "label": "0.4–0.6",
+       "n": 0,
+       "rate": 0
+      },
+      {
+       "label": "0.6–0.8",
+       "n": 0,
+       "rate": 0
+      }
+     ],
+     "spread": 0
+    },
+    {
+     "key": "style",
+     "bins": [
+      {
+       "label": "react",
+       "n": 0,
+       "rate": 0
+      },
+      {
+       "label": "support",
+       "n": 0,
+       "rate": 0
+      },
+      {
+       "label": "offense",
+       "n": 0,
+       "rate": 0
+      }
+     ],
+     "spread": 0
+    },
+    {
+     "key": "counters",
+     "bins": [
+      {
+       "label": "yes",
+       "n": 0,
+       "rate": 0
+      },
+      {
+       "label": "no",
+       "n": 0,
+       "rate": 0
+      }
+     ],
+     "spread": 0
+    },
+    {
+     "key": "crowd",
+     "bins": [
+      {
+       "label": "30–140",
+       "n": 0,
+       "rate": 0
+      },
+      {
+       "label": "140–250",
+       "n": 0,
+       "rate": 0
+      },
+      {
+       "label": "250–360",
+       "n": 0,
+       "rate": 0
+      }
+     ],
+     "spread": 0
+    },
+    {
+     "key": "base",
+     "bins": [
+      {
+       "label": "0–0.33",
+       "n": 0,
+       "rate": 0
+      },
+      {
+       "label": "0.33–0.67",
+       "n": 0,
+       "rate": 0
+      },
+      {
+       "label": "0.67–1",
+       "n": 0,
+       "rate": 0
+      }
+     ],
+     "spread": 0
+    },
+    {
+     "key": "push",
+     "bins": [
+      {
+       "label": "0–0.33",
+       "n": 0,
+       "rate": 0
+      },
+      {
+       "label": "0.33–0.67",
+       "n": 0,
+       "rate": 0
+      },
+      {
+       "label": "0.67–1",
+       "n": 0,
+       "rate": 0
+      }
+     ],
+     "spread": 0
+    },
+    {
+     "key": "restAt",
+     "bins": [
+      {
+       "label": "20–47",
+       "n": 0,
+       "rate": 0
+      },
+      {
+       "label": "47–73",
+       "n": 0,
+       "rate": 0
+      },
+      {
+       "label": "73–100",
+       "n": 0,
+       "rate": 0
+      }
+     ],
+     "spread": 0
+    },
+    {
+     "key": "storm",
+     "bins": [
+      {
+       "label": "yes",
+       "n": 0,
+       "rate": 0
+      },
+      {
+       "label": "no",
+       "n": 0,
+       "rate": 0
+      }
+     ],
+     "spread": 0
+    },
+    {
+     "key": "sectors",
+     "bins": [
+      {
+       "label": "all",
+       "n": 0,
+       "rate": 0
+      },
+      {
+       "label": "shift",
+       "n": 0,
+       "rate": 0
+      },
+      {
+       "label": "noLymph",
+       "n": 0,
+       "rate": 0
+      },
+      {
+       "label": "front2",
+       "n": 0,
+       "rate": 0
+      }
+     ],
+     "spread": 0
+    }
+   ],
+   "pressures": [
+    {
+     "p": 1,
+     "idle": {
+      "w": 0,
+      "n": 4
+     },
+     "casual": {
+      "w": 1,
+      "n": 2
+     },
+     "smart": {
+      "w": 2,
+      "n": 2
+     },
+     "static": {
+      "w": 17,
+      "n": 59
+     },
+     "reactive": {
+      "w": 0,
+      "n": 0
+     }
+    }
+   ],
+   "games": 75
+  },
+  {
+   "key": "hospital",
+   "name": "Hospital visit",
+   "i": 1,
+   "units": [
+    "neut",
+    "mac"
+   ],
+   "score": 71,
+   "comps": [
+    {
+     "key": "mustLose",
+     "name": "Must-lose bots lose",
+     "w": 3,
+     "u": 1,
+     "lost": 0,
+     "detail": "idle, random, storm spam and chill won 0% (idle 0/2, random 0/2, stormSpam 0/2, chill 0/2)"
+    },
+    {
+     "key": "trivial",
+     "name": "No trivial wins",
+     "w": 2,
+     "u": 0,
+     "lost": 2,
+     "detail": "best set-and-forget setup won 100%: Wound + Tissue only, counter-heavy, front Support, back Offense, stress 71%"
+    },
+    {
+     "key": "breadth",
+     "name": "Many ways to win",
+     "w": 2,
+     "u": null,
+     "lost": 0,
+     "detail": "strategy sweep not run yet"
+    },
+    {
+     "key": "good",
+     "name": "Good player wins",
+     "w": 2,
+     "u": 1,
+     "lost": 0,
+     "detail": "the good bot won 100%"
+    },
+    {
+     "key": "variety",
+     "name": "Variety",
+     "w": 1,
+     "u": null,
+     "lost": 0,
+     "detail": "strategy sweep not run yet"
+    },
+    {
+     "key": "skill",
+     "name": "Skill matters",
+     "w": 1,
+     "u": 1,
+     "lost": 0,
+     "detail": "good bot 100% vs beginner 50%"
+    },
+    {
+     "key": "close",
+     "name": "Feels close",
+     "w": 0.5,
+     "u": 0,
+     "lost": 0.5,
+     "detail": "median winner closeness 0.00 (organ bars lost / 4, or peak breach clock)"
+    }
+   ],
+   "m": {
+    "mustLose": 0,
+    "mustLoseTxt": "idle 0/2, random 0/2, stormSpam 0/2, chill 0/2",
+    "trivial": 1,
+    "trivialDesc": "Wound + Tissue only, counter-heavy, front Support, back Offense, stress 71%",
+    "breadth": null,
+    "good": 1,
+    "casual": 1,
+    "beginner": 0.5,
+    "styles": 0,
+    "styleTxt": "",
+    "close": 0
+   },
+   "bots": {
+    "idle": {
+     "w": 0,
+     "n": 2
+    },
+    "random": {
+     "w": 0,
+     "n": 2
+    },
+    "stormSpam": {
+     "w": 0,
+     "n": 2
+    },
+    "chill": {
+     "w": 0,
+     "n": 2
+    },
+    "beginner": {
+     "w": 1,
+     "n": 2
+    },
+    "casual": {
+     "w": 2,
+     "n": 2
+    },
+    "coast": {
+     "w": 2,
+     "n": 2
+    },
+    "smart": {
+     "w": 2,
+     "n": 2
+    }
+   },
+   "setups": [
+    {
+     "key": "counter/frontS/front2/0.5",
+     "desc": "Wound + Tissue only, counter-heavy, front Support, back Offense, stress 71%",
+     "wins": 2,
+     "n": 2,
+     "score": 1.25
+    },
+    {
+     "key": "balanced/frontS/noLymph/0.5",
+     "desc": "Lymph node off, 60/40 neutrophils/macrophages, front Support, back Offense, stress 71%",
+     "wins": 2,
+     "n": 2,
+     "score": 1.25
+    },
+    {
+     "key": "even/frontS/noLymph/0.5",
+     "desc": "Lymph node off, even split, front Support, back Offense, stress 71%",
+     "wins": 2,
+     "n": 2,
+     "score": 1.25
+    },
+    {
+     "key": "balanced/support/wound/0.5",
+     "desc": "Wound only, 60/40 neutrophils/macrophages, all Support, stress 71%",
+     "wins": 1,
+     "n": 1,
+     "score": 1.25
+    },
+    {
+     "key": "even/frontS/wound/0.5",
+     "desc": "Wound only, even split, front Support, back Offense, stress 71%",
+     "wins": 1,
+     "n": 1,
+     "score": 1.25
+    },
+    {
+     "key": "macs/support/middle/0.5",
+     "desc": "Tissue + Deep tissue only, 30/70 neutrophils/macrophages, all Support, stress 71%",
+     "wins": 1,
+     "n": 1,
+     "score": 1.25
+    },
+    {
+     "key": "balanced/frontS/front2/0.5",
+     "desc": "Wound + Tissue only, 60/40 neutrophils/macrophages, front Support, back Offense, stress 71%",
+     "wins": 1,
+     "n": 1,
+     "score": 1.25
+    },
+    {
+     "key": "macs/frontS/front2/0.5",
+     "desc": "Wound + Tissue only, 30/70 neutrophils/macrophages, front Support, back Offense, stress 71%",
+     "wins": 1,
+     "n": 1,
+     "score": 1.25
+    }
+   ],
+   "setupsTried": 56,
+   "setupWins": 15,
+   "strategies": 0,
+   "strategyWinners": 0,
+   "habits": [
+    {
+     "key": "look",
+     "bins": [
+      {
+       "label": "0.5",
+       "n": 0,
+       "rate": 0
+      },
+      {
+       "label": "1",
+       "n": 0,
+       "rate": 0
+      },
+      {
+       "label": "1.5",
+       "n": 0,
+       "rate": 0
+      },
+      {
+       "label": "2",
+       "n": 0,
+       "rate": 0
+      },
+      {
+       "label": "3",
+       "n": 0,
+       "rate": 0
+      },
+      {
+       "label": "5",
+       "n": 0,
+       "rate": 0
+      }
+     ],
+     "spread": 0
+    },
+    {
+     "key": "macs",
+     "bins": [
+      {
+       "label": "0–18",
+       "n": 0,
+       "rate": 0
+      },
+      {
+       "label": "18–36",
+       "n": 0,
+       "rate": 0
+      },
+      {
+       "label": "36–54",
+       "n": 0,
+       "rate": 0
+      }
+     ],
+     "spread": 0
+    },
+    {
+     "key": "macShare",
+     "bins": [
+      {
+       "label": "0.2–0.4",
+       "n": 0,
+       "rate": 0
+      },
+      {
+       "label": "0.4–0.6",
+       "n": 0,
+       "rate": 0
+      },
+      {
+       "label": "0.6–0.8",
+       "n": 0,
+       "rate": 0
+      }
+     ],
+     "spread": 0
+    },
+    {
+     "key": "style",
+     "bins": [
+      {
+       "label": "react",
+       "n": 0,
+       "rate": 0
+      },
+      {
+       "label": "support",
+       "n": 0,
+       "rate": 0
+      },
+      {
+       "label": "offense",
+       "n": 0,
+       "rate": 0
+      }
+     ],
+     "spread": 0
+    },
+    {
+     "key": "counters",
+     "bins": [
+      {
+       "label": "yes",
+       "n": 0,
+       "rate": 0
+      },
+      {
+       "label": "no",
+       "n": 0,
+       "rate": 0
+      }
+     ],
+     "spread": 0
+    },
+    {
+     "key": "crowd",
+     "bins": [
+      {
+       "label": "30–140",
+       "n": 0,
+       "rate": 0
+      },
+      {
+       "label": "140–250",
+       "n": 0,
+       "rate": 0
+      },
+      {
+       "label": "250–360",
+       "n": 0,
+       "rate": 0
+      }
+     ],
+     "spread": 0
+    },
+    {
+     "key": "base",
+     "bins": [
+      {
+       "label": "0–0.33",
+       "n": 0,
+       "rate": 0
+      },
+      {
+       "label": "0.33–0.67",
+       "n": 0,
+       "rate": 0
+      },
+      {
+       "label": "0.67–1",
+       "n": 0,
+       "rate": 0
+      }
+     ],
+     "spread": 0
+    },
+    {
+     "key": "push",
+     "bins": [
+      {
+       "label": "0–0.33",
+       "n": 0,
+       "rate": 0
+      },
+      {
+       "label": "0.33–0.67",
+       "n": 0,
+       "rate": 0
+      },
+      {
+       "label": "0.67–1",
+       "n": 0,
+       "rate": 0
+      }
+     ],
+     "spread": 0
+    },
+    {
+     "key": "restAt",
+     "bins": [
+      {
+       "label": "20–47",
+       "n": 0,
+       "rate": 0
+      },
+      {
+       "label": "47–73",
+       "n": 0,
+       "rate": 0
+      },
+      {
+       "label": "73–100",
+       "n": 0,
+       "rate": 0
+      }
+     ],
+     "spread": 0
+    },
+    {
+     "key": "storm",
+     "bins": [
+      {
+       "label": "yes",
+       "n": 0,
+       "rate": 0
+      },
+      {
+       "label": "no",
+       "n": 0,
+       "rate": 0
+      }
+     ],
+     "spread": 0
+    },
+    {
+     "key": "sectors",
+     "bins": [
+      {
+       "label": "all",
+       "n": 0,
+       "rate": 0
+      },
+      {
+       "label": "shift",
+       "n": 0,
+       "rate": 0
+      },
+      {
+       "label": "noLymph",
+       "n": 0,
+       "rate": 0
+      },
+      {
+       "label": "front2",
+       "n": 0,
+       "rate": 0
+      }
+     ],
+     "spread": 0
+    }
+   ],
+   "pressures": [
+    {
+     "p": 1,
+     "idle": {
+      "w": 0,
+      "n": 4
+     },
+     "casual": {
+      "w": 2,
+      "n": 2
+     },
+     "smart": {
+      "w": 2,
+      "n": 2
+     },
+     "static": {
+      "w": 18,
+      "n": 59
+     },
+     "reactive": {
+      "w": 0,
+      "n": 0
+     }
+    }
+   ],
+   "games": 75
+  },
+  {
+   "key": "pool",
+   "name": "Pool water",
+   "i": 2,
+   "units": [
+    "neut",
+    "mac"
+   ],
+   "score": 71,
+   "comps": [
+    {
+     "key": "mustLose",
+     "name": "Must-lose bots lose",
+     "w": 3,
+     "u": 1,
+     "lost": 0,
+     "detail": "idle, random, storm spam and chill won 0% (idle 0/2, random 0/2, stormSpam 0/2, chill 0/2)"
+    },
+    {
+     "key": "trivial",
+     "name": "No trivial wins",
+     "w": 2,
+     "u": 0,
+     "lost": 2,
+     "detail": "best set-and-forget setup won 100%: every sector, even split, all Support, stress 71%"
+    },
+    {
+     "key": "breadth",
+     "name": "Many ways to win",
+     "w": 2,
+     "u": null,
+     "lost": 0,
+     "detail": "strategy sweep not run yet"
+    },
+    {
+     "key": "good",
+     "name": "Good player wins",
+     "w": 2,
+     "u": 1,
+     "lost": 0,
+     "detail": "the good bot won 100%"
+    },
+    {
+     "key": "variety",
+     "name": "Variety",
+     "w": 1,
+     "u": null,
+     "lost": 0,
+     "detail": "strategy sweep not run yet"
+    },
+    {
+     "key": "skill",
+     "name": "Skill matters",
+     "w": 1,
+     "u": 1,
+     "lost": 0,
+     "detail": "good bot 100% vs beginner 0%"
+    },
+    {
+     "key": "close",
+     "name": "Feels close",
+     "w": 0.5,
+     "u": 0,
+     "lost": 0.5,
+     "detail": "median winner closeness 0.00 (organ bars lost / 4, or peak breach clock)"
+    }
+   ],
+   "m": {
+    "mustLose": 0,
+    "mustLoseTxt": "idle 0/2, random 0/2, stormSpam 0/2, chill 0/2",
+    "trivial": 1,
+    "trivialDesc": "every sector, even split, all Support, stress 71%",
+    "breadth": null,
+    "good": 1,
+    "casual": 0,
+    "beginner": 0,
+    "styles": 0,
+    "styleTxt": "",
+    "close": 0
+   },
+   "bots": {
+    "idle": {
+     "w": 0,
+     "n": 2
+    },
+    "random": {
+     "w": 0,
+     "n": 2
+    },
+    "stormSpam": {
+     "w": 0,
+     "n": 2
+    },
+    "chill": {
+     "w": 0,
+     "n": 2
+    },
+    "beginner": {
+     "w": 0,
+     "n": 2
+    },
+    "casual": {
+     "w": 0,
+     "n": 2
+    },
+    "coast": {
+     "w": 2,
+     "n": 2
+    },
+    "smart": {
+     "w": 2,
+     "n": 2
+    }
+   },
+   "setups": [
+    {
+     "key": "even/support/all/0.5",
+     "desc": "every sector, even split, all Support, stress 71%",
+     "wins": 2,
+     "n": 2,
+     "score": 1.25
+    },
+    {
+     "key": "counter/frontS/front2/0.5",
+     "desc": "Wound + Tissue only, counter-heavy, front Support, back Offense, stress 71%",
+     "wins": 2,
+     "n": 2,
+     "score": 1.25
+    },
+    {
+     "key": "even/frontS/noLymph/0.5",
+     "desc": "Lymph node off, even split, front Support, back Offense, stress 71%",
+     "wins": 2,
+     "n": 2,
+     "score": 1.25
+    },
+    {
+     "key": "macs/frontS/noLymph/0.5",
+     "desc": "Lymph node off, 30/70 neutrophils/macrophages, front Support, back Offense, stress 71%",
+     "wins": 1,
+     "n": 1,
+     "score": 1.25
+    },
+    {
+     "key": "balanced/frontS/wound/0.5",
+     "desc": "Wound only, 60/40 neutrophils/macrophages, front Support, back Offense, stress 71%",
+     "wins": 1,
+     "n": 1,
+     "score": 1.25
+    },
+    {
+     "key": "macs/support/all/0.5",
+     "desc": "every sector, 30/70 neutrophils/macrophages, all Support, stress 71%",
+     "wins": 1,
+     "n": 1,
+     "score": 1.25
+    },
+    {
+     "key": "balanced/support/all/0.5",
+     "desc": "every sector, 60/40 neutrophils/macrophages, all Support, stress 71%",
+     "wins": 1,
+     "n": 1,
+     "score": 1.25
+    },
+    {
+     "key": "counter/support/all/0.5",
+     "desc": "every sector, counter-heavy, all Support, stress 71%",
+     "wins": 1,
+     "n": 1,
+     "score": 1.25
+    }
+   ],
+   "setupsTried": 56,
+   "setupWins": 14,
+   "strategies": 0,
+   "strategyWinners": 0,
+   "habits": [
+    {
+     "key": "look",
+     "bins": [
+      {
+       "label": "0.5",
+       "n": 0,
+       "rate": 0
+      },
+      {
+       "label": "1",
+       "n": 0,
+       "rate": 0
+      },
+      {
+       "label": "1.5",
+       "n": 0,
+       "rate": 0
+      },
+      {
+       "label": "2",
+       "n": 0,
+       "rate": 0
+      },
+      {
+       "label": "3",
+       "n": 0,
+       "rate": 0
+      },
+      {
+       "label": "5",
+       "n": 0,
+       "rate": 0
+      }
+     ],
+     "spread": 0
+    },
+    {
+     "key": "macs",
+     "bins": [
+      {
+       "label": "0–18",
+       "n": 0,
+       "rate": 0
+      },
+      {
+       "label": "18–36",
+       "n": 0,
+       "rate": 0
+      },
+      {
+       "label": "36–54",
+       "n": 0,
+       "rate": 0
+      }
+     ],
+     "spread": 0
+    },
+    {
+     "key": "macShare",
+     "bins": [
+      {
+       "label": "0.2–0.4",
+       "n": 0,
+       "rate": 0
+      },
+      {
+       "label": "0.4–0.6",
+       "n": 0,
+       "rate": 0
+      },
+      {
+       "label": "0.6–0.8",
+       "n": 0,
+       "rate": 0
+      }
+     ],
+     "spread": 0
+    },
+    {
+     "key": "style",
+     "bins": [
+      {
+       "label": "react",
+       "n": 0,
+       "rate": 0
+      },
+      {
+       "label": "support",
+       "n": 0,
+       "rate": 0
+      },
+      {
+       "label": "offense",
+       "n": 0,
+       "rate": 0
+      }
+     ],
+     "spread": 0
+    },
+    {
+     "key": "counters",
+     "bins": [
+      {
+       "label": "yes",
+       "n": 0,
+       "rate": 0
+      },
+      {
+       "label": "no",
+       "n": 0,
+       "rate": 0
+      }
+     ],
+     "spread": 0
+    },
+    {
+     "key": "crowd",
+     "bins": [
+      {
+       "label": "30–140",
+       "n": 0,
+       "rate": 0
+      },
+      {
+       "label": "140–250",
+       "n": 0,
+       "rate": 0
+      },
+      {
+       "label": "250–360",
+       "n": 0,
+       "rate": 0
+      }
+     ],
+     "spread": 0
+    },
+    {
+     "key": "base",
+     "bins": [
+      {
+       "label": "0–0.33",
+       "n": 0,
+       "rate": 0
+      },
+      {
+       "label": "0.33–0.67",
+       "n": 0,
+       "rate": 0
+      },
+      {
+       "label": "0.67–1",
+       "n": 0,
+       "rate": 0
+      }
+     ],
+     "spread": 0
+    },
+    {
+     "key": "push",
+     "bins": [
+      {
+       "label": "0–0.33",
+       "n": 0,
+       "rate": 0
+      },
+      {
+       "label": "0.33–0.67",
+       "n": 0,
+       "rate": 0
+      },
+      {
+       "label": "0.67–1",
+       "n": 0,
+       "rate": 0
+      }
+     ],
+     "spread": 0
+    },
+    {
+     "key": "restAt",
+     "bins": [
+      {
+       "label": "20–47",
+       "n": 0,
+       "rate": 0
+      },
+      {
+       "label": "47–73",
+       "n": 0,
+       "rate": 0
+      },
+      {
+       "label": "73–100",
+       "n": 0,
+       "rate": 0
+      }
+     ],
+     "spread": 0
+    },
+    {
+     "key": "storm",
+     "bins": [
+      {
+       "label": "yes",
+       "n": 0,
+       "rate": 0
+      },
+      {
+       "label": "no",
+       "n": 0,
+       "rate": 0
+      }
+     ],
+     "spread": 0
+    },
+    {
+     "key": "sectors",
+     "bins": [
+      {
+       "label": "all",
+       "n": 0,
+       "rate": 0
+      },
+      {
+       "label": "shift",
+       "n": 0,
+       "rate": 0
+      },
+      {
+       "label": "noLymph",
+       "n": 0,
+       "rate": 0
+      },
+      {
+       "label": "front2",
+       "n": 0,
+       "rate": 0
+      }
+     ],
+     "spread": 0
+    }
+   ],
+   "pressures": [
+    {
+     "p": 1,
+     "idle": {
+      "w": 0,
+      "n": 4
+     },
+     "casual": {
+      "w": 0,
+      "n": 2
+     },
+     "smart": {
+      "w": 2,
+      "n": 2
+     },
+     "static": {
+      "w": 17,
+      "n": 59
+     },
+     "reactive": {
+      "w": 0,
+      "n": 0
+     }
+    }
+   ],
+   "games": 75
+  },
+  {
+   "key": "flu",
+   "name": "Flu season",
+   "i": 3,
+   "units": [
+    "neut",
+    "net",
+    "mac"
+   ],
+   "score": 78,
+   "comps": [
+    {
+     "key": "mustLose",
+     "name": "Must-lose bots lose",
+     "w": 3,
+     "u": 1,
+     "lost": 0,
+     "detail": "idle, random, storm spam and chill won 0% (idle 0/2, random 0/2, stormSpam 0/2, chill 0/2)"
+    },
+    {
+     "key": "trivial",
+     "name": "No trivial wins",
+     "w": 2,
+     "u": 0,
+     "lost": 2,
+     "detail": "best set-and-forget setup won 100%: every sector, 60/40 neutrophils/macrophages, front Support, back Offense, stress 71%"
+    },
+    {
+     "key": "breadth",
+     "name": "Many ways to win",
+     "w": 2,
+     "u": null,
+     "lost": 0,
+     "detail": "strategy sweep not run yet"
+    },
+    {
+     "key": "good",
+     "name": "Good player wins",
+     "w": 2,
+     "u": 1,
+     "lost": 0,
+     "detail": "the good bot won 100%"
+    },
+    {
+     "key": "variety",
+     "name": "Variety",
+     "w": 1,
+     "u": null,
+     "lost": 0,
+     "detail": "strategy sweep not run yet"
+    },
+    {
+     "key": "skill",
+     "name": "Skill matters",
+     "w": 1,
+     "u": 1,
+     "lost": 0,
+     "detail": "good bot 100% vs beginner 0%"
+    },
+    {
+     "key": "close",
+     "name": "Feels close",
+     "w": 1,
+     "u": 1,
+     "lost": 0,
+     "detail": "median winner closeness 1.00 (organ bars lost / 4, or peak breach clock)"
+    }
+   ],
+   "m": {
+    "mustLose": 0,
+    "mustLoseTxt": "idle 0/2, random 0/2, stormSpam 0/2, chill 0/2",
+    "trivial": 1,
+    "trivialDesc": "every sector, 60/40 neutrophils/macrophages, front Support, back Offense, stress 71%",
+    "breadth": null,
+    "good": 1,
+    "casual": 0.5,
+    "beginner": 0,
+    "styles": 0,
+    "styleTxt": "",
+    "close": 0.999
+   },
+   "bots": {
+    "idle": {
+     "w": 0,
+     "n": 2
+    },
+    "random": {
+     "w": 0,
+     "n": 2
+    },
+    "stormSpam": {
+     "w": 0,
+     "n": 2
+    },
+    "chill": {
+     "w": 0,
+     "n": 2
+    },
+    "beginner": {
+     "w": 0,
+     "n": 2
+    },
+    "casual": {
+     "w": 1,
+     "n": 2
+    },
+    "coast": {
+     "w": 2,
+     "n": 2
+    },
+    "smart": {
+     "w": 2,
+     "n": 2
+    }
+   },
+   "setups": [
+    {
+     "key": "balanced/frontS/all/0.5",
+     "desc": "every sector, 60/40 neutrophils/macrophages, front Support, back Offense, stress 71%",
+     "wins": 1,
+     "n": 1,
+     "score": 1.198
+    },
+    {
+     "key": "gunners/support/all/0.5",
+     "desc": "every sector, gunners only, all Support, stress 71%",
+     "wins": 0,
+     "n": 1,
+     "score": 0.855
+    },
+    {
+     "key": "gunners/frontS/all/0.85",
+     "desc": "every sector, gunners only, front Support, back Offense, stress 146%",
+     "wins": 0,
+     "n": 1,
+     "score": 0.855
+    },
+    {
+     "key": "gunners/frontS/all/0.5",
+     "desc": "every sector, gunners only, front Support, back Offense, stress 71%",
+     "wins": 0,
+     "n": 2,
+     "score": 0.737
+    },
+    {
+     "key": "counter/support/all/0.5",
+     "desc": "every sector, counter-heavy, all Support, stress 71%",
+     "wins": 0,
+     "n": 2,
+     "score": 0.662
+    },
+    {
+     "key": "gunners/offense/all/0.5",
+     "desc": "every sector, gunners only, all Offense, stress 71%",
+     "wins": 0,
+     "n": 2,
+     "score": 0.628
+    },
+    {
+     "key": "gunners/frontO/all/0.5",
+     "desc": "every sector, gunners only, front Offense, back Support, stress 71%",
+     "wins": 0,
+     "n": 1,
+     "score": 0.618
+    },
+    {
+     "key": "counter/frontS/all/0.5",
+     "desc": "every sector, counter-heavy, front Support, back Offense, stress 71%",
+     "wins": 0,
+     "n": 1,
+     "score": 0.465
+    }
+   ],
+   "setupsTried": 56,
+   "setupWins": 1,
+   "strategies": 0,
+   "strategyWinners": 0,
+   "habits": [
+    {
+     "key": "look",
+     "bins": [
+      {
+       "label": "0.5",
+       "n": 0,
+       "rate": 0
+      },
+      {
+       "label": "1",
+       "n": 0,
+       "rate": 0
+      },
+      {
+       "label": "1.5",
+       "n": 0,
+       "rate": 0
+      },
+      {
+       "label": "2",
+       "n": 0,
+       "rate": 0
+      },
+      {
+       "label": "3",
+       "n": 0,
+       "rate": 0
+      },
+      {
+       "label": "5",
+       "n": 0,
+       "rate": 0
+      }
+     ],
+     "spread": 0
+    },
+    {
+     "key": "macs",
+     "bins": [
+      {
+       "label": "0–18",
+       "n": 0,
+       "rate": 0
+      },
+      {
+       "label": "18–36",
+       "n": 0,
+       "rate": 0
+      },
+      {
+       "label": "36–54",
+       "n": 0,
+       "rate": 0
+      }
+     ],
+     "spread": 0
+    },
+    {
+     "key": "macShare",
+     "bins": [
+      {
+       "label": "0.2–0.4",
+       "n": 0,
+       "rate": 0
+      },
+      {
+       "label": "0.4–0.6",
+       "n": 0,
+       "rate": 0
+      },
+      {
+       "label": "0.6–0.8",
+       "n": 0,
+       "rate": 0
+      }
+     ],
+     "spread": 0
+    },
+    {
+     "key": "style",
+     "bins": [
+      {
+       "label": "react",
+       "n": 0,
+       "rate": 0
+      },
+      {
+       "label": "support",
+       "n": 0,
+       "rate": 0
+      },
+      {
+       "label": "offense",
+       "n": 0,
+       "rate": 0
+      }
+     ],
+     "spread": 0
+    },
+    {
+     "key": "counters",
+     "bins": [
+      {
+       "label": "yes",
+       "n": 0,
+       "rate": 0
+      },
+      {
+       "label": "no",
+       "n": 0,
+       "rate": 0
+      }
+     ],
+     "spread": 0
+    },
+    {
+     "key": "crowd",
+     "bins": [
+      {
+       "label": "30–140",
+       "n": 0,
+       "rate": 0
+      },
+      {
+       "label": "140–250",
+       "n": 0,
+       "rate": 0
+      },
+      {
+       "label": "250–360",
+       "n": 0,
+       "rate": 0
+      }
+     ],
+     "spread": 0
+    },
+    {
+     "key": "base",
+     "bins": [
+      {
+       "label": "0–0.33",
+       "n": 0,
+       "rate": 0
+      },
+      {
+       "label": "0.33–0.67",
+       "n": 0,
+       "rate": 0
+      },
+      {
+       "label": "0.67–1",
+       "n": 0,
+       "rate": 0
+      }
+     ],
+     "spread": 0
+    },
+    {
+     "key": "push",
+     "bins": [
+      {
+       "label": "0–0.33",
+       "n": 0,
+       "rate": 0
+      },
+      {
+       "label": "0.33–0.67",
+       "n": 0,
+       "rate": 0
+      },
+      {
+       "label": "0.67–1",
+       "n": 0,
+       "rate": 0
+      }
+     ],
+     "spread": 0
+    },
+    {
+     "key": "restAt",
+     "bins": [
+      {
+       "label": "20–47",
+       "n": 0,
+       "rate": 0
+      },
+      {
+       "label": "47–73",
+       "n": 0,
+       "rate": 0
+      },
+      {
+       "label": "73–100",
+       "n": 0,
+       "rate": 0
+      }
+     ],
+     "spread": 0
+    },
+    {
+     "key": "storm",
+     "bins": [
+      {
+       "label": "yes",
+       "n": 0,
+       "rate": 0
+      },
+      {
+       "label": "no",
+       "n": 0,
+       "rate": 0
+      }
+     ],
+     "spread": 0
+    },
+    {
+     "key": "sectors",
+     "bins": [
+      {
+       "label": "all",
+       "n": 0,
+       "rate": 0
+      },
+      {
+       "label": "shift",
+       "n": 0,
+       "rate": 0
+      },
+      {
+       "label": "noLymph",
+       "n": 0,
+       "rate": 0
+      },
+      {
+       "label": "front2",
+       "n": 0,
+       "rate": 0
+      }
+     ],
+     "spread": 0
+    }
+   ],
+   "pressures": [
+    {
+     "p": 1,
+     "idle": {
+      "w": 0,
+      "n": 4
+     },
+     "casual": {
+      "w": 1,
+      "n": 2
+     },
+     "smart": {
+      "w": 2,
+      "n": 2
+     },
+     "static": {
+      "w": 1,
+      "n": 59
+     },
+     "reactive": {
+      "w": 0,
+      "n": 0
+     }
+    }
+   ],
+   "games": 75
+  },
+  {
+   "key": "soil",
+   "name": "Soil cut",
+   "i": 4,
+   "units": [
+    "neut",
+    "net",
+    "mac"
+   ],
+   "score": 67,
+   "comps": [
+    {
+     "key": "mustLose",
+     "name": "Must-lose bots lose",
+     "w": 3,
+     "u": 1,
+     "lost": 0,
+     "detail": "idle, random, storm spam and chill won 0% (idle 0/2, random 0/2, stormSpam 0/2, chill 0/2)"
+    },
+    {
+     "key": "trivial",
+     "name": "No trivial wins",
+     "w": 2,
+     "u": 0,
+     "lost": 2,
+     "detail": "best set-and-forget setup won 100%: Wound + Tissue only, 60/40 neutrophils/macrophages, all Support, stress 71%"
+    },
+    {
+     "key": "breadth",
+     "name": "Many ways to win",
+     "w": 2,
+     "u": null,
+     "lost": 0,
+     "detail": "strategy sweep not run yet"
+    },
+    {
+     "key": "good",
+     "name": "Good player wins",
+     "w": 2,
+     "u": 1,
+     "lost": 0,
+     "detail": "the good bot won 100%"
+    },
+    {
+     "key": "variety",
+     "name": "Variety",
+     "w": 1,
+     "u": null,
+     "lost": 0,
+     "detail": "strategy sweep not run yet"
+    },
+    {
+     "key": "skill",
+     "name": "Skill matters",
+     "w": 1,
+     "u": 1,
+     "lost": 0,
+     "detail": "good bot 100% vs beginner 0%"
+    },
+    {
+     "key": "close",
+     "name": "Feels close",
+     "w": 1,
+     "u": 0,
+     "lost": 1,
+     "detail": "median winner closeness 0.00 (organ bars lost / 4, or peak breach clock)"
+    }
+   ],
+   "m": {
+    "mustLose": 0,
+    "mustLoseTxt": "idle 0/2, random 0/2, stormSpam 0/2, chill 0/2",
+    "trivial": 1,
+    "trivialDesc": "Wound + Tissue only, 60/40 neutrophils/macrophages, all Support, stress 71%",
+    "breadth": null,
+    "good": 1,
+    "casual": 0,
+    "beginner": 0,
+    "styles": 0,
+    "styleTxt": "",
+    "close": 0
+   },
+   "bots": {
+    "idle": {
+     "w": 0,
+     "n": 2
+    },
+    "random": {
+     "w": 0,
+     "n": 2
+    },
+    "stormSpam": {
+     "w": 0,
+     "n": 2
+    },
+    "chill": {
+     "w": 0,
+     "n": 2
+    },
+    "beginner": {
+     "w": 0,
+     "n": 2
+    },
+    "casual": {
+     "w": 0,
+     "n": 2
+    },
+    "coast": {
+     "w": 2,
+     "n": 2
+    },
+    "smart": {
+     "w": 2,
+     "n": 2
+    }
+   },
+   "setups": [
+    {
+     "key": "balanced/support/front2/0.5",
+     "desc": "Wound + Tissue only, 60/40 neutrophils/macrophages, all Support, stress 71%",
+     "wins": 2,
+     "n": 2,
+     "score": 1.25
+    },
+    {
+     "key": "balanced/frontS/front2/0.5",
+     "desc": "Wound + Tissue only, 60/40 neutrophils/macrophages, front Support, back Offense, stress 71%",
+     "wins": 1,
+     "n": 1,
+     "score": 1.25
+    },
+    {
+     "key": "balanced/support/all/0.5",
+     "desc": "every sector, 60/40 neutrophils/macrophages, all Support, stress 71%",
+     "wins": 1,
+     "n": 1,
+     "score": 1.25
+    },
+    {
+     "key": "balanced/support/noLymph/0.5",
+     "desc": "Lymph node off, 60/40 neutrophils/macrophages, all Support, stress 71%",
+     "wins": 1,
+     "n": 1,
+     "score": 1.25
+    },
+    {
+     "key": "macs/support/all/0.5",
+     "desc": "every sector, 30/70 neutrophils/macrophages, all Support, stress 71%",
+     "wins": 1,
+     "n": 1,
+     "score": 1.25
+    },
+    {
+     "key": "counter/support/noLymph/0.5",
+     "desc": "Lymph node off, counter-heavy, all Support, stress 71%",
+     "wins": 1,
+     "n": 1,
+     "score": 1.25
+    },
+    {
+     "key": "balanced/support/front2/0.85",
+     "desc": "Wound + Tissue only, 60/40 neutrophils/macrophages, all Support, stress 146%",
+     "wins": 1,
+     "n": 1,
+     "score": 1.167
+    },
+    {
+     "key": "gunners/support/front2/0.5",
+     "desc": "Wound + Tissue only, gunners only, all Support, stress 71%",
+     "wins": 0,
+     "n": 2,
+     "score": 0.855
+    }
+   ],
+   "setupsTried": 56,
+   "setupWins": 7,
+   "strategies": 0,
+   "strategyWinners": 0,
+   "habits": [
+    {
+     "key": "look",
+     "bins": [
+      {
+       "label": "0.5",
+       "n": 0,
+       "rate": 0
+      },
+      {
+       "label": "1",
+       "n": 0,
+       "rate": 0
+      },
+      {
+       "label": "1.5",
+       "n": 0,
+       "rate": 0
+      },
+      {
+       "label": "2",
+       "n": 0,
+       "rate": 0
+      },
+      {
+       "label": "3",
+       "n": 0,
+       "rate": 0
+      },
+      {
+       "label": "5",
+       "n": 0,
+       "rate": 0
+      }
+     ],
+     "spread": 0
+    },
+    {
+     "key": "macs",
+     "bins": [
+      {
+       "label": "0–18",
+       "n": 0,
+       "rate": 0
+      },
+      {
+       "label": "18–36",
+       "n": 0,
+       "rate": 0
+      },
+      {
+       "label": "36–54",
+       "n": 0,
+       "rate": 0
+      }
+     ],
+     "spread": 0
+    },
+    {
+     "key": "macShare",
+     "bins": [
+      {
+       "label": "0.2–0.4",
+       "n": 0,
+       "rate": 0
+      },
+      {
+       "label": "0.4–0.6",
+       "n": 0,
+       "rate": 0
+      },
+      {
+       "label": "0.6–0.8",
+       "n": 0,
+       "rate": 0
+      }
+     ],
+     "spread": 0
+    },
+    {
+     "key": "style",
+     "bins": [
+      {
+       "label": "react",
+       "n": 0,
+       "rate": 0
+      },
+      {
+       "label": "support",
+       "n": 0,
+       "rate": 0
+      },
+      {
+       "label": "offense",
+       "n": 0,
+       "rate": 0
+      }
+     ],
+     "spread": 0
+    },
+    {
+     "key": "counters",
+     "bins": [
+      {
+       "label": "yes",
+       "n": 0,
+       "rate": 0
+      },
+      {
+       "label": "no",
+       "n": 0,
+       "rate": 0
+      }
+     ],
+     "spread": 0
+    },
+    {
+     "key": "crowd",
+     "bins": [
+      {
+       "label": "30–140",
+       "n": 0,
+       "rate": 0
+      },
+      {
+       "label": "140–250",
+       "n": 0,
+       "rate": 0
+      },
+      {
+       "label": "250–360",
+       "n": 0,
+       "rate": 0
+      }
+     ],
+     "spread": 0
+    },
+    {
+     "key": "base",
+     "bins": [
+      {
+       "label": "0–0.33",
+       "n": 0,
+       "rate": 0
+      },
+      {
+       "label": "0.33–0.67",
+       "n": 0,
+       "rate": 0
+      },
+      {
+       "label": "0.67–1",
+       "n": 0,
+       "rate": 0
+      }
+     ],
+     "spread": 0
+    },
+    {
+     "key": "push",
+     "bins": [
+      {
+       "label": "0–0.33",
+       "n": 0,
+       "rate": 0
+      },
+      {
+       "label": "0.33–0.67",
+       "n": 0,
+       "rate": 0
+      },
+      {
+       "label": "0.67–1",
+       "n": 0,
+       "rate": 0
+      }
+     ],
+     "spread": 0
+    },
+    {
+     "key": "restAt",
+     "bins": [
+      {
+       "label": "20–47",
+       "n": 0,
+       "rate": 0
+      },
+      {
+       "label": "47–73",
+       "n": 0,
+       "rate": 0
+      },
+      {
+       "label": "73–100",
+       "n": 0,
+       "rate": 0
+      }
+     ],
+     "spread": 0
+    },
+    {
+     "key": "storm",
+     "bins": [
+      {
+       "label": "yes",
+       "n": 0,
+       "rate": 0
+      },
+      {
+       "label": "no",
+       "n": 0,
+       "rate": 0
+      }
+     ],
+     "spread": 0
+    },
+    {
+     "key": "sectors",
+     "bins": [
+      {
+       "label": "all",
+       "n": 0,
+       "rate": 0
+      },
+      {
+       "label": "shift",
+       "n": 0,
+       "rate": 0
+      },
+      {
+       "label": "noLymph",
+       "n": 0,
+       "rate": 0
+      },
+      {
+       "label": "front2",
+       "n": 0,
+       "rate": 0
+      }
+     ],
+     "spread": 0
+    }
+   ],
+   "pressures": [
+    {
+     "p": 1,
+     "idle": {
+      "w": 0,
+      "n": 4
+     },
+     "casual": {
+      "w": 0,
+      "n": 2
+     },
+     "smart": {
+      "w": 2,
+      "n": 2
+     },
+     "static": {
+      "w": 8,
+      "n": 59
+     },
+     "reactive": {
+      "w": 0,
+      "n": 0
+     }
+    }
+   ],
+   "games": 75
+  },
+  {
+   "key": "foot",
+   "name": "Athlete's foot",
+   "i": 5,
+   "units": [
+    "neut",
+    "net",
+    "mac"
+   ],
+   "score": 67,
+   "comps": [
+    {
+     "key": "mustLose",
+     "name": "Must-lose bots lose",
+     "w": 3,
+     "u": 1,
+     "lost": 0,
+     "detail": "idle, random, storm spam and chill won 0% (idle 0/2, random 0/2, stormSpam 0/2, chill 0/2)"
+    },
+    {
+     "key": "trivial",
+     "name": "No trivial wins",
+     "w": 2,
+     "u": 0,
+     "lost": 2,
+     "detail": "best set-and-forget setup won 100%: Wound + Tissue only, counter-heavy, front Support, back Offense, stress 71%"
+    },
+    {
+     "key": "breadth",
+     "name": "Many ways to win",
+     "w": 2,
+     "u": null,
+     "lost": 0,
+     "detail": "strategy sweep not run yet"
+    },
+    {
+     "key": "good",
+     "name": "Good player wins",
+     "w": 2,
+     "u": 1,
+     "lost": 0,
+     "detail": "the good bot won 100%"
+    },
+    {
+     "key": "variety",
+     "name": "Variety",
+     "w": 1,
+     "u": null,
+     "lost": 0,
+     "detail": "strategy sweep not run yet"
+    },
+    {
+     "key": "skill",
+     "name": "Skill matters",
+     "w": 1,
+     "u": 1,
+     "lost": 0,
+     "detail": "good bot 100% vs beginner 0%"
+    },
+    {
+     "key": "close",
+     "name": "Feels close",
+     "w": 1,
+     "u": 0,
+     "lost": 1,
+     "detail": "median winner closeness 0.00 (organ bars lost / 4, or peak breach clock)"
+    }
+   ],
+   "m": {
+    "mustLose": 0,
+    "mustLoseTxt": "idle 0/2, random 0/2, stormSpam 0/2, chill 0/2",
+    "trivial": 1,
+    "trivialDesc": "Wound + Tissue only, counter-heavy, front Support, back Offense, stress 71%",
+    "breadth": null,
+    "good": 1,
+    "casual": 0,
+    "beginner": 0,
+    "styles": 0,
+    "styleTxt": "",
+    "close": 0
+   },
+   "bots": {
+    "idle": {
+     "w": 0,
+     "n": 2
+    },
+    "random": {
+     "w": 0,
+     "n": 2
+    },
+    "stormSpam": {
+     "w": 0,
+     "n": 2
+    },
+    "chill": {
+     "w": 0,
+     "n": 2
+    },
+    "beginner": {
+     "w": 0,
+     "n": 2
+    },
+    "casual": {
+     "w": 0,
+     "n": 2
+    },
+    "coast": {
+     "w": 0,
+     "n": 2
+    },
+    "smart": {
+     "w": 2,
+     "n": 2
+    }
+   },
+   "setups": [
+    {
+     "key": "counter/frontS/front2/0.5",
+     "desc": "Wound + Tissue only, counter-heavy, front Support, back Offense, stress 71%",
+     "wins": 2,
+     "n": 2,
+     "score": 1.25
+    },
+    {
+     "key": "counter/support/front2/0.5",
+     "desc": "Wound + Tissue only, counter-heavy, all Support, stress 71%",
+     "wins": 1,
+     "n": 1,
+     "score": 1.25
+    },
+    {
+     "key": "counter/frontS/noLymph/0.5",
+     "desc": "Lymph node off, counter-heavy, front Support, back Offense, stress 71%",
+     "wins": 1,
+     "n": 1,
+     "score": 1.25
+    },
+    {
+     "key": "counter/support/all/0.5",
+     "desc": "every sector, counter-heavy, all Support, stress 71%",
+     "wins": 1,
+     "n": 1,
+     "score": 1.25
+    },
+    {
+     "key": "even/support/all/0.5",
+     "desc": "every sector, even split, all Support, stress 71%",
+     "wins": 1,
+     "n": 1,
+     "score": 1.25
+    },
+    {
+     "key": "macs/support/all/0.5",
+     "desc": "every sector, 30/70 neutrophils/macrophages, all Support, stress 71%",
+     "wins": 0,
+     "n": 2,
+     "score": 0.855
+    },
+    {
+     "key": "macs/frontS/front2/0.5",
+     "desc": "Wound + Tissue only, 30/70 neutrophils/macrophages, front Support, back Offense, stress 71%",
+     "wins": 0,
+     "n": 2,
+     "score": 0.855
+    },
+    {
+     "key": "balanced/frontS/front2/0.5",
+     "desc": "Wound + Tissue only, 60/40 neutrophils/macrophages, front Support, back Offense, stress 71%",
+     "wins": 0,
+     "n": 1,
+     "score": 0.855
+    }
+   ],
+   "setupsTried": 56,
+   "setupWins": 5,
+   "strategies": 0,
+   "strategyWinners": 0,
+   "habits": [
+    {
+     "key": "look",
+     "bins": [
+      {
+       "label": "0.5",
+       "n": 0,
+       "rate": 0
+      },
+      {
+       "label": "1",
+       "n": 0,
+       "rate": 0
+      },
+      {
+       "label": "1.5",
+       "n": 0,
+       "rate": 0
+      },
+      {
+       "label": "2",
+       "n": 0,
+       "rate": 0
+      },
+      {
+       "label": "3",
+       "n": 0,
+       "rate": 0
+      },
+      {
+       "label": "5",
+       "n": 0,
+       "rate": 0
+      }
+     ],
+     "spread": 0
+    },
+    {
+     "key": "macs",
+     "bins": [
+      {
+       "label": "0–18",
+       "n": 0,
+       "rate": 0
+      },
+      {
+       "label": "18–36",
+       "n": 0,
+       "rate": 0
+      },
+      {
+       "label": "36–54",
+       "n": 0,
+       "rate": 0
+      }
+     ],
+     "spread": 0
+    },
+    {
+     "key": "macShare",
+     "bins": [
+      {
+       "label": "0.2–0.4",
+       "n": 0,
+       "rate": 0
+      },
+      {
+       "label": "0.4–0.6",
+       "n": 0,
+       "rate": 0
+      },
+      {
+       "label": "0.6–0.8",
+       "n": 0,
+       "rate": 0
+      }
+     ],
+     "spread": 0
+    },
+    {
+     "key": "style",
+     "bins": [
+      {
+       "label": "react",
+       "n": 0,
+       "rate": 0
+      },
+      {
+       "label": "support",
+       "n": 0,
+       "rate": 0
+      },
+      {
+       "label": "offense",
+       "n": 0,
+       "rate": 0
+      }
+     ],
+     "spread": 0
+    },
+    {
+     "key": "counters",
+     "bins": [
+      {
+       "label": "yes",
+       "n": 0,
+       "rate": 0
+      },
+      {
+       "label": "no",
+       "n": 0,
+       "rate": 0
+      }
+     ],
+     "spread": 0
+    },
+    {
+     "key": "crowd",
+     "bins": [
+      {
+       "label": "30–140",
+       "n": 0,
+       "rate": 0
+      },
+      {
+       "label": "140–250",
+       "n": 0,
+       "rate": 0
+      },
+      {
+       "label": "250–360",
+       "n": 0,
+       "rate": 0
+      }
+     ],
+     "spread": 0
+    },
+    {
+     "key": "base",
+     "bins": [
+      {
+       "label": "0–0.33",
+       "n": 0,
+       "rate": 0
+      },
+      {
+       "label": "0.33–0.67",
+       "n": 0,
+       "rate": 0
+      },
+      {
+       "label": "0.67–1",
+       "n": 0,
+       "rate": 0
+      }
+     ],
+     "spread": 0
+    },
+    {
+     "key": "push",
+     "bins": [
+      {
+       "label": "0–0.33",
+       "n": 0,
+       "rate": 0
+      },
+      {
+       "label": "0.33–0.67",
+       "n": 0,
+       "rate": 0
+      },
+      {
+       "label": "0.67–1",
+       "n": 0,
+       "rate": 0
+      }
+     ],
+     "spread": 0
+    },
+    {
+     "key": "restAt",
+     "bins": [
+      {
+       "label": "20–47",
+       "n": 0,
+       "rate": 0
+      },
+      {
+       "label": "47–73",
+       "n": 0,
+       "rate": 0
+      },
+      {
+       "label": "73–100",
+       "n": 0,
+       "rate": 0
+      }
+     ],
+     "spread": 0
+    },
+    {
+     "key": "storm",
+     "bins": [
+      {
+       "label": "yes",
+       "n": 0,
+       "rate": 0
+      },
+      {
+       "label": "no",
+       "n": 0,
+       "rate": 0
+      }
+     ],
+     "spread": 0
+    },
+    {
+     "key": "sectors",
+     "bins": [
+      {
+       "label": "all",
+       "n": 0,
+       "rate": 0
+      },
+      {
+       "label": "shift",
+       "n": 0,
+       "rate": 0
+      },
+      {
+       "label": "noLymph",
+       "n": 0,
+       "rate": 0
+      },
+      {
+       "label": "front2",
+       "n": 0,
+       "rate": 0
+      }
+     ],
+     "spread": 0
+    }
+   ],
+   "pressures": [
+    {
+     "p": 1,
+     "idle": {
+      "w": 0,
+      "n": 4
+     },
+     "casual": {
+      "w": 0,
+      "n": 2
+     },
+     "smart": {
+      "w": 2,
+      "n": 2
+     },
+     "static": {
+      "w": 6,
+      "n": 59
+     },
+     "reactive": {
+      "w": 0,
+      "n": 0
+     }
+    }
+   ],
+   "games": 75
+  },
+  {
+   "key": "lungs",
+   "name": "Lungs",
+   "i": 6,
+   "units": [
+    "neut",
+    "net",
+    "nk",
+    "mac"
+   ],
+   "score": 67,
+   "comps": [
+    {
+     "key": "mustLose",
+     "name": "Must-lose bots lose",
+     "w": 3,
+     "u": 1,
+     "lost": 0,
+     "detail": "idle, random, storm spam and chill won 0% (idle 0/2, random 0/2, stormSpam 0/2, chill 0/2)"
+    },
+    {
+     "key": "trivial",
+     "name": "No trivial wins",
+     "w": 2,
+     "u": 0,
+     "lost": 2,
+     "detail": "best set-and-forget setup won 100%: every sector, 30/70 neutrophils/macrophages, front Support, back Offense, stress 71%"
+    },
+    {
+     "key": "breadth",
+     "name": "Many ways to win",
+     "w": 2,
+     "u": null,
+     "lost": 0,
+     "detail": "strategy sweep not run yet"
+    },
+    {
+     "key": "good",
+     "name": "Good player wins",
+     "w": 2,
+     "u": 1,
+     "lost": 0,
+     "detail": "the good bot won 100%"
+    },
+    {
+     "key": "variety",
+     "name": "Variety",
+     "w": 1,
+     "u": null,
+     "lost": 0,
+     "detail": "strategy sweep not run yet"
+    },
+    {
+     "key": "skill",
+     "name": "Skill matters",
+     "w": 1,
+     "u": 1,
+     "lost": 0,
+     "detail": "good bot 100% vs beginner 0%"
+    },
+    {
+     "key": "close",
+     "name": "Feels close",
+     "w": 1,
+     "u": 0,
+     "lost": 1,
+     "detail": "median winner closeness 0.00 (organ bars lost / 4, or peak breach clock)"
+    }
+   ],
+   "m": {
+    "mustLose": 0,
+    "mustLoseTxt": "idle 0/2, random 0/2, stormSpam 0/2, chill 0/2",
+    "trivial": 1,
+    "trivialDesc": "every sector, 30/70 neutrophils/macrophages, front Support, back Offense, stress 71%",
+    "breadth": null,
+    "good": 1,
+    "casual": 0,
+    "beginner": 0,
+    "styles": 0,
+    "styleTxt": "",
+    "close": 0
+   },
+   "bots": {
+    "idle": {
+     "w": 0,
+     "n": 2
+    },
+    "random": {
+     "w": 0,
+     "n": 2
+    },
+    "stormSpam": {
+     "w": 0,
+     "n": 2
+    },
+    "chill": {
+     "w": 0,
+     "n": 2
+    },
+    "beginner": {
+     "w": 0,
+     "n": 2
+    },
+    "casual": {
+     "w": 0,
+     "n": 2
+    },
+    "coast": {
+     "w": 2,
+     "n": 2
+    },
+    "smart": {
+     "w": 2,
+     "n": 2
+    }
+   },
+   "setups": [
+    {
+     "key": "macs/frontS/all/0.5",
+     "desc": "every sector, 30/70 neutrophils/macrophages, front Support, back Offense, stress 71%",
+     "wins": 2,
+     "n": 2,
+     "score": 1.25
+    },
+    {
+     "key": "counter/frontS/front2/0.5",
+     "desc": "Wound + Tissue only, counter-heavy, front Support, back Offense, stress 71%",
+     "wins": 2,
+     "n": 2,
+     "score": 1.25
+    },
+    {
+     "key": "balanced/support/all/0.5",
+     "desc": "every sector, 60/40 neutrophils/macrophages, all Support, stress 71%",
+     "wins": 2,
+     "n": 2,
+     "score": 1.25
+    },
+    {
+     "key": "gunners/frontS/front2/0.5",
+     "desc": "Wound + Tissue only, gunners only, front Support, back Offense, stress 71%",
+     "wins": 1,
+     "n": 1,
+     "score": 1.25
+    },
+    {
+     "key": "balanced/frontS/front2/0.5",
+     "desc": "Wound + Tissue only, 60/40 neutrophils/macrophages, front Support, back Offense, stress 71%",
+     "wins": 1,
+     "n": 1,
+     "score": 1.25
+    },
+    {
+     "key": "macs/support/noLymph/0.5",
+     "desc": "Lymph node off, 30/70 neutrophils/macrophages, all Support, stress 71%",
+     "wins": 1,
+     "n": 1,
+     "score": 1.25
+    },
+    {
+     "key": "gunners/frontS/noLymph/0.5",
+     "desc": "Lymph node off, gunners only, front Support, back Offense, stress 71%",
+     "wins": 1,
+     "n": 1,
+     "score": 1.25
+    },
+    {
+     "key": "gunners/support/noLymph/0.5",
+     "desc": "Lymph node off, gunners only, all Support, stress 71%",
+     "wins": 1,
+     "n": 1,
+     "score": 1.25
+    }
+   ],
+   "setupsTried": 55,
+   "setupWins": 17,
+   "strategies": 0,
+   "strategyWinners": 0,
+   "habits": [
+    {
+     "key": "look",
+     "bins": [
+      {
+       "label": "0.5",
+       "n": 0,
+       "rate": 0
+      },
+      {
+       "label": "1",
+       "n": 0,
+       "rate": 0
+      },
+      {
+       "label": "1.5",
+       "n": 0,
+       "rate": 0
+      },
+      {
+       "label": "2",
+       "n": 0,
+       "rate": 0
+      },
+      {
+       "label": "3",
+       "n": 0,
+       "rate": 0
+      },
+      {
+       "label": "5",
+       "n": 0,
+       "rate": 0
+      }
+     ],
+     "spread": 0
+    },
+    {
+     "key": "macs",
+     "bins": [
+      {
+       "label": "0–18",
+       "n": 0,
+       "rate": 0
+      },
+      {
+       "label": "18–36",
+       "n": 0,
+       "rate": 0
+      },
+      {
+       "label": "36–54",
+       "n": 0,
+       "rate": 0
+      }
+     ],
+     "spread": 0
+    },
+    {
+     "key": "macShare",
+     "bins": [
+      {
+       "label": "0.2–0.4",
+       "n": 0,
+       "rate": 0
+      },
+      {
+       "label": "0.4–0.6",
+       "n": 0,
+       "rate": 0
+      },
+      {
+       "label": "0.6–0.8",
+       "n": 0,
+       "rate": 0
+      }
+     ],
+     "spread": 0
+    },
+    {
+     "key": "style",
+     "bins": [
+      {
+       "label": "react",
+       "n": 0,
+       "rate": 0
+      },
+      {
+       "label": "support",
+       "n": 0,
+       "rate": 0
+      },
+      {
+       "label": "offense",
+       "n": 0,
+       "rate": 0
+      }
+     ],
+     "spread": 0
+    },
+    {
+     "key": "counters",
+     "bins": [
+      {
+       "label": "yes",
+       "n": 0,
+       "rate": 0
+      },
+      {
+       "label": "no",
+       "n": 0,
+       "rate": 0
+      }
+     ],
+     "spread": 0
+    },
+    {
+     "key": "crowd",
+     "bins": [
+      {
+       "label": "30–140",
+       "n": 0,
+       "rate": 0
+      },
+      {
+       "label": "140–250",
+       "n": 0,
+       "rate": 0
+      },
+      {
+       "label": "250–360",
+       "n": 0,
+       "rate": 0
+      }
+     ],
+     "spread": 0
+    },
+    {
+     "key": "base",
+     "bins": [
+      {
+       "label": "0–0.33",
+       "n": 0,
+       "rate": 0
+      },
+      {
+       "label": "0.33–0.67",
+       "n": 0,
+       "rate": 0
+      },
+      {
+       "label": "0.67–1",
+       "n": 0,
+       "rate": 0
+      }
+     ],
+     "spread": 0
+    },
+    {
+     "key": "push",
+     "bins": [
+      {
+       "label": "0–0.33",
+       "n": 0,
+       "rate": 0
+      },
+      {
+       "label": "0.33–0.67",
+       "n": 0,
+       "rate": 0
+      },
+      {
+       "label": "0.67–1",
+       "n": 0,
+       "rate": 0
+      }
+     ],
+     "spread": 0
+    },
+    {
+     "key": "restAt",
+     "bins": [
+      {
+       "label": "20–47",
+       "n": 0,
+       "rate": 0
+      },
+      {
+       "label": "47–73",
+       "n": 0,
+       "rate": 0
+      },
+      {
+       "label": "73–100",
+       "n": 0,
+       "rate": 0
+      }
+     ],
+     "spread": 0
+    },
+    {
+     "key": "storm",
+     "bins": [
+      {
+       "label": "yes",
+       "n": 0,
+       "rate": 0
+      },
+      {
+       "label": "no",
+       "n": 0,
+       "rate": 0
+      }
+     ],
+     "spread": 0
+    },
+    {
+     "key": "sectors",
+     "bins": [
+      {
+       "label": "all",
+       "n": 0,
+       "rate": 0
+      },
+      {
+       "label": "shift",
+       "n": 0,
+       "rate": 0
+      },
+      {
+       "label": "noLymph",
+       "n": 0,
+       "rate": 0
+      },
+      {
+       "label": "front2",
+       "n": 0,
+       "rate": 0
+      }
+     ],
+     "spread": 0
+    }
+   ],
+   "pressures": [
+    {
+     "p": 1,
+     "idle": {
+      "w": 0,
+      "n": 4
+     },
+     "casual": {
+      "w": 0,
+      "n": 2
+     },
+     "smart": {
+      "w": 2,
+      "n": 2
+     },
+     "static": {
+      "w": 21,
+      "n": 59
+     },
+     "reactive": {
+      "w": 0,
+      "n": 0
+     }
+    }
+   ],
+   "games": 75
+  },
+  {
+   "key": "throat",
+   "name": "Sore throat",
+   "i": 7,
+   "units": [
+    "neut",
+    "net",
+    "mac"
+   ],
+   "score": 67,
+   "comps": [
+    {
+     "key": "mustLose",
+     "name": "Must-lose bots lose",
+     "w": 3,
+     "u": 1,
+     "lost": 0,
+     "detail": "idle, random, storm spam and chill won 0% (idle 0/2, random 0/2, stormSpam 0/2, chill 0/2)"
+    },
+    {
+     "key": "trivial",
+     "name": "No trivial wins",
+     "w": 2,
+     "u": 0,
+     "lost": 2,
+     "detail": "best set-and-forget setup won 100%: Wound + Tissue only, 60/40 neutrophils/macrophages, front Support, back Offense, stress 71%"
+    },
+    {
+     "key": "breadth",
+     "name": "Many ways to win",
+     "w": 2,
+     "u": null,
+     "lost": 0,
+     "detail": "strategy sweep not run yet"
+    },
+    {
+     "key": "good",
+     "name": "Good player wins",
+     "w": 2,
+     "u": 1,
+     "lost": 0,
+     "detail": "the good bot won 100%"
+    },
+    {
+     "key": "variety",
+     "name": "Variety",
+     "w": 1,
+     "u": null,
+     "lost": 0,
+     "detail": "strategy sweep not run yet"
+    },
+    {
+     "key": "skill",
+     "name": "Skill matters",
+     "w": 1,
+     "u": 1,
+     "lost": 0,
+     "detail": "good bot 100% vs beginner 0%"
+    },
+    {
+     "key": "close",
+     "name": "Feels close",
+     "w": 1,
+     "u": 0,
+     "lost": 1,
+     "detail": "median winner closeness 0.00 (organ bars lost / 4, or peak breach clock)"
+    }
+   ],
+   "m": {
+    "mustLose": 0,
+    "mustLoseTxt": "idle 0/2, random 0/2, stormSpam 0/2, chill 0/2",
+    "trivial": 1,
+    "trivialDesc": "Wound + Tissue only, 60/40 neutrophils/macrophages, front Support, back Offense, stress 71%",
+    "breadth": null,
+    "good": 1,
+    "casual": 0.5,
+    "beginner": 0,
+    "styles": 0,
+    "styleTxt": "",
+    "close": 0
+   },
+   "bots": {
+    "idle": {
+     "w": 0,
+     "n": 2
+    },
+    "random": {
+     "w": 0,
+     "n": 2
+    },
+    "stormSpam": {
+     "w": 0,
+     "n": 2
+    },
+    "chill": {
+     "w": 0,
+     "n": 2
+    },
+    "beginner": {
+     "w": 0,
+     "n": 2
+    },
+    "casual": {
+     "w": 1,
+     "n": 2
+    },
+    "coast": {
+     "w": 2,
+     "n": 2
+    },
+    "smart": {
+     "w": 2,
+     "n": 2
+    }
+   },
+   "setups": [
+    {
+     "key": "balanced/frontS/front2/0.5",
+     "desc": "Wound + Tissue only, 60/40 neutrophils/macrophages, front Support, back Offense, stress 71%",
+     "wins": 2,
+     "n": 2,
+     "score": 1.25
+    },
+    {
+     "key": "macs/frontS/noLymph/0.5",
+     "desc": "Lymph node off, 30/70 neutrophils/macrophages, front Support, back Offense, stress 71%",
+     "wins": 2,
+     "n": 2,
+     "score": 1.25
+    },
+    {
+     "key": "macs/frontS/front2/0.5",
+     "desc": "Wound + Tissue only, 30/70 neutrophils/macrophages, front Support, back Offense, stress 71%",
+     "wins": 1,
+     "n": 1,
+     "score": 1.25
+    },
+    {
+     "key": "counter/frontS/front2/0.5",
+     "desc": "Wound + Tissue only, counter-heavy, front Support, back Offense, stress 71%",
+     "wins": 1,
+     "n": 1,
+     "score": 1.25
+    },
+    {
+     "key": "balanced/support/front2/0.5",
+     "desc": "Wound + Tissue only, 60/40 neutrophils/macrophages, all Support, stress 71%",
+     "wins": 1,
+     "n": 1,
+     "score": 1.25
+    },
+    {
+     "key": "balanced/frontS/noLymph/0.5",
+     "desc": "Lymph node off, 60/40 neutrophils/macrophages, front Support, back Offense, stress 71%",
+     "wins": 1,
+     "n": 1,
+     "score": 1.25
+    },
+    {
+     "key": "balanced/frontS/all/0.5",
+     "desc": "every sector, 60/40 neutrophils/macrophages, front Support, back Offense, stress 71%",
+     "wins": 1,
+     "n": 1,
+     "score": 1.25
+    },
+    {
+     "key": "counter/frontS/noLymph/0.5",
+     "desc": "Lymph node off, counter-heavy, front Support, back Offense, stress 71%",
+     "wins": 1,
+     "n": 1,
+     "score": 1.25
+    }
+   ],
+   "setupsTried": 55,
+   "setupWins": 9,
+   "strategies": 0,
+   "strategyWinners": 0,
+   "habits": [
+    {
+     "key": "look",
+     "bins": [
+      {
+       "label": "0.5",
+       "n": 0,
+       "rate": 0
+      },
+      {
+       "label": "1",
+       "n": 0,
+       "rate": 0
+      },
+      {
+       "label": "1.5",
+       "n": 0,
+       "rate": 0
+      },
+      {
+       "label": "2",
+       "n": 0,
+       "rate": 0
+      },
+      {
+       "label": "3",
+       "n": 0,
+       "rate": 0
+      },
+      {
+       "label": "5",
+       "n": 0,
+       "rate": 0
+      }
+     ],
+     "spread": 0
+    },
+    {
+     "key": "macs",
+     "bins": [
+      {
+       "label": "0–18",
+       "n": 0,
+       "rate": 0
+      },
+      {
+       "label": "18–36",
+       "n": 0,
+       "rate": 0
+      },
+      {
+       "label": "36–54",
+       "n": 0,
+       "rate": 0
+      }
+     ],
+     "spread": 0
+    },
+    {
+     "key": "macShare",
+     "bins": [
+      {
+       "label": "0.2–0.4",
+       "n": 0,
+       "rate": 0
+      },
+      {
+       "label": "0.4–0.6",
+       "n": 0,
+       "rate": 0
+      },
+      {
+       "label": "0.6–0.8",
+       "n": 0,
+       "rate": 0
+      }
+     ],
+     "spread": 0
+    },
+    {
+     "key": "style",
+     "bins": [
+      {
+       "label": "react",
+       "n": 0,
+       "rate": 0
+      },
+      {
+       "label": "support",
+       "n": 0,
+       "rate": 0
+      },
+      {
+       "label": "offense",
+       "n": 0,
+       "rate": 0
+      }
+     ],
+     "spread": 0
+    },
+    {
+     "key": "counters",
+     "bins": [
+      {
+       "label": "yes",
+       "n": 0,
+       "rate": 0
+      },
+      {
+       "label": "no",
+       "n": 0,
+       "rate": 0
+      }
+     ],
+     "spread": 0
+    },
+    {
+     "key": "crowd",
+     "bins": [
+      {
+       "label": "30–140",
+       "n": 0,
+       "rate": 0
+      },
+      {
+       "label": "140–250",
+       "n": 0,
+       "rate": 0
+      },
+      {
+       "label": "250–360",
+       "n": 0,
+       "rate": 0
+      }
+     ],
+     "spread": 0
+    },
+    {
+     "key": "base",
+     "bins": [
+      {
+       "label": "0–0.33",
+       "n": 0,
+       "rate": 0
+      },
+      {
+       "label": "0.33–0.67",
+       "n": 0,
+       "rate": 0
+      },
+      {
+       "label": "0.67–1",
+       "n": 0,
+       "rate": 0
+      }
+     ],
+     "spread": 0
+    },
+    {
+     "key": "push",
+     "bins": [
+      {
+       "label": "0–0.33",
+       "n": 0,
+       "rate": 0
+      },
+      {
+       "label": "0.33–0.67",
+       "n": 0,
+       "rate": 0
+      },
+      {
+       "label": "0.67–1",
+       "n": 0,
+       "rate": 0
+      }
+     ],
+     "spread": 0
+    },
+    {
+     "key": "restAt",
+     "bins": [
+      {
+       "label": "20–47",
+       "n": 0,
+       "rate": 0
+      },
+      {
+       "label": "47–73",
+       "n": 0,
+       "rate": 0
+      },
+      {
+       "label": "73–100",
+       "n": 0,
+       "rate": 0
+      }
+     ],
+     "spread": 0
+    },
+    {
+     "key": "storm",
+     "bins": [
+      {
+       "label": "yes",
+       "n": 0,
+       "rate": 0
+      },
+      {
+       "label": "no",
+       "n": 0,
+       "rate": 0
+      }
+     ],
+     "spread": 0
+    },
+    {
+     "key": "sectors",
+     "bins": [
+      {
+       "label": "all",
+       "n": 0,
+       "rate": 0
+      },
+      {
+       "label": "shift",
+       "n": 0,
+       "rate": 0
+      },
+      {
+       "label": "noLymph",
+       "n": 0,
+       "rate": 0
+      },
+      {
+       "label": "front2",
+       "n": 0,
+       "rate": 0
+      }
+     ],
+     "spread": 0
+    }
+   ],
+   "pressures": [
+    {
+     "p": 1,
+     "idle": {
+      "w": 0,
+      "n": 4
+     },
+     "casual": {
+      "w": 1,
+      "n": 2
+     },
+     "smart": {
+      "w": 2,
+      "n": 2
+     },
+     "static": {
+      "w": 11,
+      "n": 59
+     },
+     "reactive": {
+      "w": 0,
+      "n": 0
+     }
+    }
+   ],
+   "games": 75
+  },
+  {
+   "key": "coldsore",
+   "name": "Cold sore",
+   "i": 8,
+   "units": [
+    "neut",
+    "net",
+    "nk",
+    "mac"
+   ],
+   "score": 67,
+   "comps": [
+    {
+     "key": "mustLose",
+     "name": "Must-lose bots lose",
+     "w": 3,
+     "u": 1,
+     "lost": 0,
+     "detail": "idle, random, storm spam and chill won 0% (idle 0/2, random 0/2, stormSpam 0/2, chill 0/2)"
+    },
+    {
+     "key": "trivial",
+     "name": "No trivial wins",
+     "w": 2,
+     "u": 0,
+     "lost": 2,
+     "detail": "best set-and-forget setup won 100%: Wound + Tissue only, counter-heavy, front Support, back Offense, stress 71%"
+    },
+    {
+     "key": "breadth",
+     "name": "Many ways to win",
+     "w": 2,
+     "u": null,
+     "lost": 0,
+     "detail": "strategy sweep not run yet"
+    },
+    {
+     "key": "good",
+     "name": "Good player wins",
+     "w": 2,
+     "u": 1,
+     "lost": 0,
+     "detail": "the good bot won 100%"
+    },
+    {
+     "key": "variety",
+     "name": "Variety",
+     "w": 1,
+     "u": null,
+     "lost": 0,
+     "detail": "strategy sweep not run yet"
+    },
+    {
+     "key": "skill",
+     "name": "Skill matters",
+     "w": 1,
+     "u": 1,
+     "lost": 0,
+     "detail": "good bot 100% vs beginner 0%"
+    },
+    {
+     "key": "close",
+     "name": "Feels close",
+     "w": 1,
+     "u": 0,
+     "lost": 1,
+     "detail": "median winner closeness 0.00 (organ bars lost / 4, or peak breach clock)"
+    }
+   ],
+   "m": {
+    "mustLose": 0,
+    "mustLoseTxt": "idle 0/2, random 0/2, stormSpam 0/2, chill 0/2",
+    "trivial": 1,
+    "trivialDesc": "Wound + Tissue only, counter-heavy, front Support, back Offense, stress 71%",
+    "breadth": null,
+    "good": 1,
+    "casual": 0,
+    "beginner": 0,
+    "styles": 0,
+    "styleTxt": "",
+    "close": 0
+   },
+   "bots": {
+    "idle": {
+     "w": 0,
+     "n": 2
+    },
+    "random": {
+     "w": 0,
+     "n": 2
+    },
+    "stormSpam": {
+     "w": 0,
+     "n": 2
+    },
+    "chill": {
+     "w": 0,
+     "n": 2
+    },
+    "beginner": {
+     "w": 0,
+     "n": 2
+    },
+    "casual": {
+     "w": 0,
+     "n": 2
+    },
+    "coast": {
+     "w": 0,
+     "n": 2
+    },
+    "smart": {
+     "w": 2,
+     "n": 2
+    }
+   },
+   "setups": [
+    {
+     "key": "counter/frontS/front2/0.5",
+     "desc": "Wound + Tissue only, counter-heavy, front Support, back Offense, stress 71%",
+     "wins": 1,
+     "n": 1,
+     "score": 1.25
+    },
+    {
+     "key": "balanced/support/all/0.5",
+     "desc": "every sector, 60/40 neutrophils/macrophages, all Support, stress 71%",
+     "wins": 0,
+     "n": 2,
+     "score": 0.855
+    },
+    {
+     "key": "macs/support/noLymph/0.5",
+     "desc": "Lymph node off, 30/70 neutrophils/macrophages, all Support, stress 71%",
+     "wins": 0,
+     "n": 2,
+     "score": 0.855
+    },
+    {
+     "key": "balanced/support/noLymph/0.5",
+     "desc": "Lymph node off, 60/40 neutrophils/macrophages, all Support, stress 71%",
+     "wins": 0,
+     "n": 1,
+     "score": 0.855
+    },
+    {
+     "key": "counter/support/all/0.5",
+     "desc": "every sector, counter-heavy, all Support, stress 71%",
+     "wins": 0,
+     "n": 1,
+     "score": 0.855
+    },
+    {
+     "key": "macs/support/all/0.5",
+     "desc": "every sector, 30/70 neutrophils/macrophages, all Support, stress 71%",
+     "wins": 0,
+     "n": 1,
+     "score": 0.855
+    },
+    {
+     "key": "balanced/support/front2/0.5",
+     "desc": "Wound + Tissue only, 60/40 neutrophils/macrophages, all Support, stress 71%",
+     "wins": 0,
+     "n": 1,
+     "score": 0.855
+    },
+    {
+     "key": "balanced/support/all/0.85",
+     "desc": "every sector, 60/40 neutrophils/macrophages, all Support, stress 146%",
+     "wins": 0,
+     "n": 1,
+     "score": 0.855
+    }
+   ],
+   "setupsTried": 55,
+   "setupWins": 1,
+   "strategies": 0,
+   "strategyWinners": 0,
+   "habits": [
+    {
+     "key": "look",
+     "bins": [
+      {
+       "label": "0.5",
+       "n": 0,
+       "rate": 0
+      },
+      {
+       "label": "1",
+       "n": 0,
+       "rate": 0
+      },
+      {
+       "label": "1.5",
+       "n": 0,
+       "rate": 0
+      },
+      {
+       "label": "2",
+       "n": 0,
+       "rate": 0
+      },
+      {
+       "label": "3",
+       "n": 0,
+       "rate": 0
+      },
+      {
+       "label": "5",
+       "n": 0,
+       "rate": 0
+      }
+     ],
+     "spread": 0
+    },
+    {
+     "key": "macs",
+     "bins": [
+      {
+       "label": "0–18",
+       "n": 0,
+       "rate": 0
+      },
+      {
+       "label": "18–36",
+       "n": 0,
+       "rate": 0
+      },
+      {
+       "label": "36–54",
+       "n": 0,
+       "rate": 0
+      }
+     ],
+     "spread": 0
+    },
+    {
+     "key": "macShare",
+     "bins": [
+      {
+       "label": "0.2–0.4",
+       "n": 0,
+       "rate": 0
+      },
+      {
+       "label": "0.4–0.6",
+       "n": 0,
+       "rate": 0
+      },
+      {
+       "label": "0.6–0.8",
+       "n": 0,
+       "rate": 0
+      }
+     ],
+     "spread": 0
+    },
+    {
+     "key": "style",
+     "bins": [
+      {
+       "label": "react",
+       "n": 0,
+       "rate": 0
+      },
+      {
+       "label": "support",
+       "n": 0,
+       "rate": 0
+      },
+      {
+       "label": "offense",
+       "n": 0,
+       "rate": 0
+      }
+     ],
+     "spread": 0
+    },
+    {
+     "key": "counters",
+     "bins": [
+      {
+       "label": "yes",
+       "n": 0,
+       "rate": 0
+      },
+      {
+       "label": "no",
+       "n": 0,
+       "rate": 0
+      }
+     ],
+     "spread": 0
+    },
+    {
+     "key": "crowd",
+     "bins": [
+      {
+       "label": "30–140",
+       "n": 0,
+       "rate": 0
+      },
+      {
+       "label": "140–250",
+       "n": 0,
+       "rate": 0
+      },
+      {
+       "label": "250–360",
+       "n": 0,
+       "rate": 0
+      }
+     ],
+     "spread": 0
+    },
+    {
+     "key": "base",
+     "bins": [
+      {
+       "label": "0–0.33",
+       "n": 0,
+       "rate": 0
+      },
+      {
+       "label": "0.33–0.67",
+       "n": 0,
+       "rate": 0
+      },
+      {
+       "label": "0.67–1",
+       "n": 0,
+       "rate": 0
+      }
+     ],
+     "spread": 0
+    },
+    {
+     "key": "push",
+     "bins": [
+      {
+       "label": "0–0.33",
+       "n": 0,
+       "rate": 0
+      },
+      {
+       "label": "0.33–0.67",
+       "n": 0,
+       "rate": 0
+      },
+      {
+       "label": "0.67–1",
+       "n": 0,
+       "rate": 0
+      }
+     ],
+     "spread": 0
+    },
+    {
+     "key": "restAt",
+     "bins": [
+      {
+       "label": "20–47",
+       "n": 0,
+       "rate": 0
+      },
+      {
+       "label": "47–73",
+       "n": 0,
+       "rate": 0
+      },
+      {
+       "label": "73–100",
+       "n": 0,
+       "rate": 0
+      }
+     ],
+     "spread": 0
+    },
+    {
+     "key": "storm",
+     "bins": [
+      {
+       "label": "yes",
+       "n": 0,
+       "rate": 0
+      },
+      {
+       "label": "no",
+       "n": 0,
+       "rate": 0
+      }
+     ],
+     "spread": 0
+    },
+    {
+     "key": "sectors",
+     "bins": [
+      {
+       "label": "all",
+       "n": 0,
+       "rate": 0
+      },
+      {
+       "label": "shift",
+       "n": 0,
+       "rate": 0
+      },
+      {
+       "label": "noLymph",
+       "n": 0,
+       "rate": 0
+      },
+      {
+       "label": "front2",
+       "n": 0,
+       "rate": 0
+      }
+     ],
+     "spread": 0
+    }
+   ],
+   "pressures": [
+    {
+     "p": 1,
+     "idle": {
+      "w": 0,
+      "n": 4
+     },
+     "casual": {
+      "w": 0,
+      "n": 2
+     },
+     "smart": {
+      "w": 2,
+      "n": 2
+     },
+     "static": {
+      "w": 1,
+      "n": 59
+     },
+     "reactive": {
+      "w": 0,
+      "n": 0
+     }
+    }
+   ],
+   "games": 75
+  },
+  {
+   "key": "gut",
+   "name": "Gut",
+   "i": 9,
+   "units": [
+    "neut",
+    "net",
+    "nk",
+    "mac"
+   ],
+   "score": 67,
+   "comps": [
+    {
+     "key": "mustLose",
+     "name": "Must-lose bots lose",
+     "w": 3,
+     "u": 1,
+     "lost": 0,
+     "detail": "idle, random, storm spam and chill won 0% (idle 0/2, random 0/2, stormSpam 0/2, chill 0/2)"
+    },
+    {
+     "key": "trivial",
+     "name": "No trivial wins",
+     "w": 2,
+     "u": 0,
+     "lost": 2,
+     "detail": "best set-and-forget setup won 100%: every sector, 30/70 neutrophils/macrophages, all Support, stress 71%"
+    },
+    {
+     "key": "breadth",
+     "name": "Many ways to win",
+     "w": 2,
+     "u": null,
+     "lost": 0,
+     "detail": "strategy sweep not run yet"
+    },
+    {
+     "key": "good",
+     "name": "Good player wins",
+     "w": 2,
+     "u": 1,
+     "lost": 0,
+     "detail": "the good bot won 100%"
+    },
+    {
+     "key": "variety",
+     "name": "Variety",
+     "w": 1,
+     "u": null,
+     "lost": 0,
+     "detail": "strategy sweep not run yet"
+    },
+    {
+     "key": "skill",
+     "name": "Skill matters",
+     "w": 1,
+     "u": 1,
+     "lost": 0,
+     "detail": "good bot 100% vs beginner 0%"
+    },
+    {
+     "key": "close",
+     "name": "Feels close",
+     "w": 1,
+     "u": 0,
+     "lost": 1,
+     "detail": "median winner closeness 0.00 (organ bars lost / 4, or peak breach clock)"
+    }
+   ],
+   "m": {
+    "mustLose": 0,
+    "mustLoseTxt": "idle 0/2, random 0/2, stormSpam 0/2, chill 0/2",
+    "trivial": 1,
+    "trivialDesc": "every sector, 30/70 neutrophils/macrophages, all Support, stress 71%",
+    "breadth": null,
+    "good": 1,
+    "casual": 0.5,
+    "beginner": 0,
+    "styles": 0,
+    "styleTxt": "",
+    "close": 0
+   },
+   "bots": {
+    "idle": {
+     "w": 0,
+     "n": 2
+    },
+    "random": {
+     "w": 0,
+     "n": 2
+    },
+    "stormSpam": {
+     "w": 0,
+     "n": 2
+    },
+    "chill": {
+     "w": 0,
+     "n": 2
+    },
+    "beginner": {
+     "w": 0,
+     "n": 2
+    },
+    "casual": {
+     "w": 1,
+     "n": 2
+    },
+    "coast": {
+     "w": 2,
+     "n": 2
+    },
+    "smart": {
+     "w": 2,
+     "n": 2
+    }
+   },
+   "setups": [
+    {
+     "key": "macs/support/all/0.5",
+     "desc": "every sector, 30/70 neutrophils/macrophages, all Support, stress 71%",
+     "wins": 2,
+     "n": 2,
+     "score": 1.25
+    },
+    {
+     "key": "macs/support/front2/0.5",
+     "desc": "Wound + Tissue only, 30/70 neutrophils/macrophages, all Support, stress 71%",
+     "wins": 2,
+     "n": 2,
+     "score": 1.25
+    },
+    {
+     "key": "balanced/support/front2/0.5",
+     "desc": "Wound + Tissue only, 60/40 neutrophils/macrophages, all Support, stress 71%",
+     "wins": 2,
+     "n": 2,
+     "score": 1.25
+    },
+    {
+     "key": "balanced/frontS/front2/0.5",
+     "desc": "Wound + Tissue only, 60/40 neutrophils/macrophages, front Support, back Offense, stress 71%",
+     "wins": 1,
+     "n": 1,
+     "score": 1.25
+    },
+    {
+     "key": "balanced/support/all/0.5",
+     "desc": "every sector, 60/40 neutrophils/macrophages, all Support, stress 71%",
+     "wins": 1,
+     "n": 1,
+     "score": 1.25
+    },
+    {
+     "key": "macs/support/noLymph/0.5",
+     "desc": "Lymph node off, 30/70 neutrophils/macrophages, all Support, stress 71%",
+     "wins": 1,
+     "n": 1,
+     "score": 1.25
+    },
+    {
+     "key": "macs/frontS/front2/0.5",
+     "desc": "Wound + Tissue only, 30/70 neutrophils/macrophages, front Support, back Offense, stress 71%",
+     "wins": 1,
+     "n": 1,
+     "score": 1.25
+    },
+    {
+     "key": "counter/frontS/all/0.5",
+     "desc": "every sector, counter-heavy, front Support, back Offense, stress 71%",
+     "wins": 0,
+     "n": 1,
+     "score": 0.855
+    }
+   ],
+   "setupsTried": 54,
+   "setupWins": 7,
+   "strategies": 0,
+   "strategyWinners": 0,
+   "habits": [
+    {
+     "key": "look",
+     "bins": [
+      {
+       "label": "0.5",
+       "n": 0,
+       "rate": 0
+      },
+      {
+       "label": "1",
+       "n": 0,
+       "rate": 0
+      },
+      {
+       "label": "1.5",
+       "n": 0,
+       "rate": 0
+      },
+      {
+       "label": "2",
+       "n": 0,
+       "rate": 0
+      },
+      {
+       "label": "3",
+       "n": 0,
+       "rate": 0
+      },
+      {
+       "label": "5",
+       "n": 0,
+       "rate": 0
+      }
+     ],
+     "spread": 0
+    },
+    {
+     "key": "macs",
+     "bins": [
+      {
+       "label": "0–18",
+       "n": 0,
+       "rate": 0
+      },
+      {
+       "label": "18–36",
+       "n": 0,
+       "rate": 0
+      },
+      {
+       "label": "36–54",
+       "n": 0,
+       "rate": 0
+      }
+     ],
+     "spread": 0
+    },
+    {
+     "key": "macShare",
+     "bins": [
+      {
+       "label": "0.2–0.4",
+       "n": 0,
+       "rate": 0
+      },
+      {
+       "label": "0.4–0.6",
+       "n": 0,
+       "rate": 0
+      },
+      {
+       "label": "0.6–0.8",
+       "n": 0,
+       "rate": 0
+      }
+     ],
+     "spread": 0
+    },
+    {
+     "key": "style",
+     "bins": [
+      {
+       "label": "react",
+       "n": 0,
+       "rate": 0
+      },
+      {
+       "label": "support",
+       "n": 0,
+       "rate": 0
+      },
+      {
+       "label": "offense",
+       "n": 0,
+       "rate": 0
+      }
+     ],
+     "spread": 0
+    },
+    {
+     "key": "counters",
+     "bins": [
+      {
+       "label": "yes",
+       "n": 0,
+       "rate": 0
+      },
+      {
+       "label": "no",
+       "n": 0,
+       "rate": 0
+      }
+     ],
+     "spread": 0
+    },
+    {
+     "key": "crowd",
+     "bins": [
+      {
+       "label": "30–140",
+       "n": 0,
+       "rate": 0
+      },
+      {
+       "label": "140–250",
+       "n": 0,
+       "rate": 0
+      },
+      {
+       "label": "250–360",
+       "n": 0,
+       "rate": 0
+      }
+     ],
+     "spread": 0
+    },
+    {
+     "key": "base",
+     "bins": [
+      {
+       "label": "0–0.33",
+       "n": 0,
+       "rate": 0
+      },
+      {
+       "label": "0.33–0.67",
+       "n": 0,
+       "rate": 0
+      },
+      {
+       "label": "0.67–1",
+       "n": 0,
+       "rate": 0
+      }
+     ],
+     "spread": 0
+    },
+    {
+     "key": "push",
+     "bins": [
+      {
+       "label": "0–0.33",
+       "n": 0,
+       "rate": 0
+      },
+      {
+       "label": "0.33–0.67",
+       "n": 0,
+       "rate": 0
+      },
+      {
+       "label": "0.67–1",
+       "n": 0,
+       "rate": 0
+      }
+     ],
+     "spread": 0
+    },
+    {
+     "key": "restAt",
+     "bins": [
+      {
+       "label": "20–47",
+       "n": 0,
+       "rate": 0
+      },
+      {
+       "label": "47–73",
+       "n": 0,
+       "rate": 0
+      },
+      {
+       "label": "73–100",
+       "n": 0,
+       "rate": 0
+      }
+     ],
+     "spread": 0
+    },
+    {
+     "key": "storm",
+     "bins": [
+      {
+       "label": "yes",
+       "n": 0,
+       "rate": 0
+      },
+      {
+       "label": "no",
+       "n": 0,
+       "rate": 0
+      }
+     ],
+     "spread": 0
+    },
+    {
+     "key": "sectors",
+     "bins": [
+      {
+       "label": "all",
+       "n": 0,
+       "rate": 0
+      },
+      {
+       "label": "shift",
+       "n": 0,
+       "rate": 0
+      },
+      {
+       "label": "noLymph",
+       "n": 0,
+       "rate": 0
+      },
+      {
+       "label": "front2",
+       "n": 0,
+       "rate": 0
+      }
+     ],
+     "spread": 0
+    }
+   ],
+   "pressures": [
+    {
+     "p": 1,
+     "idle": {
+      "w": 0,
+      "n": 4
+     },
+     "casual": {
+      "w": 1,
+      "n": 2
+     },
+     "smart": {
+      "w": 2,
+      "n": 2
+     },
+     "static": {
+      "w": 10,
+      "n": 59
+     },
+     "reactive": {
+      "w": 0,
+      "n": 0
+     }
+    }
+   ],
+   "games": 75
+  }
+ ]
+}

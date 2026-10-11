@@ -61,7 +61,10 @@ ui("    // Fields under everything: slime domes, nets, Support rings",
 ui("      if (a.flash > 0) al *= 0.6;\n      switch (a.k) {\n", "      if (a.flash > 0) al *= 0.6;\n      if (a.hj) draw('pollen', a.u, a.v, a.rot, al, mul); // workshop: Measles\n      else switch (a.k) {\n")
 ui("        const name = c.tb ? 'macrophage-infected' : c.mode === 'support' ? 'macrophage-support' : 'macrophage-offense';\n        const stunA = c.stun > 0 ? 0.5 + 0.3 * Math.sin(ts * 20) : 1;",
    "        const name = c.tb || (c.hj && Math.floor(ts / 0.3) % 2) ? 'macrophage-infected' : c.mode === 'support' ? 'macrophage-support' : 'macrophage-offense';\n        const stunA = c.hj ? 0.45 : c.stun > 0 ? 0.5 + 0.3 * Math.sin(ts * 20) : 1;")
-_pa = next(x for x in ("    const W = w / dpr, H = h / dpr, D = game.duration;\n", "    const W = w / dpr, H = h / dpr, bh = 10, pad = 14, D = game.duration;\n") if x in s)
+ui("  function nextEventText(g) {\n", "  function nextEventText(g) {\n    if (ws && ws.sandbox) return null; // workshop: the open sandbox has no waves (V43 would say 'Final wave is in')\n")
+if "    const ws = game.lv.waves, idx = game.waveIdx, list = [];\n    ws.forEach(" in s: # V43 rail names its wave list ws, which shadows the Workshop (the prog block reads ws.sandbox first)
+  ui("    const ws = game.lv.waves, idx = game.waveIdx, list = [];\n    ws.forEach(", "    const wv = game.lv.waves, idx = game.waveIdx, list = [];\n    wv.forEach(")
+_pa = next(x for x in ("    const W = w / dpr, H = h / dpr, D = game.duration;\n", "    const W = w / dpr, H = h / dpr, bh = 10, pad = 14, D = game.duration;\n", "    const W = w / dpr, H = h / dpr;\n") if x in s) # V43: untimed rail
 ui(_pa, _pa + blocks['prog'])
 # workshop HUD additions go into hud() right before the Stress slider sync (older v3: after the cell count line)
 _o = "    if (document.activeElement !== $('#output')) $('#output').value"
@@ -98,7 +101,7 @@ ui("    game = new Game(levelKey, seed);\n", """    levelKey = dev.level;
     if (c) {
       if (c.mix) for (let z = 0; z < NZ; z++) game.setMix(z, c.mix);
       if (c.zones) c.zones.forEach((m, z) => game.setZone(z, m));
-      if (c.output != null) game.setOutput(c.output);
+      if (c.stress != null) { const O = CONFIG.output; game.setOutput(Math.max(0, Math.min(1, Math.log(c.stress / O.min) / Math.log(O.max / O.min)))); } // Stress multiplier -> slider position
       if (c.boss) ws.spawnGroup('worm');
       if (c.organs) for (const k in c.organs) ws.setOrgan(k, c.organs[k]);
       if (c.fatigue != null) game.fatigue = c.fatigue;
@@ -129,7 +132,7 @@ ui("  newGame();\n  showStart();\n  requestAnimationFrame(frame);", "  pendingSe
 ui("const infected = g.cells.filter(c => c.infected).length;", "const infected = g.cells.filter(c => c.infected && !c.hj).length; // workshop: Measles-hijacked macrophages aren't neutrophils")
 
 # the Sandbox level never ends (duration 1e9), so the end graph's time axis must use the match length
-ui("    const T = Math.max(game.duration, game.t), maxY", "    const T = game.duration > 1e6 ? Math.max(game.t, 1) : Math.max(game.duration, game.t), maxY") # workshop: Sandbox has no end time
+ui("    const T = Math.max(game.duration, game.t)", "    const T = game.duration > 1e6 ? Math.max(game.t, 1) : Math.max(game.duration, game.t)") # workshop: Sandbox has no end time
 
 # organ health: liver and kidneys in the vessel, toxin tint, leaker art and banners
 ui("measles: { art: 'pollen', marker: 'herpes' },", "measles: { art: 'pollen', marker: 'herpes' }, hep: { art: 'hepatitis', marker: 'hepatitis' }, ecoli: { art: 'e-coli', marker: 'e-coli' },")
@@ -153,8 +156,8 @@ ui("        const warn = KINDS[a.k].divides && a.age < a.div && a.div - a.age < 
    "        const ewarn = a.leak === 'kidney' && a.ediv > 0 && a.ediv < BLINK_WARN; // workshop: E. coli keeps its own division clock\n        const warn = ewarn || (KINDS[a.k].divides && a.age < a.div && a.div - a.age < BLINK_WARN && a.div - a.age > 0);\n        const tm = a.blink > 0 ? a.blink : warn ? (ewarn ? a.ediv : a.div - a.age) : -1;")
 
 # guide: the Sandbox-only system clips (Fatigue and toxins) under How to play, and the leakers and organs
-ui("${TUT.ANTIGENS.filter(id => TUT.CLIPS[id]).map(btn).join('')}</div>`;",
-   "${TUT.ANTIGENS.filter(id => TUT.CLIPS[id]).map(btn).join('')}${(TUT.SYSTEMS || []).some(id => TUT.CLIPS[id]) ? `<h4>Systems</h4>${TUT.SYSTEMS.filter(id => TUT.CLIPS[id]).map(btn).join('')}` : ''}</div>`;")
+ui("${TUT.ANTIGENS.filter(id => TUT.CLIPS[id]).map(btn).join('')}", # Systems row right after Antigens (before V40's Cells row)
+   "${TUT.ANTIGENS.filter(id => TUT.CLIPS[id]).map(btn).join('')}${(TUT.SYSTEMS || []).some(id => TUT.CLIPS[id]) ? `<h4>Systems</h4>${TUT.SYSTEMS.filter(id => TUT.CLIPS[id]).map(btn).join('')}` : ''}")
 ui("      unit('tapeworm-head', 'Tapeworm',",
    "      unit('hepatitis', 'Hepatitis (workshop only)', 'The liver leaker. Fast swarms of 18, one hit kills.', [`Swims for the left blood vessel. Each one that gets in adds ${Math.round(WS.leakers.leak * 100)}% to the liver's breach clock. Net neutrophils catch the swarm.`]),\n      unit('e-coli', 'E. coli (workshop only)', 'The kidney leaker. Takes 2 hits and divides.', [`Each one that reaches the blood adds ${Math.round(WS.leakers.leak * 100)}% to the kidneys' breach clock. ${dev.toxinLoad ? 'Shooting it dumps extra toxin; <b>swallowing it is the clean answer</b>.' : 'Swallowing it is the quickest answer.'}`]),\n      unit('tapeworm-head', 'Tapeworm',")
 

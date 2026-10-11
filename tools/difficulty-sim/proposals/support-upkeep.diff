@@ -1,0 +1,55 @@
+--- a/sim.js	2026-10-10 19:43:49.459309755 +0000
++++ b/sim.js	2026-10-10 19:43:49.474770349 +0000
+@@ -31,7 +31,7 @@
+   ifn:        { speed: 22, radius: 3.5, life: 70, haze: 40, fluSlow: 0.5 },
+   mast:       { speed: 14, radius: 4.5, life: 120, reach: 60, mucus: 5, every: 12, slow: 0.5, ownSlow: 0.8 },
+   macrophage: { speed: 22, radius: 8, eatEvery: 2, gulp: 0.45, reach: 12 },
+-  support:    { ring: 50, speedMul: 1.5, spread: 1.7, spreadSpeed: 30, cover: 0.8, uncover: 0.7, check: 0.5 },
++  support:    { ring: 50, speedMul: 1.5, spread: 1.7, spreadSpeed: 30, cover: 0.8, uncover: 0.7, check: 0.5, upkeep: 0.5 },
+   bacteria:   { maxCount: 1350, drift: 10, driftSpread: 0.3, crowdDrift: 0, crowdStart: 180, crowdRadius: 8, crowdMax: 5, jitter: 0.25, knock: 40, maxSpeed: 70 },
+   staph:      { hp: 3, doubling: 10, radius: 2.4 },
+   mrsa:       { hp: 12, doubling: 20, radius: 3.2 },
+@@ -176,6 +176,7 @@
+   'macrophage.gulp': 'Seconds a swallow takes.',
+   'macrophage.reach': 'How close it must get to swallow.',
+   'support.ring': 'Radius of a Support macrophage ring.',
++  'support.upkeep': 'Inflammation: with every sector in use on Support, the sustainable stress (output.rest) drops by this much; half the sectors, half as much.',
+   'support.speedMul': 'Speed multiplier for neutrophils inside a ring.',
+   'idle.half': 'Half-life in seconds of your cells standing in a switched-off sector, so a parked sector cannot stockpile macrophages (Alex, 2026-10-10). Stops when the sector is back on.',
+   'support.spread': 'Support macrophages push their posts apart until they are this many ring radii from each other, so the rings tile the sector (Alex, 2026-10-10).',
+@@ -618,13 +619,23 @@
+     if (this.organs[k] <= 0 && this.organLoss) this.finish(false, `Host failure. ${ORGAN_NAMES[k]} function lost ${cause === 'breach' ? 'to germs in the Lymph node' : cause === 'overload' ? `at fatigue ${Math.round(this.fatigue)}` : `(${cause})`}.`, 'host');
+   }
+   // Rough look ahead for the storm preview: fatigue path and the worst organ left, assuming nothing changes
++  // Inflammation upkeep: Support sectors lower the stress the body can sustain, by support.upkeep x (Support sectors /
++  // sectors in use). Holding everything on Support at the default stress tires you into overload; easing stress or
++  // switching quiet sectors to Offense keeps it in check. Counting sectors in use means switching sectors off doesn't dodge it.
++  restLevel() {
++    const O = CONFIG.output, k = CONFIG.support.upkeep;
++    if (!k) return O.rest;
++    let n = 0; for (const z of this.zones) if (z.on && z.mode === 'support') n++;
++    return O.rest - k * n / this.zonesOn();
++  }
+   stormOutcome() {
+     const C = CONFIG, S = C.storm, O = C.output, G = C.organs, F = C.fatigue;
+     let f = Math.min(F.max, this.fatigue + S.cost), after = S.after, peak = f, worst = 4;
++    const rest = this.restLevel();
+     const hp = Object.assign({}, this.organs), mul = this.effMul();
+     for (let t = 0, dt = 0.2; t < 240; t += dt) {
+       const kl = Math.max(0, Math.min(4, Math.ceil(hp.kidney - 1e-9))), rm = kl >= 4 ? 1 : G['kidney' + Math.max(1, kl)];
+-      let df = mul > O.rest ? (mul - O.rest) * O.tire : (mul - O.rest) * O.recover * rm;
++      let df = mul > rest ? (mul - rest) * O.tire : (mul - rest) * O.recover * rm;
+       if (after > 0) { after -= dt; df = Math.max(0, df) + S.afterRate * (this.output <= 0.001 ? 0.5 : 1); }
+       else if (df < 0 && f > 100) df *= G.overRecover;
+       f = Math.max(0, Math.min(F.max, f + df * dt)); peak = Math.max(peak, f);
+@@ -894,8 +905,8 @@
+     const toxicAlive = this.ag.some(a => a.k === 'toxic' && !a.dead);
+     this.toxicDrain = toxicAlive;
+     // above rest fatigue builds; below it the body recovers (slower with hurt kidneys, much faster while in overload)
+-    const calm = this.calmMul();
+-    let df = mul > O.rest ? (mul - O.rest) * O.tire * calm * (toxicAlive ? C.toxic.fatigueMul : 1) : (mul - O.rest) * O.recover * this.recoverMul() * (this.fatigue > 100 ? G.overRecover : 1);
++    const calm = this.calmMul(), rest = this.restLevel();
++    let df = mul > rest ? (mul - rest) * O.tire * calm * (toxicAlive ? C.toxic.fatigueMul : 1) : (mul - rest) * O.recover * this.recoverMul() * (this.fatigue > 100 ? G.overRecover : 1);
+     if (this.storm.wind > 0) {
+       this.storm.wind -= dt;
+       if (this.storm.wind <= 0) this.fireStorm();

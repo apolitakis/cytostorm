@@ -57,8 +57,9 @@ function mergeWs(saved) {
 }
 
 // The sandbox: no waves, no trickle, no toxin bursts, never "ends". Every unit type is available.
+const FRIENDLY = ['neut', 'net', 'nk', 'mac', 'bcell', 'eos', 'plt', 'dc', 'treg', 'ifn', 'mast']; // V39 campaign units too
 LEVELS.sandbox = {
-  name: 'Sandbox', blurb: 'No script. The Workshop panel decides what spawns.', duration: 1e9, units: ['neut', 'net', 'nk', 'mac'],
+  name: 'Sandbox', blurb: 'No script. The Workshop panel decides what spawns.', duration: 1e9, units: FRIENDLY.slice(),
   waves: [], stream: { start: 0, end: 0, clump: 1, kinds: [{ k: 'staph', w: 1 }] }, toxins: [],
 };
 
@@ -80,11 +81,10 @@ const SPAWNABLE = [
   { k: 'ecoli', size: 12, about: 'E. coli. Swims for the left blood vessel and hurts the kidneys. Shooting it dumps toxin: swallow it.' },
   { k: 'yeast', size: 9, about: 'Candida. Settles and grows threads germs ride to the Lymph node. Nets cut them.' },
 ];
-const FRIENDLY = ['neut', 'net', 'nk', 'mac'];
 const ZERO_RATES = () => Object.fromEntries(SPAWNABLE.map(s => [s.k, 0]));
 function defaultDev() {
   return {
-    level: 'sandbox', rates: ZERO_RATES(), friendly: { neut: 0, net: 0, nk: 0, mac: 0 }, marrowOn: true, spawnMul: 1,
+    level: 'sandbox', rates: ZERO_RATES(), friendly: Object.fromEntries(FRIENDLY.map(u => [u, 0])), marrowOn: true, spawnMul: 1,
     toxinLoad: false, toxinSimple: false, organs: true, leakZone: 'random', puddles: false, noFatigue: false, noDeath: false, immortal: false, noDivision: false,
   };
 }

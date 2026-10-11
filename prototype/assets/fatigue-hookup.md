@@ -43,3 +43,9 @@ Optional: `ART.outputTrackCSS(Math.log(rest / min) / Math.log(max / min))` gives
 
 - `brain-<state>`: the sixth organ, with the same five states, 64x48 box and worldR 19 as the others.
 - `rabies` (worldR 4.5) is the brain's antigen: a lilac bullet-shaped virus. `rabies-budding` is its reproduce frame; blink to it for the last ~1 s before a copy splits off. Progress-bar kind `rabies` (`marker-rabies`).
+
+## Campaign units (art kit v10)
+
+- **B cell** (stage 2): `b-cell` on the map; swap to `b-cell-puff` for ~0.4 s each time it releases a cloud (facing downstream, +x), then spawn the existing `antibody-cloud`. Tagged germs keep using `bacterium-opsonized`. worldR 8.
+- **Eosinophil** (stage 3): `eosinophil` while swimming; `eosinophil-latched` once it grabs a big target (its flat side is +y, so rotate +y toward the target, and pulse scale and alpha while it charges); then `eosinophil-pop` on the contact point (scale 0.5 to 1.4 over ~0.35 s, fade). worldR 8.5, pop 14.
+- **First sketches** for later batches: `platelet`, `platelet-stuck`, `dendritic-cell`, `dendritic-carrying`, `treg`, `interferon-cell`, `interferon-haze` (field, 128 box), `mast-cell`, `mucus` (field, 128 box). All have `meta.worldR`.

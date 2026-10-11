@@ -16,23 +16,31 @@ HERE=$(cd "$(dirname "$0")" && pwd)
 [ -d "$REPO/.git" ] || git clone --depth 1 "$URL" "$REPO"
 cd "$REPO"
 if git ls-remote --exit-code origin refs/heads/main >/dev/null 2>&1; then
-  git fetch --depth 1 origin main
+  git fetch --depth 50 origin main
   git checkout -q -B main FETCH_HEAD
-  # Only Claude's commits may be replaced by a snapshot. Anything else on main came from
-  # GitHub and must be merged into the folder first.
-  if [ "$(git log -1 --format=%ae)" != "noreply@anthropic.com" ]; then
-    echo "main's latest commit is by $(git log -1 --format='%an <%ae>'): not overwriting"; exit 2
+  # Snapshots build on top of main. Commits made on GitHub are kept when they only touch the
+  # repo-only .claude/ folder (Alex, 2026-10-10). Anything else since the last snapshot came from
+  # GitHub and must be merged into the folder first, or the mirror would undo it.
+  LAST=$(git log -1 --format=%H --author='<noreply@anthropic.com>')
+  if [ -z "$LAST" ]; then
+    echo "no snapshot in main's last 50 commits: not overwriting"; exit 2
+  fi
+  OUTSIDE=$(git diff --name-only "$LAST" HEAD | grep -v '^\.claude/' || true)
+  if [ -n "$OUTSIDE" ]; then
+    echo "main has changes since the last snapshot outside .claude/: not overwriting"
+    echo "$OUTSIDE" | head -20; exit 2
   fi
 else
   git checkout -q -B main   # empty repo: first snapshot
 fi
 
-# Mirror the folder. README.md and .gitignore are repo-only and come from this script's folder.
+# Mirror the folder. README.md and .gitignore are repo-only and come from this script's folder;
+# .claude/ is repo-only too and is kept as it is on main (never copied from the folder).
 # Left out: chat uploads, zip bundles, rendered audio (audio/render.js remakes it), caches.
-find . -mindepth 1 -maxdepth 1 ! -name .git -exec rm -rf {} +
+find . -mindepth 1 -maxdepth 1 ! -name .git ! -name .claude -exec rm -rf {} +
 (cd "$SRC" && tar -cf - --exclude='__pycache__' --exclude='*.pyc' --exclude='*.zip' \
   --exclude='./uploads' --exclude='./audio/renders' --exclude='node_modules' --exclude='.DS_Store' \
-  --exclude='.env' --exclude='.env.*' --exclude='.git' .) | tar -xf -
+  --exclude='.env' --exclude='.env.*' --exclude='.git' --exclude='./.claude' .) | tar -xf -
 cp "$HERE/repo-README.md" README.md
 cp "$HERE/repo-gitignore" .gitignore
 chown -R "$(id -u):$(id -g)" .

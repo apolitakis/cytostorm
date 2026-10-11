@@ -14,7 +14,9 @@ const CYT = (function () {
   const PAL = ART.palette;
   const FONT = '"Instrument Sans", "Helvetica Neue", Arial, sans-serif', MONO = '"IBM Plex Mono", ui-monospace, Menlo, monospace';
   const BLINK = 0.6, BLINK_WARN = 0.7; // same as the game (sim.js)
-  const COLORS = { neut: '#3FE6FF', net: '#FFD23F', nk: '#B9A6FF', mac: '#FF7A3D' };
+  const COLORS = { neut: '#3FE6FF', net: '#FFD23F', nk: '#B9A6FF', mac: '#FF7A3D',
+    // the seven campaign units (Play V39, ui.js UNIT colours)
+    bcell: '#F2C14E', eos: '#FF9A4D', plt: '#E8E4FF', dc: '#FF6FB5', treg: '#7EE08A', ifn: '#BFE9FF', mast: '#5B8CFF' };
 
   // Candida has no art-kit sprite yet; same stand-in the game uses
   if (!ART.svg.yeast) {
@@ -380,11 +382,20 @@ const CYT = (function () {
   // Left of the map: each sector's germ count and output %. Right of it: each sector's Response button (a mini bar
   // of its mix), stance button and power button; the thin Lymph strip gets one compact row. A vertical level rail
   // (waves, hatches) runs down the far left.
-  const UNIT_ORDER = ['neut', 'net', 'nk', 'mac'];
-  function miniMix(x, y, w, h, mix) {
+  const UNIT_ORDER = ['neut', 'net', 'nk', 'mac', 'bcell', 'eos', 'plt', 'dc', 'treg', 'ifn', 'mast'];
+  function miniMix(x, y, w, h, mix, paused) {
     ctx.fillStyle = '#10152A'; rrect(x, y, w, h, h / 2); ctx.fill();
     let ax = x; ctx.save(); rrect(x, y, w, h, h / 2); ctx.clip();
-    for (const k of UNIT_ORDER) if (mix && mix[k] > 0.004) { ctx.fillStyle = COLORS[k]; ctx.fillRect(ax, y, w * mix[k], h); ax += w * mix[k]; }
+    for (const k of UNIT_ORDER) if (mix && mix[k] > 0.004) {
+      const ww = w * mix[k];
+      if (paused && k === 'mac') { // hatched: the share is kept but not being made
+        ctx.fillStyle = 'rgba(255,122,61,0.18)'; ctx.fillRect(ax, y, ww, h);
+        ctx.save(); ctx.beginPath(); ctx.rect(ax, y, ww, h); ctx.clip(); ctx.strokeStyle = COLORS.mac; ctx.lineWidth = 1;
+        for (let hx = ax - h; hx < ax + ww + h; hx += 3) { ctx.beginPath(); ctx.moveTo(hx, y + h); ctx.lineTo(hx + h, y); ctx.stroke(); }
+        ctx.restore();
+      } else { ctx.fillStyle = COLORS[k]; ctx.fillRect(ax, y, ww, h); }
+      ax += ww;
+    }
     ctx.restore();
   }
   function powerBtn(cx, cy, r, on, shake = 0) {
@@ -424,7 +435,7 @@ const CYT = (function () {
       return { resp: [rx + 4, top, rw - 8, 32], mode: [rx + rw / 2 - 14, top + 48], pwr: [rx + rw / 2 + 14, top + 48], r };
     });
   }
-  // o: { zones, mix (one or per zone), mode, on, flip, shake, open (zone index whose sheet is open), press: { resp|mode|pwr: z } }
+  // o: { zones, mix (one or per zone), mode, on, flip, shake, paused (macs paused, V32), open (zone index whose sheet is open), press: { resp|mode|pwr: z } }
   function sideCtl(o = {}) {
     const zones = o.zones || MAP.map(z => [z[0], z[1]]), L = ctlLayout(zones), at = (v, z, d) => (Array.isArray(v) ? (v[z] === undefined ? d : v[z]) : v === undefined ? d : v);
     R.hud.ctl = { resp: [], mode: [], pwr: [] };
@@ -435,9 +446,10 @@ const CYT = (function () {
         ctx.fillStyle = press ? 'rgba(63,230,255,0.18)' : '#0A0D18'; ctx.strokeStyle = open ? PAL.cell : '#1E2540'; ctx.lineWidth = open ? 1.5 : 1;
         if (open) { ctx.shadowColor = PAL.cell; ctx.shadowBlur = 8; }
         rrect(x, y, w, h, 7); ctx.fill(); ctx.stroke(); ctx.shadowBlur = 0;
-        miniMix(x + 6, y + 7, w - 12, 5, on ? mix : null);
-        ctx.fillStyle = on ? '#9AA4BC' : '#5A6070'; ctx.font = `600 ${w < 60 ? 9.5 : 10.5}px ${FONT}`; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-        ctx.fillText('Response', x + w / 2, y + 22.5);
+        const paused = at(o.paused, z, false);
+        miniMix(x + 6, y + 7, w - 12, 5, on ? mix : null, paused);
+        ctx.fillStyle = paused ? COLORS.mac : on ? '#9AA4BC' : '#5A6070'; ctx.font = `600 ${(w < 60 ? 9.5 : 10.5) - (paused ? 1.5 : 0)}px ${FONT}`; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+        ctx.fillText(paused ? 'Macs paused' : 'Response', x + w / 2, y + 22.5);
         R.hud.ctl.resp.push([x + w / 2, y + h / 2]);
       } else { if (l.pill) miniMix(l.pill[0], l.pill[1], l.pill[2], l.pill[3], on ? mix : null); R.hud.ctl.resp.push(l.pill ? [l.pill[0] + l.pill[2] / 2, l.pill[1] + 3] : [0, 0]); }
       R.hud.ctl.mode.push(stanceBtn(l.mode[0], l.mode[1], l.r, mode, at(o.flip, z, 0)));
@@ -460,22 +472,27 @@ const CYT = (function () {
       ctx.fillText(ptxt, cx, small ? my + 8 : my + 26);
     });
   }
-  // The level rail down the far left (V30): fills top to bottom; events [{ at, kind, ring }] use the art kit's markers
-  function rail(frac, events = [], ringCol) {
+  // The level rail down the far left (V43, Alex 2026-10-10: no timeline). events [{ kind, ring }] are the level's
+  // waves in order, evenly spaced; the first `landed` have landed (dim) and the fill steps one badge per wave;
+  // the next one is drawn bigger. Nothing on the rail says when.
+  function rail(landed, events = []) {
     if (!R.rail) return;
-    const [x, y, w, h] = R.rail, cx = x + w / 2, y0 = y + 8, y1 = y + h - 8, f = clamp(frac);
+    const [x, y, w, h] = R.rail, cx = x + w / 2, y0 = y + 8, y1 = y + h - 8, n = events.length, k = Math.max(0, Math.min(n, landed | 0));
+    const at = j => (j + 1) / (n + 1), f = k ? (k === n ? n / (n + 1) : at(k - 1)) : 0;
     ctx.fillStyle = 'rgba(221,230,245,0.08)'; ctx.strokeStyle = 'rgba(221,230,245,0.3)'; ctx.lineWidth = 1;
     rrect(cx - 4, y0, 8, y1 - y0, 4); ctx.fill(); ctx.stroke();
-    const g = ctx.createLinearGradient(0, y0, 0, y0 + (y1 - y0) * f); g.addColorStop(0, 'rgba(63,230,255,0.15)'); g.addColorStop(1, 'rgba(63,230,255,0.55)');
-    ctx.fillStyle = g; rrect(cx - 4, y0, 8, Math.max(8, (y1 - y0) * f), 4); ctx.fill();
-    ctx.fillStyle = PAL.cellHi || '#BFF6FF'; ctx.fillRect(cx - 7, y0 + (y1 - y0) * f - 1, 14, 2);
-    for (const e of events) {
-      const img = ART.ready['marker-' + e.kind]; if (!img) continue;
-      const sz = (e.kind === 'wave-final' ? 22 : 18), ey = y0 + (y1 - y0) * e.at;
-      ctx.globalAlpha = e.at <= f ? 0.3 : 1; ctx.drawImage(img, cx - sz / 2, ey - sz / 2, sz, sz);
-      if (e.ring) { ctx.strokeStyle = e.ring; ctx.lineWidth = 1.8; ctx.beginPath(); ctx.arc(cx, ey, 12, 0, 6.283); ctx.stroke(); }
-      ctx.globalAlpha = 1;
+    if (f > 0) {
+      const g = ctx.createLinearGradient(0, y0, 0, y0 + (y1 - y0) * f); g.addColorStop(0, 'rgba(63,230,255,0.15)'); g.addColorStop(1, 'rgba(63,230,255,0.55)');
+      ctx.fillStyle = g; rrect(cx - 4, y0, 8, Math.max(8, (y1 - y0) * f), 4); ctx.fill();
+      ctx.fillStyle = PAL.cellHi || '#BFF6FF'; ctx.fillRect(cx - 7, y0 + (y1 - y0) * f - 1, 14, 2);
     }
+    events.forEach((e, j) => {
+      const img = ART.ready['marker-' + e.kind]; if (!img) return;
+      const sz = (e.kind === 'wave-final' ? 22 : 18) * (j === k ? 1.15 : 1), ey = y0 + (y1 - y0) * at(j);
+      ctx.globalAlpha = j < k ? 0.25 : 1; ctx.drawImage(img, cx - sz / 2, ey - sz / 2, sz, sz);
+      if (e.ring) { ctx.strokeStyle = e.ring; ctx.lineWidth = 1.8; ctx.beginPath(); ctx.arc(cx, ey, sz * 0.62, 0, 6.283); ctx.stroke(); }
+      ctx.globalAlpha = 1;
+    });
     R.hud.rail = { x: cx, y0, y1 };
   }
   function zonePower(u0, u1, on, shake = 0) {
@@ -755,7 +772,7 @@ const CYT = (function () {
     ctx.fillStyle = 'rgba(4,5,10,0.6)'; ctx.fillRect(0, 0, R.w, R.h);
     ctx.fillStyle = 'rgba(10,13,24,0.98)'; ctx.strokeStyle = '#1E2540'; rrect(x, y, w, h, 14); ctx.fill(); ctx.stroke();
     ctx.textAlign = 'left'; ctx.textBaseline = 'middle';
-    ctx.font = `500 10px ${MONO}`; ctx.fillStyle = '#7A86A0'; ctx.fillText('BODY · PAUSED', x + 14, y + 16);
+    ctx.font = `500 10px ${MONO}`; ctx.fillStyle = '#7A86A0'; ctx.fillText('BODY', x + 14, y + 16); // V35: the fight keeps running behind it
     ctx.font = `650 17px ${FONT}`; ctx.fillStyle = PAL.ui; ctx.fillText('Organ status', x + 14, y + 36);
     ORGANS.forEach(([k, name], i) => {
       const ry = y + 58 + i * rh, lv = organLevel(hp[i]);
@@ -769,7 +786,7 @@ const CYT = (function () {
     });
     const by = y + h - 36, bw = 110, bx = x + (w - bw) / 2;
     ctx.fillStyle = PAL.cell; rrect(bx, by, bw, 26, 8); ctx.fill();
-    ctx.fillStyle = '#04050A'; ctx.font = `600 13px ${FONT}`; ctx.textAlign = 'center'; ctx.fillText('Resume', bx + bw / 2, by + 13.5);
+    ctx.fillStyle = '#04050A'; ctx.font = `600 13px ${FONT}`; ctx.textAlign = 'center'; ctx.fillText('Close', bx + bw / 2, by + 13.5);
     R.hud.resume = [bx + bw / 2, by + 13];
     ctx.restore();
   }
@@ -778,26 +795,28 @@ const CYT = (function () {
     const [x, y, w, h] = rect;
     ctx.fillStyle = '#0A0D18'; ctx.strokeStyle = '#1E2540'; ctx.lineWidth = 1; rrect(x, y, w, h, 10); ctx.fill(); ctx.stroke();
     heart(x + 30, y + 34, 38, st.f, t, st, o);
-    const lx = x + 58, rx = x + w - 10, mul = 0.5 * Math.pow(4, st.out), pct = Math.round(mul * 20) * 5;
+    // V32: the slider runs 25%..200% (stress = 0.25 x 8^pos, 100% at 2/3). Clips still give st.out on the old 50-200%
+    // scale (stress = 0.5 x 4^out), so it's mapped across; st.stress (0.25..2) overrides.
+    const lx = x + 58, rx = x + w - 10, mul = st.stress != null ? st.stress : 0.5 * Math.pow(4, st.out), pct = Math.round(mul * 20) * 5, pos = clamp(Math.log(mul / 0.25) / Math.log(8));
     ctx.textBaseline = 'middle'; ctx.textAlign = 'left'; ctx.font = `600 12px ${FONT}`; ctx.fillStyle = PAL.ui;
     ctx.fillText('Stress', lx, y + 13);
     // the game's label (V27+): "Stress 100%", from 50% to 200%
     ctx.font = `500 11px ${MONO}`; ctx.fillStyle = '#9AA4BC'; ctx.textAlign = 'right'; ctx.fillText(`${pct}%`, rx, y + 13.5);
-    const ty = y + 31, tx0 = lx, tx1 = rx - 2, rest = 0.6;
+    const ty = y + 31, tx0 = lx, tx1 = rx - 2, rest = 0.734; // fatigue builds above 115%
     const gr = ctx.createLinearGradient(tx0, 0, tx1, 0);
     gr.addColorStop(0, 'rgba(63,230,255,.15)'); gr.addColorStop(rest, 'rgba(63,230,255,.45)'); gr.addColorStop(rest + 0.001, '#FFD23F'); gr.addColorStop(rest + (1 - rest) / 2, '#FF7A3D'); gr.addColorStop(1, '#FF3B4E');
     ctx.fillStyle = gr; rrect(tx0, ty - 3, tx1 - tx0, 6, 3); ctx.fill();
-    const kx = tx0 + (tx1 - tx0) * st.out;
+    const kx = tx0 + (tx1 - tx0) * pos;
     ctx.shadowColor = 'rgba(255,210,63,.6)'; ctx.shadowBlur = 8; ctx.fillStyle = PAL.ui; ctx.beginPath(); ctx.arc(kx, ty, 8, 0, 6.283); ctx.fill(); ctx.shadowBlur = 0;
     ctx.strokeStyle = '#04050A'; ctx.lineWidth = 2; ctx.stroke();
     // presets, as in V30: the one matching the current Stress lights gold
-    const pg = 5, pw = (rx - lx - 3 * pg) / 4, py = y + 50;
+    const pg = 4, pw = (rx - lx - 4 * pg) / 5, py = y + 50;
     R.hud.presets = {};
-    [50, 100, 150, 200].forEach((v, i) => {
+    [25, 50, 100, 150, 200].forEach((v, i) => {
       const px = lx + i * (pw + pg), on = Math.abs(pct - v) < 3;
       ctx.fillStyle = on ? 'rgba(255,210,63,0.12)' : '#10152A'; ctx.strokeStyle = on ? '#FFD23F' : '#1E2540'; ctx.lineWidth = 1;
       rrect(px, py - 9, pw, 18, 5); ctx.fill(); ctx.stroke();
-      ctx.fillStyle = on ? '#FFD23F' : '#9AA4BC'; ctx.font = `500 10.5px ${MONO}`; ctx.textAlign = 'center'; ctx.fillText(`${v}%`, px + pw / 2, py + 0.5);
+      ctx.fillStyle = on ? '#FFD23F' : '#9AA4BC'; ctx.font = `500 ${pw < 40 ? 9.5 : 10.5}px ${MONO}`; ctx.textAlign = 'center'; ctx.fillText(`${v}%`, px + pw / 2, py + 0.5);
       R.hud.presets[v] = [px + pw / 2, py];
     });
     const tier = TIER(st.f);
@@ -814,6 +833,34 @@ const CYT = (function () {
     ctx.fillStyle = '#9AA4BC'; ctx.font = `500 10.5px ${MONO}`; ctx.textAlign = 'right'; ctx.fillText(`${Math.round(cells)}/${cap}`, x + w - 10, cy + 0.5);
     R.hud.slider = { x0: tx0, x1: tx1, y: ty };
     R.hud.heart = [x + 30, y + 34];
+  }
+  // V35: the column right of the Storm button, the adrenaline surge (syringe, uses left, drains while it runs)
+  // above Pause. o: { left (uses left, default 3), on, drain (0..1 of the surge left), press: 'surge' | 'pause' }
+  const SYRINGE = 'M18 2l4 4M20 4l-3 3M15 5l4 4M17 7L8.5 15.5 6 16l.5-2.5L15 5M11 9l2 2M9 11l2 2M6 16l-4 4';
+  let syringeP = null;
+  function hudPcol(rect, o = {}) {
+    const [x, y, w, h] = rect, bh = (h - 6) / 2, left = o.left == null ? 3 : o.left, on = !!o.on, dim = !on && left <= 0;
+    // syringe
+    ctx.save(); ctx.globalAlpha = dim ? 0.35 : 1;
+    ctx.fillStyle = o.press === 'surge' ? 'rgba(127,216,255,0.18)' : '#0A0D18'; ctx.strokeStyle = on ? '#7FD8FF' : '#1E2540'; ctx.lineWidth = 1;
+    if (on) { ctx.shadowColor = 'rgba(127,216,255,.5)'; ctx.shadowBlur = 10; }
+    rrect(x, y, w, bh, 12); ctx.fill(); ctx.stroke(); ctx.shadowBlur = 0;
+    if (on && o.drain > 0) {
+      ctx.save(); rrect(x, y, w, bh, 12); ctx.clip();
+      const fh = bh * clamp(o.drain), g = ctx.createLinearGradient(0, y + bh, 0, y + bh - fh);
+      g.addColorStop(0, 'rgba(127,216,255,.4)'); g.addColorStop(1, 'rgba(127,216,255,.12)');
+      ctx.fillStyle = g; ctx.fillRect(x, y + bh - fh, w, fh); ctx.restore();
+    }
+    if (!syringeP && typeof Path2D !== 'undefined') syringeP = new Path2D(SYRINGE);
+    if (syringeP) { ctx.save(); ctx.translate(x + w / 2 - 10, y + bh / 2 - 10); ctx.scale(20 / 24, 20 / 24); ctx.strokeStyle = '#7FD8FF'; ctx.lineWidth = 1.8; ctx.lineCap = 'round'; ctx.lineJoin = 'round'; ctx.stroke(syringeP); ctx.restore(); }
+    ctx.fillStyle = '#7FD8FF'; ctx.font = `600 10px ${MONO}`; ctx.textAlign = 'right'; ctx.textBaseline = 'alphabetic'; ctx.fillText(String(left), x + w - 5, y + bh - 4);
+    ctx.restore();
+    // pause
+    const py = y + bh + 6;
+    ctx.fillStyle = o.press === 'pause' ? 'rgba(221,230,245,0.12)' : '#0A0D18'; ctx.strokeStyle = '#1E2540'; ctx.lineWidth = 1;
+    rrect(x, py, w, bh, 12); ctx.fill(); ctx.stroke();
+    ctx.fillStyle = PAL.ui; ctx.fillRect(x + w / 2 - 5, py + bh / 2 - 6, 3, 12); ctx.fillRect(x + w / 2 + 2, py + bh / 2 - 6, 3, 12);
+    R.hud.surge = [x + w / 2, y + bh / 2]; R.hud.pause = [x + w / 2, py + bh / 2];
   }
   // Storm button: state 'idle' | 'held' | 'risky' (organs would lose bars) | 'lethal' (an organ would fail) | 'burning'. charge 0..1: the 5 s press-and-hold
   // fills a ring around the icon and the button from the bottom; full charge pulses (fires on release)
@@ -916,7 +963,8 @@ const CYT = (function () {
     const hw = Math.min(w, Math.max(SW + LW + RW + RAILW, 340)), hx = (w - hw) / 2;
     R = { w, h, dpr, dt: Math.max(0, Math.min(0.1, dt || 0)), portrait, k, ox, oy, sx: ox, sy: oy, sw: SW, sh: SH, hud: {},
       left: LW ? [ox - LW, oy, LW, SH] : null, right: RW ? [ox + SW, oy, RW, SH] : null, rail: RAILW ? [ox - LW - RAILW, oy, RAILW, SH] : null,
-      bottom: hudB ? [hx, h - hudB, hw, hudB] : null, top: hudT ? [hx, 0, hw, hudT] : null, infoReq: null, ctlReq: null };
+      bottom: hudB ? [hx, h - hudB, hw - 52, hudB] : null, pcol: hudB ? [hx + hw - 46, h - hudB, 46, hudB] : null,
+      top: hudT ? [hx, 0, hw, hudT] : null, infoReq: null, ctlReq: null };
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
     ctx.globalCompositeOperation = 'source-over'; ctx.globalAlpha = 1;
     ctx.fillStyle = PAL.void; ctx.fillRect(0, 0, w, h);
@@ -936,6 +984,7 @@ const CYT = (function () {
     if (side === 'map') { const o = Object.assign({}, R.infoReq || {}, so); sideInfo(o); sideCtl(o); }
     else if (side === 'ctl') { const q = R.ctlReq || { zones: [[0, U]] }; sideCtl(Object.assign({ zones: q.zones, mode: q.mode, flip: q.flip }, so)); }
     if (clip.hudFrame) clip.hudFrame(t, clip.state, api);
+    if (R.pcol) hudPcol(R.pcol, clip.surge ? clip.surge(t, clip.state, api) || {} : {});
     if (clip.overlay) clip.overlay(t, clip.state, api);
     if (clip.fingers) clip.fingers(t, clip.state, api);
   }
@@ -956,7 +1005,7 @@ const CYT = (function () {
     P, ang, spr, icon, glow, blinkGlow, ringFx, burst, dots,
     ent, divide, gulp, shot, volley, alive, scene, drawEnt,
     zoneRect, zoneName, zoneCount, zoneChip, lymphTimer, tag, flowArrow, flash, rrect,
-    MAP, MAP_BG, NODE_U, mapLabels, nodeRow, zonePower, sideCtl, sideInfo, rail, ctlLayout, powerBtn, stanceBtn, miniMix, hudCards, hudSheet, hudOutput, hudStorm, hudProgress, heart, finger, toast, spotlight, vesselRect, organPanel, organLevel, TIER,
+    MAP, MAP_BG, NODE_U, mapLabels, nodeRow, zonePower, hudPcol, sideCtl, sideInfo, rail, ctlLayout, powerBtn, stanceBtn, miniMix, hudCards, hudSheet, hudOutput, hudStorm, hudProgress, heart, finger, toast, spotlight, vesselRect, organPanel, organLevel, TIER,
     get ctx() { return ctx; }, get R() { return R; },
   };
   return { render, api, U, V };

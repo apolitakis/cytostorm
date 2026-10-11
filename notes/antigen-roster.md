@@ -174,3 +174,5 @@ A sample early arc:
 3. ~~MRSA as a true hard-lock (only tuned shots), or should macrophages be able to swallow it slowly as a fallback?~~ Answered 2026-10-08 (Alex): plain neutrophil fire kills it slowly; macrophages still can't swallow it.
 4. Should the progress bar show which antigen is coming in each wave, or only that a new one is coming?
 5. Which one or two would you want to try first in the prototype? My pick: MRSA's swallow immunity plus Pseudomonas, since both are pure enemy changes and together they make the zone-mode choice matter.
+
+**Measles** (Alex 2026-10-10 16:18): stays Sandbox-only, not in the main roster. TB already covers "infects macrophages, NK only".

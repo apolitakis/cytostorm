@@ -9,7 +9,7 @@ const BOT_LEVELS = JSON.parse(JSON.stringify(LEVELS)); // the live game's script
 
 // What is in each zone right now
 function scan(g) {
-  const z = g.zones.map(() => ({ n: 0, mrsa: 0, tb: 0, flu: 0, worm: 0, strep: 0, virus: 0, pseudo: 0, infected: 0, domes: 0, hyph: 0, walled: 0 }));
+  const z = g.zones.map(() => ({ n: 0, mrsa: 0, tb: 0, flu: 0, worm: 0, strep: 0, virus: 0, pseudo: 0, infected: 0, domes: 0, hyph: 0, walled: 0, yeast: 0 }));
   for (const a of g.ag) {
     if (a.dead || a.eaten) continue;
     const s = z[zoneOf(a.u)];
@@ -23,7 +23,8 @@ function scan(g) {
   for (const h of g.hyphae || []) if (!h.wither) z[zoneOf(h.u)].hyph++;
   return z;
 }
-const soonWave = (g, s) => g.markers().some(m => (m.kind === 'wave' || m.kind === 'hatch') && m.t > g.t && m.t - g.t < s);
+// V43: bots time waves by the scripted schedule (t0, what a player can learn), not the jittered real time
+const soonWave = (g, s) => g.markers().some(m => { const t = m.t0 ?? m.t; return (m.kind === 'wave' || m.kind === 'hatch') && t > g.t && t - g.t < s; });
 
 // A zone mix: macrophages until there are `macs` of them, the level's special cell where it counters
 // something, the rest neutrophils
@@ -34,6 +35,15 @@ function counterMix(g, z, s, p) {
   if (p.counters) {
     if (g.units.includes('net') && (s[z].flu > 15 || s[z].hyph > 0 || s[z].n > p.netAt || (z < 2 && s[z + 1] && s[z + 1].flu > 15))) mix.net = p.net;
     if (g.units.includes('nk') && (s[z].infected > 0 || s[z].virus > 0 || s.some(q => q.virus > 9))) mix.nk = p.nk;
+    // campaign units (V39): each where it counters something
+    const q = s[z], has = u => g.units.includes(u);
+    if (has('bcell') && (q.mrsa > 0 || q.n > 30)) mix.bcell = q.mrsa > 0 ? 0.3 : 0.15;
+    if (has('eos') && (q.domes > 0 || q.worm > 0 || q.hyph > 0 || q.yeast > 0 || q.pseudo > 5)) mix.eos = 0.3;
+    if (has('plt') && z < 3 && q.n > 40) mix.plt = 0.15;
+    if (has('dc') && q.n > 10) mix.dc = 0.06;
+    if (has('treg') && z === 0 && g.fatigue > 40) mix.treg = 0.12;
+    if (has('ifn') && (q.virus > 0 || q.infected > 0 || q.flu > 5)) mix.ifn = 0.15;
+    if (has('mast') && (q.worm > 0 || q.yeast > 0)) mix.mast = 0.12;
   } else {
     // no reading of the map: a fixed even sprinkle of everything
     for (const u of g.units) if (u !== 'neut' && u !== 'mac') mix[u] = p.net * 0.5;
@@ -52,10 +62,17 @@ function zoneMode(g, z, s, p) {
   if ((q.domes > 0 || q.hyph > 9) && p.counters && q.mrsa === 0) sup = false;                          // offense tears domes down
   g.setZone(z, sup ? 'support' : 'offense');
 }
+// Bot stress settings were tuned on the V31 slider (50%-200%); V32 drops the floor to 25%, so map each old
+// slider position to the same stress on the new slider (0 stays the bottom: it halves the afterburn)
+function slider(x) {
+  if (x <= 0) return 0;
+  const O = CONFIG.output, m = 0.5 * Math.pow(4, x);
+  return Math.max(0, Math.min(1, Math.log(m / O.min) / Math.log(O.max / O.min)));
+}
 function outputFor(g, p) {
   if (g.storm.after > 0) return 0;                                    // halve the afterburn
-  if (g.fatigue > p.restAt) return Math.min(p.base, 0.15);
-  return soonWave(g, 15) || g.ag.length > 180 ? p.push : p.base;
+  if (g.fatigue > p.restAt) return slider(Math.min(p.base, 0.15));
+  return slider(soonWave(g, 15) || (p.crowdPush !== false && g.ag.length > 180) ? p.push : p.base);
 }
 function maybeStorm(g, p) {
   if (!p.storm || g.stormActive()) return;
@@ -96,6 +113,13 @@ const POLICIES = {
   // Plays well but fires the storm every time it can
   stormSpam: (() => { const f = play(GOOD); return g => { f(g); if (!g.stormActive()) g.useStorm(); }; })(),
   smart: play(GOOD),
+  // Alex (2026-10-10): "too easy to set stress to 25% and chill". chill: Stress at 25%, nothing else (must lose).
+  // coast: good play otherwise, but sits at 25% between waves and only goes to 100% when a wave is close.
+  chill: g => g.setOutput(0),
+  coast: play({ ...GOOD, base: 0, push: 0.5, crowdPush: false }),
+  // Difficulty map finding (2026-10-10): a Support-heavy setup picked at 0:00 and never touched again
+  setForget: g => { if (g.setDone) return; g.setDone = true; for (let z = 0; z < g.zones.length; z++) { g.setZone(z, 'support'); g.setMix(z, { neut: 0.6, mac: 0.4 }); } g.setOutput(2 / 3); },
+  setForget2: g => { if (g.setDone) return; g.setDone = true; for (let z = 0; z < g.zones.length; z++) { g.setZone(z, 'support'); g.setMix(z, { neut: 0.6, mac: 0.4 }); } g.setZoneOn(2, false); g.setZoneOn(3, false); g.setOutput(2 / 3); },
   // Good play, but every cell is made for one zone (the other two switched off)
   funnelWound: funnel(0), funnelTissue: funnel(1), funnelDeep: funnel(2), funnelLymph: funnel(3),
   // Good play that switches production off in empty zones and back on when something arrives
@@ -109,6 +133,8 @@ const POLICIES = {
   offenseHeavy: play({ ...GOOD, style: 'offense', macs: 54, macShare: 0.8, crowd: 999 }),
   // Gunners only: never makes macrophages
   gunner: play({ ...GOOD, macs: 0 }),
+  // V39: good play that also keeps a big share of the level's new campaign unit everywhere (is the new cell too strong?)
+  leanNew: (() => { const f = play(GOOD), NEW = ['bcell', 'eos', 'plt', 'dc', 'treg', 'ifn', 'mast']; return g => { f(g); const u = g.units.find(x => NEW.includes(x)); if (!u) return; for (let z = 0; z < g.zones.length; z++) g.setShare(z, u, 0.35); }; })(),
   // Skill ladder between mashing and good play
   beginner: every(6, (() => { const f = play({ ...GOOD, counters: false, base: 0.5, push: 0.5, storm: false }); return g => { if (g.rand2() < 0.35) randomPress(g); else f(g); }; })()),
   casual: every(3, (() => { const f = play({ ...GOOD, base: 0.5, push: 0.5, storm: false }); return g => { if (g.rand2() < 0.1) randomPress(g); else f(g); }; })()),
@@ -125,6 +151,8 @@ const STYLES = [
   { key: 'supportHeavy', name: 'Support-heavy', about: 'Max macrophages, Tissue and Lymph node on Support all game.' },
   { key: 'offenseHeavy', name: 'Offense-heavy', about: 'Max macrophages, everything on Offense except where MRSA is.' },
   { key: 'gunner', name: 'Gunners only', about: 'Never makes macrophages; neutrophils plus the level\'s special cell.' },
+  { key: 'chill', name: 'Chiller', about: 'Sets Stress to 25% and touches nothing else. Should lose.' },
+  { key: 'coast', name: 'Coaster', about: 'Plays well but sits at 25% Stress between waves, 100% only when a wave is close.' },
   { key: 'stormSpam', name: 'Storm spammer', about: 'Plays well but fires the storm every time it can. Should lose.' },
 ];
 

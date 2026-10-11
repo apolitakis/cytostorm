@@ -46,7 +46,7 @@ button:focus-visible { outline: 2px solid var(--gold); outline-offset: 2px; }
   <header>
     <span class="eyebrow">Cytostorm · tutorial clips</span>
     <h1>Short clips that teach the game <em>before it starts</em></h1>
-    <p>The basics play before the first level. Each later level opens with a clip for the new antigen it brings. Tap the picture to pause; anything that multiplies blinks first, just like in the game.</p>
+    <p>The basics play before the first level. Each later level opens with a clip for the new antigen it brings, then one for the new cell you can make there. Tap the picture to pause; anything that multiplies blinks first, just like in the game.</p>
   </header>
   <div class="main">
     <div id="player"></div>
@@ -63,6 +63,10 @@ button:focus-visible { outline: 2px solid var(--gold); outline-offset: 2px; }
       <div class="group">
         <h2>New antigens <span>one per level</span></h2>
         <div class="list" id="antigens"></div>
+      </div>
+      <div class="group">
+        <h2>New cells <span>one per level, after its antigen</span></h2>
+        <div class="list" id="units"></div>
       </div>
       <p class="note">The clips are vertical on every screen, like the game: the Wound at the top, the Lymph node at the bottom, and the blood vessel down the left.</p>
     </aside>
@@ -85,6 +89,7 @@ button:focus-visible { outline: 2px solid var(--gold); outline-offset: 2px; }
     toxin: ['marker-toxin', 'The level bar, and Staph crowds that glow and pop unless you thin them.'],
     storm: ['storm', 'Hold 5 seconds to charge, let go to fire, then the afterburn.'],
     stormRisk: ['storm-lethal', 'Orange: organs will lose bars. Red: an organ would fail. Let go early to cancel.'],
+    surge: ['neutrophil', 'The syringe slows the fight 10× for 10 s so you can change your cells. 3 per map.'],
     mrsa: ['mrsa', 'Plain shots chip it (12 hits) and it heals when it divides. Tuned shots kill it at once.', 'Hospital visit'],
     pseudo: ['pseudomonas', 'Slime domes soak up shots. Offense tears them down.', 'Pool water'],
     flu: ['flu', 'Swarms split in the Tissue. A Net neutrophil pens a cluster.', 'Flu season'],
@@ -95,6 +100,13 @@ button:focus-visible { outline: 2px solid var(--gold); outline-offset: 2px; }
     toxic: ['staph-toxic', 'Your body tires twice as fast while it lives.', 'Sore throat'],
     herpes: ['herpes', 'Hides in your neutrophils. NK cells pop them.', 'Cold sore'],
     worm: ['tapeworm-head', 'The boss. Broken segments run off as small worms.', 'Gut'],
+    bcell: ['b-cell', 'Antibody clouds tag germs: they clump, and macrophages swallow them twice as fast, MRSA too.', 'Hospital visit'],
+    eos: ['eosinophil', 'Latch onto domes, Candida or the Tapeworm, charge 2.5 s, then pop.', 'Pool water'],
+    plt: ['platelet-stuck', 'A clot wall at the sector\'s far edge that germs pile up against.', 'Soil cut'],
+    dc: ['dendritic-carrying', 'Walks a germ sample to the Lymph node: that kind takes 50% more damage.', "Athlete's foot"],
+    treg: ['treg', 'Slow fatigue and Overload damage, but slow your other cells a little.', 'Sore throat'],
+    ifn: ['interferon-cell', 'A haze Herpes can\'t hijack through; flu in it moves at half speed.', 'Cold sore'],
+    mast: ['mast-cell', 'Mucus slows the whole sector when the Tapeworm or Candida comes close.', 'Gut'],
   };
   const artUrl = n => 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(ART.svg[n] || '');
   let current = null, list = [];
@@ -116,6 +128,7 @@ button:focus-visible { outline: 2px solid var(--gold); outline-offset: 2px; }
   CytoTutorial.BASICS.forEach(id => row(id, document.getElementById('basics'), CytoTutorial.BASICS, 'How to play'));
   CytoTutorial.SYSTEMS.forEach(id => row(id, document.getElementById('systems'), CytoTutorial.SYSTEMS, 'Sandbox system'));
   CytoTutorial.ANTIGENS.forEach(id => row(id, document.getElementById('antigens'), CytoTutorial.ANTIGENS, 'New antigen'));
+  CytoTutorial.UNITS.forEach(id => row(id, document.getElementById('units'), CytoTutorial.UNITS, 'New cell'));
   document.getElementById('playBasics').addEventListener('click', () => start(CytoTutorial.BASICS, 0, 'How to play'));
   setInterval(() => current && mark(), 400);
   start(CytoTutorial.BASICS, 0, 'How to play');

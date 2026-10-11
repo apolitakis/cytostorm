@@ -1,0 +1,709 @@
+<title>Cytostorm Campaign Planner</title>
+<meta name="description" content="Plan a Cytostorm campaign: buy upgrades and see each stage's win chance and Samples, measured with the game's own bots.">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Instrument+Sans:wdth,wght@75..100,400..700&family=IBM+Plex+Mono:wght@400;500;600&display=swap">
+<style>
+/* Layout: the game's own night-blue world. Wide: stage track left, Clinic right, campaign forecast under both. Phone: one column. */
+:root {
+  --void: #04050A; --panel: #0A0D18; --panel2: #10152A; --line: #1E2540;
+  --ink: #DDE6F5; --dim: #7A86A0;
+  --cell: #3FE6FF; --gold: #FFD23F; --germ: #FF3DCB; --good: #5CFFA1; --bad: #FF3B4E; --warn: #FF7A3D;
+  --display: "Instrument Sans", "Helvetica Neue", Arial, sans-serif;
+  --mono: "IBM Plex Mono", ui-monospace, Menlo, monospace;
+  color-scheme: dark;
+}
+* { box-sizing: border-box; }
+body { background: var(--void); color: var(--ink); font: 14px/1.45 var(--display); padding-inline: 16px; padding-block: 18px 40px; }
+.wrap { max-width: 1120px; margin: 0 auto; display: grid; gap: 16px; }
+h1, h2, h3 { margin: 0; text-wrap: balance; }
+h1 { font-size: 22px; font-weight: 700; font-stretch: 85%; letter-spacing: .01em; }
+h2 { font-size: 13px; font-weight: 600; text-transform: uppercase; letter-spacing: .09em; color: var(--dim); }
+p { margin: 0; }
+small, .dim { color: var(--dim); }
+button { font: inherit; color: inherit; cursor: pointer; }
+button:focus-visible, input:focus-visible, select:focus-visible { outline: 2px solid var(--cell); outline-offset: 2px; }
+.num { font-family: var(--mono); font-variant-numeric: tabular-nums; }
+
+/* top bar */
+.top { display: flex; flex-wrap: wrap; align-items: center; gap: 12px 20px; justify-content: space-between; }
+.top .title { display: grid; gap: 2px; min-width: 0; }
+.bank { display: flex; flex-wrap: wrap; align-items: center; gap: 10px 18px; }
+.smp { display: inline-flex; align-items: center; gap: 6px; font: 600 20px var(--mono); color: var(--gold); font-variant-numeric: tabular-nums; }
+.smp i { width: 10px; height: 10px; background: var(--gold); transform: rotate(45deg); box-shadow: 0 0 8px rgba(255,210,63,.6); flex: none; }
+.smp.sm { font-size: 13px; gap: 4px; } .smp.sm i { width: 7px; height: 7px; }
+.skill { display: grid; gap: 2px; min-width: 200px; }
+.skill label { font-size: 12px; color: var(--dim); display: flex; justify-content: space-between; gap: 8px; }
+.skill input { width: 100%; accent-color: var(--cell); }
+.btn { background: var(--panel2); border: 1px solid var(--line); border-radius: 8px; padding: 6px 12px; font-weight: 600; font-size: 13px; }
+.btn:hover:not(:disabled) { border-color: var(--dim); }
+.btn:disabled { opacity: .4; cursor: default; }
+.btn.go { border-color: var(--cell); color: var(--cell); }
+.btn.gold { border-color: var(--gold); color: var(--gold); }
+
+.cols { display: grid; grid-template-columns: minmax(0, 1.15fr) minmax(0, 1fr); gap: 16px; align-items: start; }
+@media (max-width: 820px) { .cols { grid-template-columns: minmax(0, 1fr); } }
+.panel { background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 14px; display: grid; gap: 10px; min-width: 0; }
+.panel > header { display: flex; justify-content: space-between; align-items: baseline; gap: 10px; flex-wrap: wrap; }
+
+/* stage track */
+.track { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; }
+.stage { display: grid; grid-template-columns: 2em minmax(0, 1fr) 7.5em auto; gap: 10px; align-items: center; padding: 8px 10px; border: 1px solid var(--line); border-radius: 9px; background: var(--panel2); }
+.stage .n { font: 600 13px var(--mono); color: var(--dim); text-align: center; }
+.stage .nm { min-width: 0; }
+.stage .nm b { font-weight: 600; }
+.stage .nm small { display: block; font-size: 12px; }
+.stage.done { border-color: rgba(255,210,63,.35); }
+.stage.done .n { color: var(--gold); }
+.stage.next { border-color: var(--cell); box-shadow: 0 0 0 1px rgba(63,230,255,.15) inset; }
+.stage.next .n { color: var(--cell); }
+.stage.locked { opacity: .78; }
+.odds { display: grid; gap: 3px; }
+.odds .pct { font: 600 13px var(--mono); text-align: right; font-variant-numeric: tabular-nums; }
+.bar { height: 6px; border-radius: 3px; background: var(--line); overflow: hidden; }
+.bar span { display: block; height: 100%; border-radius: 3px; }
+.stage .act { display: flex; gap: 6px; justify-content: flex-end; }
+.stage .act .btn { padding: 4px 10px; }
+@media (max-width: 480px) {
+  .stage { grid-template-columns: 1.6em minmax(0, 1fr) 5.5em; }
+  .stage .act { grid-column: 2 / -1; justify-content: flex-start; }
+}
+
+/* clinic */
+.tabs { display: flex; gap: 6px; flex-wrap: wrap; }
+.tabs button { background: var(--panel2); border: 1px solid var(--line); border-radius: 8px; padding: 6px 12px; font-weight: 600; font-size: 13px; color: var(--dim); }
+.tabs button[aria-selected="true"] { border-color: var(--cell); color: var(--cell); }
+.tabs button:disabled { opacity: .45; cursor: default; }
+.shop { display: grid; gap: 6px; }
+.item { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 4px 10px; align-items: center; padding: 8px 10px; border: 1px solid var(--line); border-radius: 9px; background: var(--panel2); }
+.item .nm { min-width: 0; display: grid; gap: 1px; }
+.item .nm b { font-weight: 600; display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.item .nm small { font-size: 12px; }
+.pips { display: inline-flex; gap: 3px; }
+.pips i { width: 9px; height: 9px; border-radius: 2px; border: 1px solid var(--dim); }
+.pips i.on { background: var(--cell); border-color: var(--cell); }
+.gain { font: 500 12px var(--mono); font-variant-numeric: tabular-nums; }
+.up { color: var(--good); } .down { color: var(--bad); } .flat { color: var(--dim); }
+.item .buy { display: grid; justify-items: end; gap: 3px; }
+.grp { font-size: 11px; text-transform: uppercase; letter-spacing: .08em; color: var(--dim); margin-top: 6px; }
+.note { font-size: 12.5px; color: var(--dim); border-left: 2px solid var(--line); padding-left: 10px; }
+.treat { display: grid; gap: 6px; }
+.treat label { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; gap: 10px; align-items: start; padding: 8px 10px; border: 1px solid var(--line); border-radius: 9px; background: var(--panel2); cursor: pointer; }
+.treat label:has(input:checked) { border-color: var(--cell); }
+.treat input { accent-color: var(--cell); margin-top: 3px; }
+.treat small { display: block; font-size: 12px; }
+.treat .minus { color: var(--warn); }
+
+/* log */
+.log { list-style: none; margin: 0; padding: 0; display: grid; gap: 4px; max-height: 260px; overflow: auto; font-size: 13px; }
+.log li { display: grid; grid-template-columns: 4.5em minmax(0, 1fr) auto; gap: 8px; padding: 4px 0; border-bottom: 1px solid var(--line); }
+.log .tag { font: 600 11px var(--mono); text-transform: uppercase; letter-spacing: .05em; }
+.tag.won { color: var(--good); } .tag.lost { color: var(--bad); } .tag.buy { color: var(--cell); }
+
+/* forecast */
+.fc { overflow-x: auto; }
+table { border-collapse: collapse; width: 100%; font-size: 13px; }
+th, td { padding: 6px 8px; text-align: right; border-bottom: 1px solid var(--line); white-space: nowrap; }
+th:first-child, td:first-child { text-align: left; }
+th { font-weight: 600; color: var(--dim); font-size: 12px; }
+td { font-family: var(--mono); font-variant-numeric: tabular-nums; }
+td:first-child { font-family: var(--display); }
+.heat { display: inline-block; min-width: 3.2em; padding: 1px 6px; border-radius: 5px; }
+.legend { display: flex; gap: 14px; flex-wrap: wrap; font-size: 12px; color: var(--dim); }
+.about { font-size: 13px; }
+.about #about { display: grid; gap: 8px; }
+.about p, .about ul { max-width: 75ch; }
+.about ul { margin: 0; padding-left: 18px; display: grid; gap: 4px; }
+.flash { animation: flash .9s ease-out; }
+@keyframes flash { from { background: rgba(63,230,255,.18); } to { background: var(--panel2); } }
+@media (prefers-reduced-motion: reduce) { .flash { animation: none; } }
+</style>
+
+<div class="wrap">
+  <div class="top">
+    <div class="title">
+      <h1>Cytostorm Campaign Planner</h1>
+      <small id="sub">Win chances measured with the game's own bots.</small>
+    </div>
+    <div class="bank">
+      <div><small>Samples</small><div class="smp" id="bank"><i></i><span>0</span></div></div>
+      <div class="skill">
+        <label for="skill"><span>Casual</span><span id="skillName">Player skill</span><span>Good player</span></label>
+        <input type="range" id="skill" min="0" max="1" step="0.05" value="0.5">
+      </div>
+      <div style="display:flex;gap:6px">
+        <button class="btn" id="undo" type="button">Undo</button>
+        <button class="btn" id="reset" type="button">New campaign</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="cols">
+    <section class="panel" aria-labelledby="h-track">
+      <header><h2 id="h-track">Stages</h2><small id="trackNote">Win chance with your build and that stage's treatment</small></header>
+      <ol class="track" id="track"></ol>
+      <h2>What happened</h2>
+      <ul class="log" id="log"></ul>
+    </section>
+
+    <section class="panel" aria-labelledby="h-clinic">
+      <header><h2 id="h-clinic">Clinic</h2><small id="clinicFor"></small></header>
+      <div class="tabs" role="tablist" id="tabs"></div>
+      <div id="pane"></div>
+    </section>
+  </div>
+
+  <section class="panel" aria-labelledby="h-fc">
+    <header><h2 id="h-fc">Play the rest out 1,000 times</h2>
+      <div style="display:flex;gap:6px;flex-wrap:wrap"><button class="btn go" id="runFc" type="button">Run forecast</button></div></header>
+    <p class="dim" style="font-size:13px">From where you are now, three spending habits play every remaining stage until each is cleared (a loss means a replay). <b>My buy order</b> keeps buying what you bought, in the order you bought it, as Samples allow. <b>Best value</b> buys whatever adds the most win chance per Sample on the next stage. <b>Never buy</b> banks everything.</p>
+    <div class="fc" id="fc"><p class="dim">Running…</p></div>
+    <div class="legend"><span>Cells: chance to clear that stage on the first try</span><span>Tries: average plays to clear the whole campaign (10 is perfect)</span><span>Spends: Samples spent from here on</span></div>
+  </section>
+
+  <section class="panel about" aria-labelledby="h-about">
+    <h2 id="h-about">Where the numbers come from</h2>
+    <div id="about"></div>
+  </section>
+</div>
+
+<script>
+'use strict';
+// ---------------------------------------------------------------------------
+// Cytostorm campaign: the rules layer. No DOM, so it also runs under node.
+// Spec: notes/campaign-brainstorm.md ("Locked for building", Alex 2026-10-08).
+//
+// Everything is applied from outside v3's sim (prototype/v3/src/sim.js, read-only):
+// - upgrades and treatments change CONFIG before each map (reset from a base copy first),
+// - the loadout swaps the level's unit list while the Game is built,
+// - Samples, antibiotics, vaccines wrap a few methods on the one Game instance
+//   (tick, damage, spawnAg, stepAntigens, stepMac).
+// ---------------------------------------------------------------------------
+const CAMPAIGN = (() => {
+  const BACTERIA = new Set(['staph', 'mrsa', 'pseudo', 'clos', 'tb', 'toxic', 'strep']);
+  // Samples per kill, by toughness. Tapeworm counts per segment (12 segments, about 140 a worm at V28 scale).
+  const VALUE = { staph: 1, mrsa: 4, pseudo: 2, flu: 0.5, spore: 1, clos: 1, tb: 4, toxic: 1.5, strep: 1, virus: 0.5, worm: 12, wormlet: 1, yeast: 3 };
+  const CUT_VALUE = 0.2;     // per hypha segment cut by a net or chewed
+  const RATE = 0.12 / 3.9;   // Samples = RATE x kill value (calibrated with bots so a first clear pays roughly 150-300).
+                             // Play V28 sends 3.9x the germs (3x units, then waves x1.3), so the rate is divided by 3.9 to keep the shop prices.
+  const FIRST_BONUS = 0.5;   // first clear pays 50% extra
+  const REPEAT = 0.25;       // replays and losses pay a quarter
+  const SLOTS = 2;           // specialist slots in the loadout
+  // Filled from the sim's UNIT table at boot (setUnits), so new units join the loadout without changes here
+  const SPECIALISTS = ['net', 'nk'];
+  const UNIT_ORDER = ['neut', 'net', 'nk', 'mac'];
+  function setUnits(keys) {
+    UNIT_ORDER.splice(0, UNIT_ORDER.length, ...keys);
+    SPECIALISTS.splice(0, SPECIALISTS.length, ...keys.filter(k => k !== 'neut' && k !== 'mac'));
+  }
+
+  // Where each map sits on the body (viewBox 0 0 724 1448, the body art's). Every map is a wound there, named "Stage N: <where>" (Alex, 2026-10-08).
+  // Unknown levels fall back to a spot by the side.
+  const PLACES = {
+    papercut: { where: 'Finger', x: 636, y: 756 }, hospital: { where: 'Elbow', x: 176, y: 472 },
+    pool: { where: 'Ear', x: 290, y: 172 }, flu: { where: 'Nose', x: 362, y: 168 }, soil: { where: 'Knee', x: 282, y: 944 },
+    foot: { where: 'Foot', x: 434, y: 1296 }, lungs: { where: 'Chest', x: 294, y: 356 }, throat: { where: 'Neck', x: 362, y: 270 },
+    coldsore: { where: 'Lip', x: 362, y: 220 }, gut: { where: 'Belly', x: 362, y: 560 },
+  };
+
+  // What a vaccine is called and covers (wormlets share the Tapeworm's, hatched Clostridium the spore's)
+  const VACCINE_OF = { staph: 'staph', mrsa: 'mrsa', pseudo: 'pseudo', flu: 'flu', spore: 'clos', clos: 'clos', tb: 'tb', toxic: 'toxic', strep: 'strep', virus: 'virus', worm: 'worm', wormlet: 'worm', yeast: 'yeast' };
+  const VACCINE_COST = 120;
+  // Germ cards in the Clinic: what it does, what beats it (unit = the cell that counters it), keyed like vaccines
+  // units = the cells that counter it, best first; the card and the loadout warning only nag when none of them is packed.
+  // Play V39's units (Alex, 2026-10-10) each answer their own stage's new germ.
+  const GERM = {
+    staph: { does: 'Drifts toward the Lymph node and doubles. Big crowds set off quorum bursts.', beat: 'Neutrophils shoot it; macrophages swallow it.', units: ['neut'] },
+    mrsa: { does: 'Armored. Plain shots barely scratch it and macrophages spit it out.', beat: 'Support macrophages tune shots to kill it in one hit. B cells tag it so macrophages can swallow it.', units: ['mac', 'bcell'], art: 'macrophage-support' },
+    pseudo: { does: 'Settles and grows a slime dome that shots, nets and storms bounce off.', beat: 'Offense macrophages tear the domes down. Eosinophils latch on and pop them.', units: ['mac', 'eos'] },
+    flu: { does: 'Tiny, fast swarms. Each one that reaches the Tissue splits.', beat: 'Net neutrophils wipe out whole clusters.', units: ['net'] },
+    clos: { does: 'Spores sit inert, then hatch into fast-dividing bacteria.', beat: 'A platelet wall holds the hatch; nets pen it.', units: ['plt', 'net'] },
+    tb: { does: 'Slow and tough. A macrophage that swallows it turns into a TB factory.', beat: 'NK cells kill infected macrophages.', units: ['nk'] },
+    toxic: { does: 'While any are alive, fatigue builds much faster.', beat: 'Kill it fast with neutrophils. Regulatory T cells calm the fatigue it causes.', units: ['treg'] },
+    strep: { does: 'Chains sprint for the Lymph node. Shooting a link splits the chain.', beat: 'Macrophages swallow links without splitting them. A platelet wall stops the sprint.', units: ['mac', 'plt'] },
+    virus: { does: 'Hides inside your neutrophils and bursts out of them later.', beat: 'NK cells pop infected neutrophils. Interferon haze stops it hiding.', units: ['nk', 'ifn'] },
+    worm: { does: 'The boss. Crawls to the Lymph node; broken segments become small fast worms.', beat: 'Mast cell mucus slows its crawl and eosinophils pop its segments.', units: ['mast', 'eos'] },
+    yeast: { does: 'Grows threads toward the Lymph node that other germs ride. Shots pass through them.', beat: 'Net neutrophils cut the threads. Eosinophils pop yeast and threads.', units: ['net', 'eos'] },
+  };
+  // When a germ (vaccine key) shows up in a stage, from its wave list and the trickle between waves
+  function arrival(lv, kind) {
+    const n = lv.waves.length, at = [];
+    lv.waves.forEach((w, i) => { if (Object.keys(w).some(k => VACCINE_OF[k] === kind && w[k] > 0)) at.push(i + 1); });
+    const drip = ((lv.stream && lv.stream.kinds) || []).some(x => VACCINE_OF[x.k] === kind);
+    const list = a => a.length > 1 ? `${a.slice(0, -1).join(', ')} and ${a[a.length - 1]}` : `${a[0]}`;
+    let s = '';
+    if (at.length === n) s = 'Every wave';
+    else if (at.length === 1) s = at[0] === n ? 'The final wave' : at[0] === 1 ? 'The first wave' : `Wave ${at[0]} of ${n}`;
+    else if (at.length > 1 && at[at.length - 1] === n && at.length === n - at[0] + 1) s = `From wave ${at[0]} on`;
+    else if (at.length) s = `Waves ${list(at)} of ${n}`;
+    if (drip) s = s ? `${s}, and trickles in between` : 'Trickles in between waves';
+    return s;
+  }
+  const vaccineWhat = k => k === 'flu' ? 'Influenza stops splitting.' : k === 'virus' ? "Herpes can't hide in your neutrophils." : k === 'mrsa' || k === 'worm' ? 'Shots and nets do 1 extra damage to it.' : 'Shots and nets do 1 extra damage to it, and macrophages swallow it twice as fast.';
+
+  // ---- upgrades: bought with Samples, kept all campaign ----
+  const pct = x => `${Math.round(x * 100)}%`;
+  const UPGRADES = [
+    { id: 'marrow', group: 'Production', name: 'Production rate', cost: [80, 160, 260], what: r => `Cells are made ${pct(0.05 * r)} faster.`, apply: (C, r) => { C.marrow.rate *= 1 + 0.05 * r; } },
+    { id: 'heart', group: 'Production', name: 'Big heart', cost: [100, 200, 320], what: r => `Stress tops out at ${Math.round((2 + 0.15 * r) * 100)}%.`, apply: (C, r) => { C.output.max += 0.15 * r; } },
+    { id: 'trigger', group: 'Neutrophils', name: 'Quick trigger', cost: [80, 160, 260], what: r => `Neutrophils fire ${pct(1 / (1 - 0.03 * r) - 1)} more often.`, apply: (C, r) => { C.neutrophil.fireEvery *= 1 - 0.03 * r; } },
+    { id: 'life', group: 'Neutrophils', name: 'Long-lived', cost: [60, 120, 200], what: r => `Neutrophils live ${1.5 * r} s longer.`, apply: (C, r) => { C.neutrophil.life += 1.5 * r; } },
+    { id: 'nets', group: 'Neutrophils', name: 'Wide nets', cost: [70, 140, 220], need: 'net', what: r => `Net neutrophil pens are ${pct(0.12 * r)} wider.`, apply: (C, r) => { C.net.burst *= 1 + 0.12 * r; } },
+    { id: 'gulp', group: 'Macrophages', name: 'Big appetite', cost: [90, 180, 280], what: r => `Macrophages on Offense swallow ${pct(1 / (1 - 0.15 * r) - 1)} more often.`, apply: (C, r) => { C.macrophage.eatEvery *= 1 - 0.15 * r; } },
+    { id: 'rings', group: 'Macrophages', name: 'Wide rings', cost: [90, 180, 280], what: r => `Support rings are ${pct(0.1 * r)} wider.`, apply: (C, r) => { C.support.ring *= 1 + 0.1 * r; } },
+    { id: 'macs', group: 'Macrophages', name: 'Reserve', cost: [80, 160, 260], what: r => `${6 * r} more macrophages allowed at once.`, apply: (C, r) => { C.caps.mac += 6 * r; } },
+    { id: 'nk', group: 'Specialists', name: 'Hardy NK cells', cost: [70, 140, 220], need: 'nk', what: r => `NK cells are ${pct(0.2 * r)} faster and live ${15 * r} s longer.`, apply: (C, r) => { C.nk.speed *= 1 + 0.2 * r; C.nk.life += 15 * r; } },
+    // one line per Play V39 unit (Alex, 2026-10-10), locked until the unit joins
+    { id: 'bcell', group: 'Specialists', name: 'Big clouds', cost: [70, 140, 220], need: 'bcell', what: r => `B cell antibody clouds are ${pct(0.15 * r)} wider.`, apply: (C, r) => { C.bcell.cloud *= 1 + 0.15 * r; } },
+    { id: 'eos', group: 'Specialists', name: 'Short fuse', cost: [70, 140, 220], need: 'eos', what: r => `Eosinophils pop ${pct(0.15 * r)} sooner after latching on.`, apply: (C, r) => { C.eos.charge *= 1 - 0.15 * r; } },
+    { id: 'plt', group: 'Specialists', name: 'Tough clots', cost: [70, 140, 220], need: 'plt', what: r => `Platelets hold the wall ${3 * r} s longer.`, apply: (C, r) => { C.plt.hp += 3 * r; } },
+    { id: 'dc', group: 'Specialists', name: 'Swift couriers', cost: [70, 140, 220], need: 'dc', what: r => `Dendritic couriers walk ${pct(0.2 * r)} faster.`, apply: (C, r) => { C.dc.speed *= 1 + 0.2 * r; } },
+    { id: 'treg', group: 'Specialists', name: 'Deep calm', cost: [70, 140, 220], need: 'treg', what: r => `Each Regulatory T cell calms fatigue by ${5 + r}% instead of 5%.`, apply: (C, r) => { C.treg.calm += 0.01 * r; } },
+    { id: 'ifn', group: 'Specialists', name: 'Wide haze', cost: [70, 140, 220], need: 'ifn', what: r => `Interferon haze is ${pct(0.15 * r)} wider.`, apply: (C, r) => { C.ifn.haze *= 1 + 0.15 * r; } },
+    { id: 'mast', group: 'Specialists', name: 'Long mucus', cost: [70, 140, 220], need: 'mast', what: r => `Mast cell mucus lasts ${1.5 * r} s longer.`, apply: (C, r) => { C.mast.mucus += 1.5 * r; } },
+    { id: 'recover', group: 'Body', name: 'Fast recovery', cost: [80, 160, 260], what: r => `Fatigue recovers ${pct(0.12 * r)} faster.`, apply: (C, r) => { C.output.recover *= 1 + 0.12 * r; } },
+    { id: 'stamina', group: 'Body', name: 'Stamina', cost: [100, 200, 320], what: r => `You can hold ${Math.round((1.15 + 0.06 * r) * 100)}% stress before tiring.`, apply: (C, r) => { C.output.rest += 0.06 * r; } },
+    { id: 'cool', group: 'Body', name: 'Cool head', cost: [70, 140, 220], what: r => `Storm afterburn is ${1.5 * r} s shorter.`, apply: (C, r) => { C.storm.after = Math.max(1, C.storm.after - 1.5 * r); } },
+  ];
+
+  // ---- treatments: one per map, passive, cost on that map only (Alex, 2026-10-08) ----
+  const TREATMENTS = [
+    { id: 'none', name: 'No treatment', plus: 'Nothing changes.', minus: '' },
+    { id: 'antibiotics', name: 'Antibiotics', plus: 'Shots and nets do double damage to bacteria.', minus: 'About 1 in 5 arriving bacteria are resistant: armored like MRSA.', apply: () => {} },
+    { id: 'antifungals', name: 'Antifungals', plus: 'Fungus threads creep a third as fast, bud a third as often, and yeast dies in half the hits.', minus: 'Hard on the liver: fatigue recovers 1% slower.',
+      apply: C => { C.fungus.grow *= 3; C.fungus.budEvery *= 3; C.fungus.hp = Math.max(1, Math.ceil(C.fungus.hp / 2)); C.output.recover *= 0.99; } },
+    { id: 'antivirals', name: 'Antivirals', plus: "Herpes can't hide in your cells and Influenza can't split.", minus: 'Bacteria divide 20% faster.',
+      apply: C => { C.herpes.seek = 0; C.flu.split = 1; for (const k of ['staph', 'mrsa', 'pseudo', 'clos', 'tb', 'toxic']) C[k].doubling /= 1.2; } },
+    { id: 'steroids', name: 'Steroids', plus: 'Calms the body: fatigue builds half as fast and the storm costs 30 instead of 50.', minus: 'You make 30% fewer cells.',
+      apply: C => { C.output.tire *= 0.5; C.storm.cost *= 0.6; C.marrow.rate *= 0.7; } },
+    { id: 'fever', name: 'Fever reducer', plus: 'Every fatigue tier starts 10 points later.', minus: "Fever no longer slows bacteria: they divide at full speed even when you're tired.",
+      apply: C => { C.fatigue.tired += 10; C.fatigue.feverish += 10; C.fatigue.exhausted += 10; if (C.fever) C.fever.on = 0; } },
+  ];
+  const treatment = id => TREATMENTS.find(t => t.id === id) || TREATMENTS[0];
+
+  // ---- campaign state ----
+  const fresh = () => ({ v: 1, samples: 0, cleared: {}, plays: {}, upgrades: {}, vaccines: {}, loadout: null, treat: {}, earned: 0, seen: {}, diff: null });
+
+  // The Clinic opens one part at a time over the first stages, each with a short note (Alex, 2026-10-08).
+  // Stage 1 has no Clinic. A part opens once you reach that stage (0-based), and stays open on replays.
+  const CLINIC = [
+    { id: 'shop', tab: 'Shop', at: 1, title: 'The Clinic',
+      text: 'Before each stage you prepare the patient here. Kills earn Samples. Spend them in the Shop on upgrades that last the whole campaign. More of the Clinic opens over the next stages.' },
+    { id: 'treat', tab: 'Treatment', at: 2, title: 'New: Treatment',
+      text: 'Pick one drug for this stage. Each one helps a lot and costs you something, on this stage only. No treatment is a fine choice.' },
+    { id: 'vax', tab: 'Vaccines', at: 3, title: 'New: Vaccines',
+      text: "Vaccinate against a germ you've already met. You pay once, and your cells hit it harder for the rest of the campaign." },
+    { id: 'loadout', tab: 'Loadout', at: 4, title: 'New: Loadout',
+      text: `Choose which specialists come to a stage. Neutrophils and macrophages always come, plus up to ${SLOTS} specialists.` },
+  ];
+  // Once there are more specialists by Stage 4 than slots, Loadout opens there and Vaccines moves to Stage 5
+  function clinicAt(order, levels) {
+    const early = levels ? SPECIALISTS.filter(sp => { const i = order.findIndex(k => levels[k].units.includes(sp)); return i >= 0 && i <= 3; }).length : 0;
+    return early > SLOTS ? { loadout: 3, vax: 4 } : {};
+  }
+  const clinicOpen = (st, order, levels) => {
+    const at = clinicAt(order, levels);
+    return CLINIC.map(c => (c.id in at ? Object.assign({}, c, { at: at[c.id] }) : c)).sort((a, b) => a.at - b.at).filter(c => reached(st, order) >= c.at);
+  };
+  // A map is open once the one before it is cleared
+  function isOpen(st, order, key) { const i = order.indexOf(key); return i === 0 || !!st.cleared[order[i - 1]]; }
+  function reached(st, order) { let i = 0; while (i < order.length - 1 && st.cleared[order[i]]) i++; return i; }
+  function kindsIn(lv) {
+    const s = new Set();
+    for (const w of lv.waves) for (const k in VALUE) if (w[k]) s.add(k);
+    for (const x of (lv.stream && lv.stream.kinds) || []) s.add(x.k);
+    return s;
+  }
+  // Specialists unlock free when you reach the map that introduces them (PvZ style)
+  function unlocked(st, levels, order) {
+    const upTo = reached(st, order), out = [];
+    for (const sp of SPECIALISTS) { const at = order.findIndex(k => levels[k].units.includes(sp)); if (at >= 0 && at <= upTo) out.push(sp); }
+    return out;
+  }
+  function unlockAt(sp, levels, order) { return order.find(k => levels[k].units.includes(sp)); }
+  // Antigens you've met: in any map you've played
+  function met(st, levels, order) {
+    const s = new Set();
+    for (const k of order) if (st.plays[k] || st.cleared[k]) for (const x of kindsIn(levels[k])) s.add(VACCINE_OF[x]);
+    return [...s].filter(Boolean);
+  }
+  // Until you pick, a stage brings its own new unit, then the best counter (first in GERM.units) of its germs that
+  // nothing packed answers yet (its new germs count double), then the next specialists in the sim's order
+  function suggest(st, levels, order, key) {
+    const un = unlocked(st, levels, order);
+    if (!key || !levels[key]) return un.slice(0, SLOTS);
+    const seen = new Set();
+    for (const k of order.slice(0, order.indexOf(key))) for (const x of kindsIn(levels[k])) seen.add(VACCINE_OF[x]);
+    const germs = [...new Set([...kindsIn(levels[key])].map(y => VACCINE_OF[y]))].filter(x => GERM[x]);
+    const pick = un.filter(u => unlockAt(u, levels, order) === key).slice(0, SLOTS);
+    const best = x => GERM[x].units.find(u => u === 'neut' || u === 'mac' || un.includes(u));
+    while (pick.length < Math.min(SLOTS, un.length)) {
+      const score = u => germs.reduce((s, x) => s + (best(x) === u ? (seen.has(x) ? 1 : 2) : 0), 0);
+      const rest = un.filter(u => !pick.includes(u));
+      pick.push(rest.reduce((b, u) => (score(u) > score(b) ? u : b), rest[0]));
+    }
+    return pick;
+  }
+  // Germs on a stage whose counters are unlocked but none packed: [[germ, [unlocked counters]]]
+  function gaps(st, levels, order, key, pick) {
+    const un = unlocked(st, levels, order), units = unitsFor(pick), out = [];
+    for (const x of new Set([...kindsIn(levels[key])].map(y => VACCINE_OF[y]))) {
+      const g = GERM[x]; if (!g || g.units.some(u => units.includes(u))) continue;
+      const can = g.units.filter(u => un.includes(u)); if (can.length) out.push([x, can]);
+    }
+    return out;
+  }
+  function loadout(st, levels, order, key) {
+    const un = unlocked(st, levels, order);
+    const pick = Array.isArray(st.loadout) ? st.loadout.filter(x => un.includes(x)) : suggest(st, levels, order, key);
+    // newly unlocked specialists join while there's a free slot
+    for (const x of un) if (pick.length < SLOTS && !pick.includes(x) && !(st.dropped || []).includes(x)) pick.push(x);
+    return pick.slice(0, SLOTS);
+  }
+  const unitsFor = pick => UNIT_ORDER.filter(u => u === 'neut' || u === 'mac' || pick.includes(u));
+  const rank = (st, id) => st.upgrades[id] || 0;
+  const nextCost = (st, u) => u.cost[rank(st, u.id)];
+
+  // ---- per-map setup ----
+  function applyConfig(C, base, st, treatId) {
+    for (const g in base) if (C[g]) Object.assign(C[g], base[g]);
+    for (const u of UPGRADES) { const r = rank(st, u.id); if (r) u.apply(C, r); }
+    if (st.vaccines.virus) C.herpes.seek = 0;
+    const t = treatment(treatId); if (t.apply) t.apply(C);
+  }
+  // Wrap one Game: count Samples, antibiotics and vaccines. Returns the tracker.
+  function instrument(game, st, treatId) {
+    const vac = k => !!st.vaccines[VACCINE_OF[k]];
+    const anti = treatId === 'antibiotics';
+    const tr = { value: 0, kills: 0, storm: 0, cut: 0, paid: false, treat: treatId };
+    const tick = game.tick, damage = game.damage, spawnAg = game.spawnAg, stepAntigens = game.stepAntigens, stepMac = game.stepMac;
+    let dividing = false;
+    game.tick = function (key, n) {
+      if (key.startsWith('kill.')) {
+        const p = key.split('.'), how = p[1], k = p[2];
+        if (how === 'storm') tr.storm += n || 1; // nothing to learn from a massacre
+        else { tr.value += (VALUE[k] || 1) * (n || 1); tr.kills += n || 1; }
+      } else if (key.startsWith('cut.')) { tr.value += CUT_VALUE * (n || 1); tr.cut += n || 1; }
+      return tick.call(this, key, n);
+    };
+    game.damage = function (a, n, how, hu, hv) {
+      if (how === 'shot' || how === 'net') {
+        if (anti && BACTERIA.has(a.k)) n *= 2;
+        if (vac(a.k)) n += 1;
+      }
+      return damage.call(this, a, n, how, hu, hv);
+    };
+    game.stepAntigens = function (dt) { dividing = true; try { return stepAntigens.call(this, dt); } finally { dividing = false; } };
+    game.spawnAg = function (k, u, v, extra) {
+      // antibiotics: some arriving bacteria are resistant (not their offspring, or resistance would snowball)
+      if (anti && !dividing && (k === 'staph' || k === 'pseudo' || k === 'toxic') && this.rand() < 0.2) k = 'mrsa';
+      const a = spawnAg.call(this, k, u, v, extra);
+      if (a && k === 'flu' && vac('flu')) a.split = true;
+      return a;
+    };
+    game.stepMac = function (m, dt, slow) {
+      const had = m.prey;
+      const out = stepMac.call(this, m, dt, slow);
+      if (!had && m.prey && m.prey.k && vac(m.prey.k)) m.gulp *= 0.5;
+      return out;
+    };
+    game.campaign = tr;
+    return tr;
+  }
+  // Campaign pressure: maps later in the run send more, because you arrive with upgrades (authored, the same for
+  // everyone, never reacting to how you're doing). PRESSURE[i] multiplies map i's waves and trickle.
+  const PRESSURE_END = 1.5;
+  const pressure = (i, n) => 1 + (PRESSURE_END - 1) * (n > 1 ? i / (n - 1) : 0);
+  function scaleLevel(lv, p) { // always a copy, so the caller can change it freely
+    const out = JSON.parse(JSON.stringify(lv));
+    for (const w of out.waves) for (const k in VALUE) if (w[k] && k !== 'worm') w[k] = Math.max(1, Math.round(w[k] * p));
+    out.stream.start *= p; out.stream.end *= p;
+    return out;
+  }
+  // A map's germs are finite: kills pay up to the value of what the level sends in (waves plus trickle),
+  // so letting bacteria multiply to farm their offspring doesn't pay
+  function budget(lv, C) {
+    let v = 0;
+    for (const w of lv.waves) for (const k in VALUE) if (w[k]) v += w[k] * VALUE[k] * (k === 'strep' ? C.strep.links : k === 'worm' ? C.worm.segments : 1);
+    const S = lv.stream, tot = S.kinds.reduce((a, x) => a + x.w, 0);
+    const per = S.kinds.reduce((a, x) => a + x.w / tot * VALUE[x.k] * (1 - (x.from || 0) / lv.duration), 0);
+    v += (S.start + S.end) / 2 * lv.duration * ((C.trickle && C.trickle.mul) || 1) * per;
+    return v;
+  }
+  // What a finished map pays; first clears get a bonus, replays and losses a quarter
+  // capMul: Hard sends more germs (DIFFICULTIES.hard.waves), so its cap grows with them
+  function payout(st, key, tr, win, lv, C, capMul = 1) {
+    const base = Math.round(Math.min(tr.value, lv && C ? budget(lv, C) * capMul : Infinity) * RATE);
+    const first = win && !st.cleared[key];
+    const total = first ? Math.round(base * (1 + FIRST_BONUS)) : Math.round(base * REPEAT);
+    return { base, first, total, bonus: first ? total - base : 0 };
+  }
+
+  return { BACTERIA, VALUE, RATE, FIRST_BONUS, REPEAT, SLOTS, SPECIALISTS, setUnits, PLACES, UPGRADES, TREATMENTS, VACCINE_OF, VACCINE_COST, vaccineWhat, GERM, arrival,
+    budget, pressure, scaleLevel, treatment, fresh, CLINIC, clinicOpen, isOpen, reached, kindsIn, unlocked, unlockAt, met, suggest, gaps, loadout, unitsFor, rank, nextCost, applyConfig, instrument, payout };
+})();
+
+if (typeof module !== 'undefined') module.exports = CAMPAIGN;
+
+</script>
+<script>
+const MODEL = {"made":"2026-10-10T20:45:25.674Z","inert":{"casual":["cool"]},"release":"v40","games":680,"clinic":{"shop":1,"treat":2,"loadout":3,"vax":4},"levels":[{"key":"papercut","name":"Papercut","where":"Finger","pressure":1,"units":["neut","mac"],"pack":["neut","mac"],"kinds":["staph"],"shares":{"staph":1}},{"key":"hospital","name":"Hospital visit","where":"Elbow","pressure":1.056,"units":["neut","mac","bcell"],"pack":["neut","mac","bcell"],"kinds":["staph","mrsa"],"shares":{"staph":0.699,"mrsa":0.301}},{"key":"pool","name":"Pool water","where":"Ear","pressure":1.111,"units":["neut","mac","eos"],"pack":["neut","mac","bcell","eos"],"kinds":["staph","pseudo","mrsa"],"shares":{"staph":0.661,"pseudo":0.186,"mrsa":0.153}},{"key":"flu","name":"Flu season","where":"Nose","pressure":1.167,"units":["neut","net","mac"],"pack":["neut","net","mac","bcell"],"kinds":["staph","flu"],"shares":{"staph":0.666,"flu":0.334}},{"key":"soil","name":"Soil cut","where":"Knee","pressure":1.222,"units":["neut","net","mac","plt"],"pack":["neut","net","mac","plt"],"kinds":["staph","mrsa"],"shares":{"staph":0.527,"clos":0.248,"mrsa":0.225}},{"key":"foot","name":"Athlete's foot","where":"Foot","pressure":1.278,"units":["neut","net","mac","dc"],"pack":["neut","net","mac","dc"],"kinds":["staph","yeast"],"shares":{"staph":0.838,"yeast":0.162}},{"key":"lungs","name":"Lungs","where":"Chest","pressure":1.333,"units":["neut","net","nk","mac"],"pack":["neut","net","nk","mac"],"kinds":["staph","tb","pseudo"],"shares":{"staph":0.47,"tb":0.355,"pseudo":0.175}},{"key":"throat","name":"Sore throat","where":"Neck","pressure":1.389,"units":["neut","net","nk","mac","treg"],"pack":["neut","net","mac","treg"],"kinds":["staph","strep","toxic"],"shares":{"staph":0.515,"strep":0.287,"toxic":0.198}},{"key":"coldsore","name":"Cold sore","where":"Lip","pressure":1.444,"units":["neut","net","nk","mac","ifn"],"pack":["neut","nk","mac","ifn"],"kinds":["staph","virus"],"shares":{"staph":0.813,"virus":0.187}},{"key":"gut","name":"Gut","where":"Belly","pressure":1.5,"units":["neut","net","nk","mac","mast"],"pack":["neut","net","mac","mast"],"kinds":["staph","worm","flu"],"shares":{"staph":0.878,"worm":0.071,"flu":0.051}}],"names":{"staph":"Staph","mrsa":"MRSA","pseudo":"Pseudomonas","flu":"Influenza","spore":"Clostridium spore","clos":"Clostridium","tb":"Tuberculosis","toxic":"Toxic-shock Staph","strep":"Strep chain","virus":"Herpes","worm":"Tapeworm","wormlet":"Tapeworm piece","yeast":"Candida"},"units":{"neut":"Neutrophils","net":"Net neutrophils","nk":"NK cells","mac":"Macrophages","bcell":"B cells","eos":"Eosinophils","plt":"Platelets","dc":"Dendritic couriers","treg":"Regulatory T cells","ifn":"Interferon cells","mast":"Mast cells"},"skills":{"casual":{"A":{"papercut":-0.353,"hospital":-0.362,"pool":-1.905,"flu":-2.509,"soil":-1.689,"foot":-3.328,"lungs":-3.746,"throat":-2.099,"coldsore":-2.287,"gut":-2.191},"B":{"marrow":0.242,"heart":0.328,"trigger":0.041,"life":0.409,"nets":0.092,"gulp":0.013,"rings":0.328,"macs":0,"nk":0.01,"bcell":0.314,"eos":0,"plt":0,"dc":0.186,"treg":0,"ifn":0,"mast":0.389,"recover":0,"stamina":0.18,"cool":0},"V":1.438,"T":{"papercut":{"antibiotics":0.677,"antifungals":-0.005,"antivirals":0.677,"steroids":-0.005,"fever":-0.005},"hospital":{"antibiotics":-0.002,"antifungals":-0.002,"antivirals":-0.002,"steroids":-0.002,"fever":-0.002},"pool":{"antibiotics":0.472,"antifungals":-0.291,"antivirals":-0.291,"steroids":-0.291,"fever":0.472},"flu":{"antibiotics":0.413,"antifungals":0.413,"antivirals":0.413,"steroids":-0.352,"fever":0.413},"soil":{"antibiotics":0.215,"antifungals":0.215,"antivirals":0.215,"steroids":-0.517,"fever":0.215},"foot":{"antibiotics":0.454,"antifungals":0.454,"antivirals":-0.332,"steroids":-0.332,"fever":0.454},"lungs":{"antibiotics":0.682,"antifungals":-0.159,"antivirals":-0.159,"steroids":-0.159,"fever":-0.159},"throat":{"antibiotics":0.364,"antifungals":0.364,"antivirals":0.364,"steroids":-0.386,"fever":-0.386},"coldsore":{"antibiotics":0.552,"antifungals":-0.236,"antivirals":-0.236,"steroids":-0.236,"fever":-0.236},"gut":{"antibiotics":0.469,"antifungals":-0.298,"antivirals":0.469,"steroids":-0.298,"fever":0.469}},"games":340,"logloss":0.482,"cv":{"model":0.588,"stageOnly":0.643},"per":{"papercut":{"games":34,"wins":16,"predicted":16.1,"payWin":197,"payLoss":182,"lossAt":0.99},"hospital":{"games":34,"wins":18,"predicted":18.1,"payWin":196,"payLoss":179,"lossAt":0.99},"pool":{"games":34,"wins":8,"predicted":8.3,"payWin":153,"payLoss":148,"lossAt":1.27},"flu":{"games":34,"wins":8,"predicted":8.4,"payWin":327,"payLoss":280,"lossAt":0.9},"soil":{"games":34,"wins":14,"predicted":14.3,"payWin":241,"payLoss":219,"lossAt":0.96},"foot":{"games":34,"wins":7,"predicted":7.5,"payWin":206,"payLoss":178,"lossAt":0.77},"lungs":{"games":34,"wins":4,"predicted":4.6,"payWin":172,"payLoss":166,"lossAt":1.41},"throat":{"games":34,"wins":13,"predicted":13.3,"payWin":306,"payLoss":278,"lossAt":0.95},"coldsore":{"games":34,"wins":11,"predicted":11.3,"payWin":163,"payLoss":149,"lossAt":0.79},"gut":{"games":34,"wins":14,"predicted":14.3,"payWin":244,"payLoss":224,"lossAt":0.94}}},"smart":{"A":{"papercut":2.637,"hospital":2.652,"pool":1.026,"flu":1.42,"soil":1.241,"foot":-0.614,"lungs":0.864,"throat":0.98,"coldsore":-0.409,"gut":0.79},"B":{"marrow":0.547,"heart":0,"trigger":0.11,"life":0.104,"nets":0.34,"gulp":0.284,"rings":0.204,"macs":0.458,"nk":0,"bcell":0,"eos":0,"plt":0.076,"dc":0.688,"treg":0.242,"ifn":0,"mast":0.208,"recover":0.145,"stamina":0.371,"cool":0},"V":1.293,"T":{"papercut":{"antibiotics":0.106,"antifungals":0.106,"antivirals":0.106,"steroids":-1.549,"fever":0.106},"hospital":{"antibiotics":0.086,"antifungals":0.086,"antivirals":0.086,"steroids":0.086,"fever":0.086},"pool":{"antibiotics":0.287,"antifungals":0.287,"antivirals":0.287,"steroids":-1.195,"fever":0.287},"flu":{"antibiotics":0.219,"antifungals":0.219,"antivirals":-0.58,"steroids":-1.31,"fever":0.219},"soil":{"antibiotics":0.215,"antifungals":0.215,"antivirals":-0.599,"steroids":-1.358,"fever":0.215},"foot":{"antibiotics":0.543,"antifungals":0.543,"antivirals":-0.243,"steroids":-0.243,"fever":-0.243},"lungs":{"antibiotics":0.304,"antifungals":0.304,"antivirals":-0.465,"steroids":-1.181,"fever":0.304},"throat":{"antibiotics":0.307,"antifungals":0.307,"antivirals":-0.453,"steroids":-1.156,"fever":-0.453},"coldsore":{"antibiotics":0.709,"antifungals":0.031,"antivirals":0.709,"steroids":-0.651,"fever":0.031},"gut":{"antibiotics":0.293,"antifungals":-0.491,"antivirals":-0.491,"steroids":-1.232,"fever":0.293}},"games":340,"logloss":0.236,"cv":{"model":0.346,"stageOnly":0.407},"per":{"papercut":{"games":34,"wins":32,"predicted":31.6,"payWin":197,"payLoss":197,"lossAt":1.21},"hospital":{"games":34,"wins":33,"predicted":32.6,"payWin":196,"payLoss":196,"lossAt":1.27},"pool":{"games":34,"wins":29,"predicted":28.8,"payWin":153,"payLoss":153,"lossAt":1.42},"flu":{"games":34,"wins":31,"predicted":30.8,"payWin":327,"payLoss":198,"lossAt":0.59},"soil":{"games":34,"wins":31,"predicted":30.8,"payWin":241,"payLoss":194,"lossAt":0.97},"foot":{"games":34,"wins":25,"predicted":25.1,"payWin":206,"payLoss":193,"lossAt":0.96},"lungs":{"games":34,"wins":30,"predicted":29.9,"payWin":172,"payLoss":172,"lossAt":1.63},"throat":{"games":34,"wins":30,"predicted":29.9,"payWin":306,"payLoss":254,"lossAt":0.99},"coldsore":{"games":34,"wins":24,"predicted":24.1,"payWin":163,"payLoss":154,"lossAt":0.82},"gut":{"games":34,"wins":30,"predicted":29.9,"payWin":244,"payLoss":227,"lossAt":0.81}}}}};
+</script>
+<script>
+'use strict';
+const C = CAMPAIGN, M = MODEL, LV = M.levels, ORDER = LV.map(l => l.key), NST = LV.length;
+const $ = s => document.querySelector(s);
+const esc = s => String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+const fmt = n => Math.round(n).toLocaleString('en-US');
+const KEY = 'cytostormPlanner.v1';
+const SK = Object.keys(M.skills); // casual, smart
+
+// ---------- campaign state ----------
+const fresh = () => ({ samples: 0, cleared: {}, played: {}, upgrades: {}, vaccines: {}, treat: {}, log: [], buys: [], skill: 0.5, tab: 'shop' });
+let st = load(), undoStack = [];
+function load() { try { const s = JSON.parse(localStorage.getItem(KEY)); if (s && s.upgrades) return Object.assign(fresh(), s); } catch (e) {} return fresh(); }
+function save() { try { localStorage.setItem(KEY, JSON.stringify(st)); } catch (e) {} }
+function snap() { undoStack.push(JSON.stringify(st)); if (undoStack.length > 60) undoStack.shift(); }
+const reached = s => { let i = 0; while (i < NST - 1 && s.cleared[ORDER[i]]) i++; return s.cleared[ORDER[NST - 1]] ? NST : i; };
+const clinicAt = M.clinic || { shop: 1, treat: 2, vax: 3, loadout: 4 };
+const opened = (s, part) => Math.min(reached(s), NST - 1) >= clinicAt[part] || reached(s) >= NST;
+// Specialists come free when you reach their stage. Each stage brings the campaign's default loadout for it (its own new unit plus a counter);
+// a unit's shop line only counts on stages that pack that unit.
+const unlocked = (s, i) => { const out = new Set(); for (let j = 0; j <= i; j++) for (const u of LV[j].units) out.add(u); return out; };
+const packed = i => new Set(LV[i].pack || LV[i].units);
+const metKinds = s => { const out = new Set(); ORDER.forEach((k, i) => { if (s.played[k] || s.cleared[k]) for (const x of LV[i].kinds) out.add(C.VACCINE_OF[x]); }); return [...out]; };
+const kindName = k => k === 'clos' ? 'Clostridium' : k === 'worm' ? 'Tapeworm' : (M.names[k] || k);
+
+// ---------- the measured model ----------
+function logitFor(s, i, treat, w) {
+  const key = ORDER[i];
+  let z = 0;
+  for (const [sk, f] of [[SK[0], 1 - w], [SK[SK.length - 1], w]]) {
+    if (!f) continue;
+    const m = M.skills[sk];
+    let q = m.A[key];
+    const un = packed(i), inert = (M.inert && M.inert[sk]) || [];
+    for (const u in s.upgrades) { const need = (C.UPGRADES.find(x => x.id === u) || {}).need; if ((!need || un.has(need)) && !inert.includes(u)) q += (m.B[u] || 0) * s.upgrades[u]; }
+    let cov = 0; for (const [k, sh] of Object.entries(LV[i].shares)) if (s.vaccines[k]) cov += sh;
+    q += m.V * cov;
+    if (treat && treat !== 'none') q += (m.T[key] && m.T[key][treat]) || 0;
+    z += f * q;
+  }
+  return z;
+}
+const chance = (s, i, treat, w = st.skill) => 1 / (1 + Math.exp(-logitFor(s, i, treat, w)));
+function payBase(i, win, w = st.skill) {
+  const key = ORDER[i]; let v = 0;
+  for (const [sk, f] of [[SK[0], 1 - w], [SK[SK.length - 1], w]]) { const q = M.skills[sk].per[key]; v += f * (win ? q.payWin : q.payLoss); }
+  return v;
+}
+const pay = (s, i, win, w) => { const b = payBase(i, win, w); return win && !s.cleared[ORDER[i]] ? Math.round(b * (1 + C.FIRST_BONUS)) : Math.round(b * C.REPEAT); };
+const treatOf = (s, i) => (opened(s, 'treat') && s.treat[ORDER[i]]) || 'none';
+
+// ---------- actions ----------
+function buyUp(id) {
+  const u = C.UPGRADES.find(x => x.id === id), r = st.upgrades[id] || 0;
+  if (r >= 3 || st.samples < u.cost[r]) return;
+  snap(); st.samples -= u.cost[r]; st.upgrades[id] = r + 1; st.buys.push({ t: 'u', id });
+  st.log.unshift({ tag: 'buy', text: `${u.name} rank ${r + 1}`, amt: -u.cost[r] }); render(id);
+}
+function buyVax(k) {
+  if (st.vaccines[k] || st.samples < C.VACCINE_COST) return;
+  snap(); st.samples -= C.VACCINE_COST; st.vaccines[k] = true; st.buys.push({ t: 'v', id: k });
+  st.log.unshift({ tag: 'buy', text: `${kindName(k)} vaccine`, amt: -C.VACCINE_COST }); render('vax-' + k);
+}
+function play(i) {
+  snap();
+  const key = ORDER[i], tr = treatOf(st, i), p = chance(st, i, tr), win = Math.random() < p, first = win && !st.cleared[key];
+  const got = pay(st, i, win);
+  st.samples += got; st.played[key] = true; if (win) st.cleared[key] = true;
+  const what = `Stage ${i + 1} ${LV[i].where}${first ? '' : win ? ' (replay)' : ''}${tr !== 'none' ? `, ${C.treatment(tr).name.toLowerCase()}` : ''}: ${Math.round(p * 100)}% chance`;
+  st.log.unshift({ tag: win ? 'won' : 'lost', text: what, amt: got });
+  render();
+}
+
+// ---------- rendering ----------
+const hue = p => p >= 0.85 ? 'var(--good)' : p >= 0.55 ? 'var(--gold)' : p >= 0.3 ? 'var(--warn)' : 'var(--bad)';
+function render(flash) {
+  save();
+  const w = st.skill, R = reached(st);
+  $('#bank span').textContent = fmt(st.samples);
+  $('#skill').value = w;
+  $('#skillName').textContent = w <= 0.15 ? 'Casual' : w >= 0.85 ? 'Good player' : `In between (${Math.round(w * 100)}%)`;
+  $('#undo').disabled = !undoStack.length;
+  // track
+  $('#track').innerHTML = LV.map((l, i) => {
+    const done = !!st.cleared[l.key], next = i === R, locked = i > R;
+    const tr = treatOf(st, i), p = chance(st, i, tr);
+    const ev = p * pay(st, i, true) + (1 - p) * pay(st, i, false);
+    const status = done ? 'Cleared' : next ? 'Next' : '';
+    return `<li class="stage ${done ? 'done' : next ? 'next' : 'locked'}">
+      <span class="n">${i + 1}</span>
+      <span class="nm"><b>${esc(l.where)}</b> <span class="dim">· ${esc(l.name)}</span>
+        <small>${status ? `<span style="color:${done ? 'var(--gold)' : 'var(--cell)'}">${status}</span> · ` : ''}win pays <span class="num">${fmt(pay(st, i, true))}</span>, loss <span class="num">${fmt(pay(st, i, false))}</span>${tr !== 'none' ? ` · ${esc(C.treatment(tr).name)}` : ''}${locked ? '' : ` · about <span class="num">${fmt(ev)}</span> a try`}</small></span>
+      <span class="odds"><span class="pct" style="color:${hue(p)}">${Math.round(p * 100)}%</span><span class="bar"><span style="width:${Math.max(2, p * 100)}%;background:${hue(p)}"></span></span></span>
+      <span class="act">${next && R < NST ? `<button class="btn go" type="button" data-play="${i}">Play</button>` : done ? `<button class="btn" type="button" data-play="${i}">Replay</button>` : ''}</span>
+    </li>`;
+  }).join('');
+  // clinic
+  const nextI = Math.min(R, NST - 1);
+  $('#clinicFor').textContent = R >= NST ? 'Campaign cleared. Replays pay a quarter.' : `Gains shown for Stage ${nextI + 1}: ${LV[nextI].where}`;
+  const tabs = [['shop', 'Shop'], ['treat', 'Treatment'], ['vax', 'Vaccines'], ['loadout', 'Loadout']];
+  if (!['shop', 'treat', 'vax', 'loadout'].includes(st.tab)) st.tab = 'shop';
+  $('#tabs').innerHTML = tabs.map(([id, name]) => {
+    const open = opened(st, id);
+    return `<button type="button" role="tab" data-tab="${id}" aria-selected="${st.tab === id}">${name}${open ? '' : ` <span class="num" style="font-size:11px">S${clinicAt[id] + 1}</span>`}</button>`;
+  }).join('');
+  $('#pane').innerHTML = st.tab === 'shop' ? shopPane(nextI) : st.tab === 'treat' ? treatPane(nextI) : st.tab === 'vax' ? vaxPane(nextI) : loadoutPane();
+  // log
+  $('#log').innerHTML = st.log.length ? st.log.slice(0, 80).map(e => `<li><span class="tag ${e.tag}">${e.tag === 'buy' ? 'Bought' : e.tag === 'won' ? 'Won' : 'Lost'}</span><span>${esc(e.text)}</span><span class="smp sm"><i></i>${e.amt > 0 ? '+' : ''}${fmt(e.amt)}</span></li>`).join('')
+    : '<li><span></span><span class="dim">Nothing yet. Stage 1 has no Clinic, so press Play on Finger to start.</span><span></span></li>';
+  if (flash) { const el = document.getElementById('it-' + flash); if (el) el.classList.add('flash'); }
+  forecastSoon();
+}
+function gainText(d) { const pts = d * 100; return Math.abs(pts) < 0.5 ? `<span class="gain flat">±0 pts</span>` : `<span class="gain ${pts > 0 ? 'up' : 'down'}">${pts > 0 ? '+' : ''}${pts.toFixed(pts < 9.95 && pts > -9.95 ? 1 : 0)} pts</span>`; }
+function shopPane(i) {
+  if (!opened(st, 'shop')) return `<p class="note">The Shop opens at Stage 2. Clear Finger first.</p>`;
+  const tr = treatOf(st, i), base = chance(st, i, tr), un = unlocked(st, i);
+  let g = '', out = '';
+  for (const u of C.UPGRADES) {
+    if (u.group !== g) { g = u.group; out += `<div class="grp">${esc(g)}</div>`; }
+    const r = st.upgrades[u.id] || 0, max = r >= 3, cost = u.cost[r], locked = u.need && !un.has(u.need);
+    let gain = '';
+    if (!max) { const t = { ...st, upgrades: { ...st.upgrades, [u.id]: r + 1 } }; gain = gainText(chance(t, i, tr) - base); }
+    const lk = locked ? `Comes with ${esc(M.units[u.need])} at Stage ${ORDER.findIndex((k, j) => LV[j].units.includes(u.need)) + 1}.` : '';
+    const away = !locked && u.need && !packed(i).has(u.need) ? ` <span class="dim">(not in Stage ${i + 1}'s loadout)</span>` : '';
+    out += `<div class="item" id="it-${u.id}"><div class="nm"><b>${esc(u.name)} <span class="pips">${[0, 1, 2].map(k => `<i class="${k < r ? 'on' : ''}"></i>`).join('')}</span></b>
+      <small>${lk || (r ? `Now: ${esc(u.what(r))}${max ? '' : ` Next: ${esc(u.what(r + 1))}`}` : esc(u.what(1)))}${away}</small></div>
+      <div class="buy">${max ? '<small>Maxed</small>' : `${locked ? '' : gain}<button class="btn gold" type="button" data-up="${u.id}" ${st.samples < cost || locked ? 'disabled' : ''}><span class="smp sm"><i></i>${fmt(cost)}</span></button>`}</div></div>`;
+  }
+  return `<div class="shop">${out}</div><p class="note">Green and red show how buying changes the win chance on the next stage at your skill. Upgrades never refund; Undo takes a buy back.</p>`;
+}
+function treatPane(i) {
+  if (!opened(st, 'treat')) return `<p class="note">Treatment opens at Stage 3.</p>`;
+  const cur = st.treat[ORDER[i]] || 'none', base = chance({ ...st }, i, 'none');
+  return `<div class="treat">${C.TREATMENTS.map(t => {
+    const d = chance(st, i, t.id) - base, measured = t.id === 'none' || SK.some(s => M.skills[s].T[ORDER[i]] && t.id in M.skills[s].T[ORDER[i]]);
+    return `<label><input type="radio" name="treat" value="${t.id}" ${cur === t.id ? 'checked' : ''}><span><b>${esc(t.name)}</b><small>${esc(t.plus)}${t.minus ? ` <span class="minus">${esc(t.minus)}</span>` : ''}</small></span>
+      <span>${t.id === 'none' ? '' : measured ? gainText(d) : '<span class="gain flat">not measured</span>'}</span></label>`;
+  }).join('')}</div><p class="note">For Stage ${i + 1} only, as in the game. The change is measured on this stage with bots.</p>`;
+}
+function vaxPane(i) {
+  if (!opened(st, 'vax')) return `<p class="note">Vaccines open at Stage 4.</p>`;
+  const tr = treatOf(st, i), base = chance(st, i, tr), met = metKinds(st);
+  if (!met.length) return `<p class="note">No germs met yet.</p>`;
+  return `<div class="shop">${met.map(k => {
+    const t = { ...st, vaccines: { ...st.vaccines, [k]: true } }, d = chance(t, i, tr) - base;
+    const later = LV.map((l, j) => j > i && l.shares[k] ? l.where : null).filter(Boolean);
+    return `<div class="item" id="it-vax-${k}"><div class="nm"><b>${esc(kindName(k))}</b><small>${esc(C.vaccineWhat(k))}${later.length ? ` Comes back at ${esc(later.join(', '))}.` : i < NST && LV[i].shares[k] ? '' : ' Not on any stage ahead.'}</small></div>
+      <div class="buy">${st.vaccines[k] ? '<small>Vaccinated</small>' : `${gainText(d)}<button class="btn gold" type="button" data-vax="${k}" ${st.samples < C.VACCINE_COST ? 'disabled' : ''}><span class="smp sm"><i></i>${C.VACCINE_COST}</span></button>`}</div></div>`;
+  }).join('')}</div>`;
+}
+function loadoutPane() {
+  if (!opened(st, 'loadout')) return `<p class="note">Loadout opens at Stage ${clinicAt.loadout + 1}. Until then each stage brings its default.</p>`;
+  const R = Math.min(reached(st), NST - 1), sp = u => u !== 'neut' && u !== 'mac';
+  return `<div class="shop">${LV.map((l, i) => i < R ? '' : `<div class="item"><div class="nm"><b>Stage ${i + 1}: ${esc(l.where)}</b><small>${(l.pack || l.units).filter(sp).map(u => esc(M.units[u] || u)).join(' + ') || 'No specialists yet'}</small></div><div class="buy">${i === R ? '<small style="color:var(--cell)">Next</small>' : ''}</div></div>`).join('')}</div>
+    <p class="note">Neutrophils and macrophages always come, plus ${C.SLOTS} specialists. The planner uses the campaign's default pick for each stage (that stage's new unit plus a counter for its germs), which is what the bots played. Other picks aren't measured yet.</p>`;
+}
+
+// ---------- forecast (Monte Carlo) ----------
+function allItems(s) {
+  const out = [];
+  for (const u of C.UPGRADES) for (let r = (s.upgrades[u.id] || 0); r < 3; r++) out.push({ t: 'u', id: u.id, r });
+  return out;
+}
+function bestValueBuys(s, i, w) {
+  for (let guard = 0; guard < 40; guard++) {
+    const tr = treatOf(s, i), p0 = chance(s, i, tr, w); let best = null, bv = 0.00002;
+    if (opened(s, 'shop')) { const un = unlocked(s, i);
+      for (const u of C.UPGRADES) { const r = s.upgrades[u.id] || 0; if (r >= 3 || u.cost[r] > s.samples || (u.need && !un.has(u.need))) continue;
+        s.upgrades[u.id] = r + 1; const v = (chance(s, i, tr, w) - p0) / u.cost[r]; s.upgrades[u.id] = r; if (v > bv) { bv = v; best = () => { s.samples -= u.cost[r]; s.upgrades[u.id] = r + 1; }; } } }
+    if (opened(s, 'vax') && s.samples >= C.VACCINE_COST) for (const k of metKinds(s)) { if (s.vaccines[k]) continue;
+      s.vaccines[k] = true; const v = (chance(s, i, tr, w) - p0) / C.VACCINE_COST; delete s.vaccines[k]; if (v > bv) { bv = v; best = () => { s.samples -= C.VACCINE_COST; s.vaccines[k] = true; }; } }
+    if (!best) return; best();
+  }
+}
+function orderBuys(s, plan, i) {
+  const un = unlocked(s, i);
+  for (const b of plan) {
+    if (b.t === 'u') { const u = C.UPGRADES.find(x => x.id === b.id), r = s.upgrades[b.id] || 0; if (r >= 3 || b.n <= r) continue; if (!opened(s, 'shop') || (u.need && !un.has(u.need)) || s.samples < u.cost[r]) return; s.samples -= u.cost[r]; s.upgrades[b.id] = r + 1; }
+    else { if (s.vaccines[b.id]) continue; if (!opened(s, 'vax') || !metKinds(s).includes(b.id) || s.samples < C.VACCINE_COST) return; s.samples -= C.VACCINE_COST; s.vaccines[b.id] = true; }
+  }
+}
+function simulate(habit, runs) {
+  const w = st.skill, R0 = reached(st);
+  // my buy order: each buy remembers which rank it was, so repeats line up
+  const seen = {}, plan = st.buys.map(b => ({ ...b, n: b.t === 'u' ? (seen[b.id] = (seen[b.id] || 0) + 1) : 1 }));
+  const first = new Array(NST).fill(0), tries = [], end = [], builds = {};
+  for (let k = 0; k < runs; k++) {
+    const s = JSON.parse(JSON.stringify({ samples: st.samples, cleared: st.cleared, played: st.played, upgrades: st.upgrades, vaccines: st.vaccines, treat: st.treat }));
+    let n = 0;
+    for (let i = R0; i < NST; i++) {
+      let att = 0;
+      for (;;) {
+        if (habit === 'best') bestValueBuys(s, i, w); else if (habit === 'order') orderBuys(s, plan, i);
+        const p = chance(s, i, treatOf(s, i), w), win = Math.random() < p;
+        s.samples += pay(s, i, win, w); s.played[ORDER[i]] = true; att++; n++;
+        if (win) { s.cleared[ORDER[i]] = true; break; }
+        if (att >= 40) break;
+      }
+      if (att === 1) first[i]++;
+      if (!s.cleared[ORDER[i]]) { n = Infinity; break; }
+    }
+    tries.push(n); end.push(s.samples);
+    const spent = Object.entries(s.upgrades).reduce((a, [id, r]) => a + C.UPGRADES.find(u => u.id === id).cost.slice(0, r).reduce((x, y) => x + y, 0), 0) + Object.keys(s.vaccines).length * C.VACCINE_COST;
+    builds.spent = (builds.spent || 0) + spent / runs;
+  }
+  const spentNow = Object.entries(st.upgrades).reduce((a, [id, r]) => a + C.UPGRADES.find(u => u.id === id).cost.slice(0, r).reduce((x, y) => x + y, 0), 0) + Object.keys(st.vaccines).length * C.VACCINE_COST;
+  const fin = tries.filter(Number.isFinite);
+  return { first: first.map(x => x / runs), tries: fin.length ? fin.reduce((a, b) => a + b, 0) / fin.length + R0 : Infinity, stuck: 1 - fin.length / runs, end: end.reduce((a, b) => a + b, 0) / runs, spent: builds.spent - spentNow };
+}
+let fcTimer = 0;
+function forecastSoon() { clearTimeout(fcTimer); fcTimer = setTimeout(forecast, 250); }
+function forecast() {
+  const R0 = reached(st);
+  if (R0 >= NST) { $('#fc').innerHTML = '<p class="dim">Every stage is cleared. Start a new campaign to forecast again.</p>'; return; }
+  const runs = 1000, H = [['order', 'My buy order'], ['best', 'Best value'], ['none', 'Never buy']];
+  const res = H.map(([h, name]) => [name, simulate(h, runs)]);
+  const cell = p => `<span class="heat" style="color:${hue(p)}">${Math.round(p * 100)}%</span>`;
+  $('#fc').innerHTML = `<table><thead><tr><th>Habit</th>${LV.map((l, i) => i >= R0 ? `<th title="${esc(l.name)}">${i + 1} ${esc(l.where)}</th>` : '').join('')}<th>Tries</th><th>Spends</th><th>Banked at end</th></tr></thead><tbody>
+    ${res.map(([name, r]) => `<tr><td>${name}</td>${r.first.map((p, i) => i >= R0 ? `<td>${cell(p)}</td>` : '').join('')}<td>${Number.isFinite(r.tries) ? r.tries.toFixed(1) : '∞'}${r.stuck > 0.005 ? ` <small>(${Math.round(r.stuck * 100)}% stuck)</small>` : ''}</td><td>${fmt(r.spent)}</td><td>${fmt(r.end)}</td></tr>`).join('')}
+  </tbody></table>`;
+}
+
+// ---------- about ----------
+function about() {
+  const s = M.skills, n = SK.reduce((a, k) => a + s[k].games, 0);
+  const row = k => `<tr><td>${esc(LV[ORDER.indexOf(k)].where)}</td>${SK.map(sk => { const q = s[sk].per[k]; return `<td>${q.wins}/${q.games}</td><td>${q.predicted}</td>`; }).join('')}</tr>`;
+  const best = sk => Object.entries(s[sk].B).sort((a, b) => b[1] - a[1]);
+  $('#about').innerHTML = `
+    <p>Every number on this page comes from <b>${fmt(n)}</b> headless games of Play ${esc(M.release.toUpperCase())} with the campaign's real rules: the pressure ramp, Samples payout, upgrades, vaccines and treatments, all at Normal. Each game is one bot playing one stage with a randomly bought build of the size you could afford by then. The bots are the game's own: <b>Casual</b> looks every 1.5 s, counters what shows up and leaves Stress in the middle; <b>Good player</b> looks every 0.5 s, paces Stress and storms only in a pinch. The skill slider blends the two.</p>
+    <p>The page fits a win model per skill: a difficulty for each stage, plus a fixed boost per upgrade rank, plus a boost for vaccines in proportion to how much of the stage's germs they cover, plus a measured effect for each treatment on each stage. A win pays the average Samples the bots earned on wins there; a loss pays a quarter of what they earned before losing.</p>
+    ${SK.every(k => s[k].cv) ? `<p>Checked on games held back from the fit: knowing the build makes the model's guesses clearly better than knowing the stage alone (average log loss ${SK.map(k => `${k === 'smart' ? 'Good player' : 'Casual'} ${s[k].cv.model} vs ${s[k].cv.stageOnly}`).join(', ')}; lower is better).</p>` : ''}
+    <ul>
+      <li>Treatments: two games per stage, treatment and skill (one with no build, one with a mid build), so a treatment's number says which way it pushes more than how far.</li>
+      <li>Strongest upgrades per rank, Casual: ${best(SK[0]).slice(0, 4).map(([u, v]) => `${esc(C.UPGRADES.find(x => x.id === u).name)} (${v.toFixed(2)})`).join(', ')}.</li>
+      <li>Strongest upgrades per rank, Good player: ${best(SK[SK.length - 1]).slice(0, 4).map(([u, v]) => `${esc(C.UPGRADES.find(x => x.id === u).name)} (${v.toFixed(2)})`).join(', ')}.</li>
+      <li>The casual bot never storms, so Cool head does nothing for it. A unit's shop line (Wide nets, Big clouds and so on) counts only on stages whose loadout packs that unit.</li>
+      <li>Limits: one bot game per build, so a single stage's odds can be off by 10 to 15 points. Where the bots won every game, the model can only say "very likely". Replays use the same odds as a first visit.</li>
+    </ul>
+    <div class="fc"><table><thead><tr><th>Stage</th>${SK.map(sk => `<th>${sk === 'smart' ? 'Good' : 'Casual'} won</th><th>model expects</th>`).join('')}</tr></thead><tbody>${ORDER.map(row).join('')}</tbody></table></div>
+    <p class="dim">Model fitted ${esc(M.made.slice(0, 16).replace('T', ' '))} UTC. Code: tools/campaign-sim/ in the project files.</p>`;
+}
+
+// ---------- events ----------
+document.addEventListener('click', e => {
+  const b = e.target.closest('button'); if (!b || b.disabled) return;
+  if (b.dataset.play != null) play(+b.dataset.play);
+  else if (b.dataset.up) buyUp(b.dataset.up);
+  else if (b.dataset.vax) buyVax(b.dataset.vax);
+  else if (b.dataset.tab) { st.tab = b.dataset.tab; render(); }
+  else if (b.id === 'undo' && undoStack.length) { const tab = st.tab, sk = st.skill; st = JSON.parse(undoStack.pop()); st.tab = tab; st.skill = sk; render(); }
+  else if (b.id === 'reset') { snap(); const sk = st.skill; st = fresh(); st.skill = sk; render(); }
+  else if (b.id === 'runFc') forecast();
+});
+document.addEventListener('change', e => {
+  if (e.target.name === 'treat') { snap(); st.treat[ORDER[Math.min(reached(st), NST - 1)]] = e.target.value; render(); }
+});
+$('#skill').addEventListener('input', e => { st.skill = +e.target.value; render(); });
+about();
+render();
+</script>

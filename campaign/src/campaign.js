@@ -19,8 +19,13 @@ const CAMPAIGN = (() => {
   const FIRST_BONUS = 0.5;   // first clear pays 50% extra
   const REPEAT = 0.25;       // replays and losses pay a quarter
   const SLOTS = 2;           // specialist slots in the loadout
+  // Filled from the sim's UNIT table at boot (setUnits), so new units join the loadout without changes here
   const SPECIALISTS = ['net', 'nk'];
   const UNIT_ORDER = ['neut', 'net', 'nk', 'mac'];
+  function setUnits(keys) {
+    UNIT_ORDER.splice(0, UNIT_ORDER.length, ...keys);
+    SPECIALISTS.splice(0, SPECIALISTS.length, ...keys.filter(k => k !== 'neut' && k !== 'mac'));
+  }
 
   // Where each map sits on the body (viewBox 0 0 724 1448, the body art's). Every map is a wound there, named "Stage N: <where>" (Alex, 2026-10-08).
   // Unknown levels fall back to a spot by the side.
@@ -34,6 +39,36 @@ const CAMPAIGN = (() => {
   // What a vaccine is called and covers (wormlets share the Tapeworm's, hatched Clostridium the spore's)
   const VACCINE_OF = { staph: 'staph', mrsa: 'mrsa', pseudo: 'pseudo', flu: 'flu', spore: 'clos', clos: 'clos', tb: 'tb', toxic: 'toxic', strep: 'strep', virus: 'virus', worm: 'worm', wormlet: 'worm', yeast: 'yeast' };
   const VACCINE_COST = 120;
+  // Germ cards in the Clinic: what it does, what beats it (unit = the cell that counters it), keyed like vaccines
+  // units = the cells that counter it, best first; the card and the loadout warning only nag when none of them is packed.
+  // Play V39's units (Alex, 2026-10-10) each answer their own stage's new germ.
+  const GERM = {
+    staph: { does: 'Drifts toward the Lymph node and doubles. Big crowds set off quorum bursts.', beat: 'Neutrophils shoot it; macrophages swallow it.', units: ['neut'] },
+    mrsa: { does: 'Armored. Plain shots barely scratch it and macrophages spit it out.', beat: 'Support macrophages tune shots to kill it in one hit. B cells tag it so macrophages can swallow it.', units: ['mac', 'bcell'], art: 'macrophage-support' },
+    pseudo: { does: 'Settles and grows a slime dome that shots, nets and storms bounce off.', beat: 'Offense macrophages tear the domes down. Eosinophils latch on and pop them.', units: ['mac', 'eos'] },
+    flu: { does: 'Tiny, fast swarms. Each one that reaches the Tissue splits.', beat: 'Net neutrophils wipe out whole clusters.', units: ['net'] },
+    clos: { does: 'Spores sit inert, then hatch into fast-dividing bacteria.', beat: 'A platelet wall holds the hatch; nets pen it.', units: ['plt', 'net'] },
+    tb: { does: 'Slow and tough. A macrophage that swallows it turns into a TB factory.', beat: 'NK cells kill infected macrophages.', units: ['nk'] },
+    toxic: { does: 'While any are alive, fatigue builds much faster.', beat: 'Kill it fast with neutrophils. Regulatory T cells calm the fatigue it causes.', units: ['treg'] },
+    strep: { does: 'Chains sprint for the Lymph node. Shooting a link splits the chain.', beat: 'Macrophages swallow links without splitting them. A platelet wall stops the sprint.', units: ['mac', 'plt'] },
+    virus: { does: 'Hides inside your neutrophils and bursts out of them later.', beat: 'NK cells pop infected neutrophils. Interferon haze stops it hiding.', units: ['nk', 'ifn'] },
+    worm: { does: 'The boss. Crawls to the Lymph node; broken segments become small fast worms.', beat: 'Mast cell mucus slows its crawl and eosinophils pop its segments.', units: ['mast', 'eos'] },
+    yeast: { does: 'Grows threads toward the Lymph node that other germs ride. Shots pass through them.', beat: 'Net neutrophils cut the threads. Eosinophils pop yeast and threads.', units: ['net', 'eos'] },
+  };
+  // When a germ (vaccine key) shows up in a stage, from its wave list and the trickle between waves
+  function arrival(lv, kind) {
+    const n = lv.waves.length, at = [];
+    lv.waves.forEach((w, i) => { if (Object.keys(w).some(k => VACCINE_OF[k] === kind && w[k] > 0)) at.push(i + 1); });
+    const drip = ((lv.stream && lv.stream.kinds) || []).some(x => VACCINE_OF[x.k] === kind);
+    const list = a => a.length > 1 ? `${a.slice(0, -1).join(', ')} and ${a[a.length - 1]}` : `${a[0]}`;
+    let s = '';
+    if (at.length === n) s = 'Every wave';
+    else if (at.length === 1) s = at[0] === n ? 'The final wave' : at[0] === 1 ? 'The first wave' : `Wave ${at[0]} of ${n}`;
+    else if (at.length > 1 && at[at.length - 1] === n && at.length === n - at[0] + 1) s = `From wave ${at[0]} on`;
+    else if (at.length) s = `Waves ${list(at)} of ${n}`;
+    if (drip) s = s ? `${s}, and trickles in between` : 'Trickles in between waves';
+    return s;
+  }
   const vaccineWhat = k => k === 'flu' ? 'Influenza stops splitting.' : k === 'virus' ? "Herpes can't hide in your neutrophils." : k === 'mrsa' || k === 'worm' ? 'Shots and nets do 1 extra damage to it.' : 'Shots and nets do 1 extra damage to it, and macrophages swallow it twice as fast.';
 
   // ---- upgrades: bought with Samples, kept all campaign ----
@@ -48,8 +83,16 @@ const CAMPAIGN = (() => {
     { id: 'rings', group: 'Macrophages', name: 'Wide rings', cost: [90, 180, 280], what: r => `Support rings are ${pct(0.1 * r)} wider.`, apply: (C, r) => { C.support.ring *= 1 + 0.1 * r; } },
     { id: 'macs', group: 'Macrophages', name: 'Reserve', cost: [80, 160, 260], what: r => `${6 * r} more macrophages allowed at once.`, apply: (C, r) => { C.caps.mac += 6 * r; } },
     { id: 'nk', group: 'Specialists', name: 'Hardy NK cells', cost: [70, 140, 220], need: 'nk', what: r => `NK cells are ${pct(0.2 * r)} faster and live ${15 * r} s longer.`, apply: (C, r) => { C.nk.speed *= 1 + 0.2 * r; C.nk.life += 15 * r; } },
+    // one line per Play V39 unit (Alex, 2026-10-10), locked until the unit joins
+    { id: 'bcell', group: 'Specialists', name: 'Big clouds', cost: [70, 140, 220], need: 'bcell', what: r => `B cell antibody clouds are ${pct(0.15 * r)} wider.`, apply: (C, r) => { C.bcell.cloud *= 1 + 0.15 * r; } },
+    { id: 'eos', group: 'Specialists', name: 'Short fuse', cost: [70, 140, 220], need: 'eos', what: r => `Eosinophils pop ${pct(0.15 * r)} sooner after latching on.`, apply: (C, r) => { C.eos.charge *= 1 - 0.15 * r; } },
+    { id: 'plt', group: 'Specialists', name: 'Tough clots', cost: [70, 140, 220], need: 'plt', what: r => `Platelets hold the wall ${3 * r} s longer.`, apply: (C, r) => { C.plt.hp += 3 * r; } },
+    { id: 'dc', group: 'Specialists', name: 'Swift couriers', cost: [70, 140, 220], need: 'dc', what: r => `Dendritic couriers walk ${pct(0.2 * r)} faster.`, apply: (C, r) => { C.dc.speed *= 1 + 0.2 * r; } },
+    { id: 'treg', group: 'Specialists', name: 'Deep calm', cost: [70, 140, 220], need: 'treg', what: r => `Each Regulatory T cell calms fatigue by ${5 + r}% instead of 5%.`, apply: (C, r) => { C.treg.calm += 0.01 * r; } },
+    { id: 'ifn', group: 'Specialists', name: 'Wide haze', cost: [70, 140, 220], need: 'ifn', what: r => `Interferon haze is ${pct(0.15 * r)} wider.`, apply: (C, r) => { C.ifn.haze *= 1 + 0.15 * r; } },
+    { id: 'mast', group: 'Specialists', name: 'Long mucus', cost: [70, 140, 220], need: 'mast', what: r => `Mast cell mucus lasts ${1.5 * r} s longer.`, apply: (C, r) => { C.mast.mucus += 1.5 * r; } },
     { id: 'recover', group: 'Body', name: 'Fast recovery', cost: [80, 160, 260], what: r => `Fatigue recovers ${pct(0.12 * r)} faster.`, apply: (C, r) => { C.output.recover *= 1 + 0.12 * r; } },
-    { id: 'stamina', group: 'Body', name: 'Stamina', cost: [100, 200, 320], what: r => `You can hold ${Math.round((1.15 + 0.06 * r) * 100)}% stress before tiring.`, apply: (C, r) => { C.output.rest += 0.06 * r; } },
+    { id: 'stamina', group: 'Body', name: 'Stamina', cost: [100, 200, 320], what: r => `You can hold ${Math.round(6 * r)}% more Stress before tiring (${Math.round((1.15 + 0.06 * r) * 100)}% with no sector on Support).`, apply: (C, r) => { C.output.rest += 0.06 * r; } }, // V41: restLevel() subtracts Support upkeep from this
     { id: 'cool', group: 'Body', name: 'Cool head', cost: [70, 140, 220], what: r => `Storm afterburn is ${1.5 * r} s shorter.`, apply: (C, r) => { C.storm.after = Math.max(1, C.storm.after - 1.5 * r); } },
   ];
 
@@ -69,7 +112,7 @@ const CAMPAIGN = (() => {
   const treatment = id => TREATMENTS.find(t => t.id === id) || TREATMENTS[0];
 
   // ---- campaign state ----
-  const fresh = () => ({ v: 1, samples: 0, cleared: {}, plays: {}, upgrades: {}, vaccines: {}, loadout: null, treat: {}, earned: 0, seen: {} });
+  const fresh = () => ({ v: 1, samples: 0, cleared: {}, plays: {}, upgrades: {}, vaccines: {}, loadout: null, treat: {}, earned: 0, seen: {}, diff: null });
 
   // The Clinic opens one part at a time over the first stages, each with a short note (Alex, 2026-10-08).
   // Stage 1 has no Clinic. A part opens once you reach that stage (0-based), and stays open on replays.
@@ -83,7 +126,15 @@ const CAMPAIGN = (() => {
     { id: 'loadout', tab: 'Loadout', at: 4, title: 'New: Loadout',
       text: `Choose which specialists come to a stage. Neutrophils and macrophages always come, plus up to ${SLOTS} specialists.` },
   ];
-  const clinicOpen = (st, order) => CLINIC.filter(c => reached(st, order) >= c.at);
+  // Once there are more specialists by Stage 4 than slots, Loadout opens there and Vaccines moves to Stage 5
+  function clinicAt(order, levels) {
+    const early = levels ? SPECIALISTS.filter(sp => { const i = order.findIndex(k => levels[k].units.includes(sp)); return i >= 0 && i <= 3; }).length : 0;
+    return early > SLOTS ? { loadout: 3, vax: 4 } : {};
+  }
+  const clinicOpen = (st, order, levels) => {
+    const at = clinicAt(order, levels);
+    return CLINIC.map(c => (c.id in at ? Object.assign({}, c, { at: at[c.id] }) : c)).sort((a, b) => a.at - b.at).filter(c => reached(st, order) >= c.at);
+  };
   // A map is open once the one before it is cleared
   function isOpen(st, order, key) { const i = order.indexOf(key); return i === 0 || !!st.cleared[order[i - 1]]; }
   function reached(st, order) { let i = 0; while (i < order.length - 1 && st.cleared[order[i]]) i++; return i; }
@@ -106,9 +157,35 @@ const CAMPAIGN = (() => {
     for (const k of order) if (st.plays[k] || st.cleared[k]) for (const x of kindsIn(levels[k])) s.add(VACCINE_OF[x]);
     return [...s].filter(Boolean);
   }
-  function loadout(st, levels, order) {
+  // Until you pick, a stage brings its own new unit, then the best counter (first in GERM.units) of its germs that
+  // nothing packed answers yet (its new germs count double), then the next specialists in the sim's order
+  function suggest(st, levels, order, key) {
     const un = unlocked(st, levels, order);
-    const pick = Array.isArray(st.loadout) ? st.loadout.filter(x => un.includes(x)) : un.slice(0, SLOTS);
+    if (!key || !levels[key]) return un.slice(0, SLOTS);
+    const seen = new Set();
+    for (const k of order.slice(0, order.indexOf(key))) for (const x of kindsIn(levels[k])) seen.add(VACCINE_OF[x]);
+    const germs = [...new Set([...kindsIn(levels[key])].map(y => VACCINE_OF[y]))].filter(x => GERM[x]);
+    const pick = un.filter(u => unlockAt(u, levels, order) === key).slice(0, SLOTS);
+    const best = x => GERM[x].units.find(u => u === 'neut' || u === 'mac' || un.includes(u));
+    while (pick.length < Math.min(SLOTS, un.length)) {
+      const score = u => germs.reduce((s, x) => s + (best(x) === u ? (seen.has(x) ? 1 : 2) : 0), 0);
+      const rest = un.filter(u => !pick.includes(u));
+      pick.push(rest.reduce((b, u) => (score(u) > score(b) ? u : b), rest[0]));
+    }
+    return pick;
+  }
+  // Germs on a stage whose counters are unlocked but none packed: [[germ, [unlocked counters]]]
+  function gaps(st, levels, order, key, pick) {
+    const un = unlocked(st, levels, order), units = unitsFor(pick), out = [];
+    for (const x of new Set([...kindsIn(levels[key])].map(y => VACCINE_OF[y]))) {
+      const g = GERM[x]; if (!g || g.units.some(u => units.includes(u))) continue;
+      const can = g.units.filter(u => un.includes(u)); if (can.length) out.push([x, can]);
+    }
+    return out;
+  }
+  function loadout(st, levels, order, key) {
+    const un = unlocked(st, levels, order);
+    const pick = Array.isArray(st.loadout) ? st.loadout.filter(x => un.includes(x)) : suggest(st, levels, order, key);
     // newly unlocked specialists join while there's a free slot
     for (const x of un) if (pick.length < SLOTS && !pick.includes(x) && !(st.dropped || []).includes(x)) pick.push(x);
     return pick.slice(0, SLOTS);
@@ -184,15 +261,16 @@ const CAMPAIGN = (() => {
     return v;
   }
   // What a finished map pays; first clears get a bonus, replays and losses a quarter
-  function payout(st, key, tr, win, lv, C) {
-    const base = Math.round(Math.min(tr.value, lv && C ? budget(lv, C) : Infinity) * RATE);
+  // capMul: Hard sends more germs (DIFFICULTIES.hard.waves), so its cap grows with them
+  function payout(st, key, tr, win, lv, C, capMul = 1) {
+    const base = Math.round(Math.min(tr.value, lv && C ? budget(lv, C) * capMul : Infinity) * RATE);
     const first = win && !st.cleared[key];
     const total = first ? Math.round(base * (1 + FIRST_BONUS)) : Math.round(base * REPEAT);
     return { base, first, total, bonus: first ? total - base : 0 };
   }
 
-  return { BACTERIA, VALUE, RATE, FIRST_BONUS, REPEAT, SLOTS, SPECIALISTS, PLACES, UPGRADES, TREATMENTS, VACCINE_OF, VACCINE_COST, vaccineWhat,
-    budget, pressure, scaleLevel, treatment, fresh, CLINIC, clinicOpen, isOpen, reached, kindsIn, unlocked, unlockAt, met, loadout, unitsFor, rank, nextCost, applyConfig, instrument, payout };
+  return { BACTERIA, VALUE, RATE, FIRST_BONUS, REPEAT, SLOTS, SPECIALISTS, setUnits, PLACES, UPGRADES, TREATMENTS, VACCINE_OF, VACCINE_COST, vaccineWhat, GERM, arrival,
+    budget, pressure, scaleLevel, treatment, fresh, CLINIC, clinicOpen, isOpen, reached, kindsIn, unlocked, unlockAt, met, suggest, gaps, loadout, unitsFor, rank, nextCost, applyConfig, instrument, payout };
 })();
 
 if (typeof module !== 'undefined') module.exports = CAMPAIGN;

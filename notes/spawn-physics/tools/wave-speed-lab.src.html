@@ -1,0 +1,193 @@
+<title>Wave Speed Lab</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Instrument+Sans:wdth,wght@75..100,400..700&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+/* Layout: the game's own dark battlefield look; two portrait maps side by side (Wound top, Lymph node bottom), controls above, readouts under each map. */
+:root {
+  --void: #04050A; --panel: #0A0D18; --line: #1E2540; --ink: #DDE6F5; --dim: #7A86A0;
+  --germ: #FF3DCB; --hot: #FF7A3D; --cell: #3FE6FF; --vessel: #2A0D16;
+  --display: "Instrument Sans", "Helvetica Neue", Arial, sans-serif;
+  --mono: "IBM Plex Mono", ui-monospace, Menlo, monospace;
+  color-scheme: dark;
+}
+html, body { background: var(--void); color: var(--ink); }
+body { font: 14px/1.45 var(--display); }
+.wrap { max-width: 760px; margin: 0 auto; padding-inline: 16px; padding-block: 18px 28px; display: grid; gap: 14px; }
+h1 { margin: 0; font: 650 22px/1.15 var(--display); font-stretch: 85%; letter-spacing: .01em; text-wrap: balance; }
+.lede { margin: 0; color: var(--dim); max-width: 62ch; }
+.lede b { color: var(--ink); font-weight: 600; }
+.hotword { color: var(--hot); font-weight: 600; }
+.controls { display: grid; gap: 8px; }
+.row { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 8px; }
+.row > span { font: 500 11px var(--mono); letter-spacing: .06em; text-transform: uppercase; color: var(--dim); min-width: 74px; }
+.seg { display: inline-flex; border: 1px solid var(--line); border-radius: 8px; overflow: hidden; }
+.seg button { font: 500 12.5px var(--display); color: var(--dim); background: var(--panel); border: 0; padding: 7px 10px; cursor: pointer; }
+.seg button + button { border-left: 1px solid var(--line); }
+.seg button[aria-pressed="true"] { color: var(--void); background: var(--cell); }
+.seg button:focus-visible, .replay:focus-visible { outline: 2px solid var(--cell); outline-offset: 2px; }
+.replay { font: 600 12.5px var(--display); color: var(--ink); background: var(--panel); border: 1px solid var(--cell); border-radius: 8px; padding: 7px 14px; cursor: pointer; }
+.panes { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; max-width: 600px; }
+.pane { min-width: 0; display: grid; gap: 6px; align-content: start; }
+.pane h2 { margin: 0; font: 600 13px var(--display); }
+.pane h2 { min-height: 2.9em; }
+.pane h2 small { display: block; font: 400 11px var(--mono); color: var(--dim); }
+canvas { display: block; width: 100%; max-width: 100%; aspect-ratio: 460 / 900; background: var(--panel); border: 1px solid var(--line); border-radius: 6px; }
+.stats { display: grid; grid-template-columns: 1fr auto; gap: 2px 8px; font: 400 11.5px var(--mono); color: var(--dim); font-variant-numeric: tabular-nums; }
+.stats b { color: var(--ink); font-weight: 500; text-align: right; }
+.stats .sep { grid-column: 1 / -1; height: 1px; background: var(--line); margin: 3px 0; }
+.clock { font: 500 12px var(--mono); color: var(--dim); font-variant-numeric: tabular-nums; }
+.foot { margin: 0; color: var(--dim); font-size: 12.5px; max-width: 66ch; }
+</style>
+
+<div class="wrap">
+  <header style="display:grid;gap:6px">
+    <h1>Wave Speed Lab</h1>
+    <p class="lede">A Papercut wave lands in an empty Wound and drifts toward the Lymph node. <b>Left</b> runs today's rules (V32). <b>Right</b> runs a fix. Germs turn <span class="hotword">orange</span> while they move faster than twice the lymph flow. Under each map: the median germ speed, the share of fast germs, and when the first germ reached each sector.</p>
+  </header>
+
+  <div class="controls">
+    <div class="row"><span>Wave</span>
+      <div class="seg" role="group" aria-label="Wave size">
+        <button id="w281" data-n="281">281 Staph</button><button id="w562" data-n="562">562</button><button id="w749" data-n="749" aria-pressed="true">749 (final)</button>
+      </div>
+    </div>
+    <div class="row"><span>Right side</span>
+      <div class="seg" role="group" aria-label="Fix shown on the right">
+        <button id="fNone" data-fix="none">No push</button><button id="fLoose" data-fix="loose" aria-pressed="true">Loose wave</button><button id="fCap" data-fix="cap">Cap 2x</button><button id="fV27" data-fix="v27">V27 push</button>
+      </div>
+    </div>
+    <div class="row"><span>Speed</span>
+      <div class="seg" role="group" aria-label="Playback speed">
+        <button id="s1" data-s="1">1x</button><button id="s2" data-s="2" aria-pressed="true">2x</button><button id="s4" data-s="4">4x</button>
+      </div>
+      <button class="replay" id="replay">Replay</button>
+      <span class="clock" id="clock">0.0 s</span>
+    </div>
+  </div>
+
+  <div class="panes">
+    <div class="pane">
+      <h2>Today (V32)<small>push 0.08 per germ</small></h2>
+      <canvas id="cA" width="460" height="900" aria-label="Today's rules"></canvas>
+      <div class="stats" id="stA"></div>
+    </div>
+    <div class="pane">
+      <h2 id="hB">No push, loose wave<small id="hBs">round blob, uneven flow</small></h2>
+      <canvas id="cB" width="460" height="900" aria-label="Proposed fix"></canvas>
+      <div class="stats" id="stB"></div>
+    </div>
+  </div>
+
+  <p class="foot">This is the real V32 simulation with germs only: no immune cells, no trickle, no quorum bursts, Staph still divide. Both sides use the same seed, so the wave lands in the same spots (the loose wave lands as a round blob instead of a box). The lymph flow is 10 units per second and a sector is 270 units long. Collisions and jostling are unchanged on both sides.</p>
+</div>
+
+<script>
+/*SIM*/
+</script>
+<script>
+(() => {
+  const FIX = {
+    none: { name: 'No crowd push', sub: 'lymph flow only', drift: 0, push: 1e9, spread: 0, blob: 0 },
+    loose: { name: 'No push, loose wave', sub: 'round blob, uneven flow', drift: 0, push: 1e9, spread: 0.3, blob: 1 },
+    cap: { name: 'Push capped at 2x', sub: 'push stops at +10 u/s', drift: 0.08, push: 10, spread: 0, blob: 0 },
+    v27: { name: 'V27 push', sub: 'push 0.027 per germ', drift: 0.027, push: 1e9, spread: 0, blob: 0 },
+  };
+  const TODAY = { drift: 0.08, push: 1e9, spread: 0, blob: 0 };
+  let N = 749, fix = 'loose', speed = 2, games = null, acc = 0, last = 0, steps = 0;
+  const DT = 1 / 60, WIN = 15, END = 120;
+
+  function setup() {
+    const lv = LEVELS.papercut;
+    lv.waves = [{ t: 0, staph: N }];
+    lv.stream = { start: 0, end: 0, clump: 1, kinds: [{ k: 'staph', w: 1 }] };
+    lv.duration = 9999; lv.quorum = 1e9;
+    CONFIG.caps.cells = 0; CONFIG.evolve.on = 0;
+    const make = rule => { const g = new Game('papercut', 7); g.cells = []; g.organLoss = false; g.rule = rule; g.reach = [null, null, null, null]; g.fast = 0; g.med = 0; return g; };
+    games = [make(TODAY), make(FIX[fix])];
+    steps = 0; acc = 0;
+    document.getElementById('hB').firstChild.nodeValue = FIX[fix].name;
+    document.getElementById('hBs').textContent = FIX[fix].sub;
+  }
+  function stepAll() {
+    for (const g of games) {
+      CONFIG.bacteria.crowdDrift = g.rule.drift; CONFIG.bacteria.crowdPush = g.rule.push; CONFIG.bacteria.driftSpread = g.rule.spread; CONFIG.wave.blob = g.rule.blob;
+      g.step(DT); g.fx.length = 0;
+    }
+    steps++;
+    for (const g of games) {
+      for (const a of g.ag) { if (a.dead || a.eaten) continue; const z = zoneOf(a.u); if (z > 0 && g.reach[z] == null) g.reach[z] = g.t; }
+      if (steps % WIN === 0) {
+        const sp = [];
+        for (const a of g.ag) {
+          if (a.dead || a.eaten) continue;
+          if (a._pu != null) { a._sp = Math.hypot(a.u - a._pu, a.v - a._pv) / (WIN * DT); sp.push(a._sp); }
+          a._pu = a.u; a._pv = a.v;
+        }
+        sp.sort((x, y) => x - y);
+        g.med = sp.length ? sp[sp.length >> 1] : 0;
+        g.fast = sp.length ? sp.filter(x => x > 20).length / sp.length : 0;
+      }
+    }
+  }
+
+  const cv = [document.getElementById('cA'), document.getElementById('cB')];
+  const st = [document.getElementById('stA'), document.getElementById('stB')];
+  const ctx = cv.map(c => c.getContext('2d'));
+  let dpr = 1;
+  function fit() {
+    dpr = Math.min(2, window.devicePixelRatio || 1);
+    for (const c of cv) { const w = c.clientWidth || 200; c.width = Math.round(w * dpr); c.height = Math.round(w * 900 / 460 * dpr); }
+  }
+  const COLS = ['#FF3DCB', '#FF5A8C', '#FF6A5C', '#FF7A3D'];
+  function draw(i) {
+    const g = games[i], c = cv[i], x = ctx[i], s = c.width / WIDTH;
+    x.fillStyle = '#0A0D18'; x.fillRect(0, 0, c.width, c.height);
+    x.fillStyle = '#2A0D16'; x.fillRect(0, 0, VESSEL * s, c.height); x.fillRect((WIDTH - FAR_VESSEL) * s, 0, FAR_VESSEL * s, c.height);
+    x.strokeStyle = '#1E2540'; x.lineWidth = Math.max(1, s); x.setLineDash([4 * s, 4 * s]);
+    x.fillStyle = '#7A86A0'; x.font = `${Math.round(11 * dpr)}px "IBM Plex Mono", monospace`; x.textBaseline = 'top';
+    for (let z = 0; z < NZ; z++) {
+      const y = ZB[z] * s;
+      if (z) { x.beginPath(); x.moveTo(0, y); x.lineTo(c.width, y); x.stroke(); }
+      x.fillText(ZONES[z], (VESSEL + 6) * s, y + 6 * s);
+    }
+    x.setLineDash([]);
+    const rad = Math.max(1.2, CONFIG.staph.radius * s);
+    const paths = COLS.map(() => new Path2D());
+    for (const a of g.ag) {
+      if (a.dead || a.eaten) continue;
+      const v = a._sp || 0, b = v > 30 ? 3 : v > 25 ? 2 : v > 20 ? 1 : 0;
+      paths[b].moveTo(a.v * s + rad, a.u * s); paths[b].arc(a.v * s, a.u * s, rad, 0, 6.2832);
+    }
+    paths.forEach((p, b) => { x.fillStyle = COLS[b]; x.fill(p); });
+    const t = r => r == null ? '–' : r.toFixed(1) + ' s';
+    const live = g.ag.filter(a => !a.dead && !a.eaten).length;
+    st[i].innerHTML = `<span>Speed</span><b>${(g.med / 10).toFixed(1)}x flow</b><span>Fast germs</span><b>${Math.round(g.fast * 100)}%</b>` +
+      `<span class="sep"></span><span>Tissue</span><b>${t(g.reach[1])}</b><span>Deep tissue</span><b>${t(g.reach[2])}</b><span>Lymph node</span><b>${t(g.reach[3])}</b>` +
+      `<span class="sep"></span><span>Germs</span><b>${live}</b>`;
+  }
+  function frame(now) {
+    const dt = last ? Math.min(0.1, (now - last) / 1000) : 0; last = now;
+    if (games[0].t < END) {
+      acc += dt * speed;
+      let n = 0;
+      while (acc >= DT && n < 12 * speed) { stepAll(); acc -= DT; n++; }
+      if (n >= 12 * speed) acc = 0;
+    }
+    draw(0); draw(1);
+    document.getElementById('clock').textContent = games[0].t.toFixed(1) + ' s' + (games[0].t >= END ? ' (end)' : '');
+    requestAnimationFrame(frame);
+  }
+  const press = (sel, btn) => document.querySelectorAll(sel + ' button').forEach(b => b.setAttribute('aria-pressed', b === btn ? 'true' : 'false'));
+  document.querySelectorAll('[data-n]').forEach(b => b.addEventListener('click', () => { N = +b.dataset.n; press('[aria-label="Wave size"]', b); setup(); }));
+  document.querySelectorAll('[data-fix]').forEach(b => b.addEventListener('click', () => { fix = b.dataset.fix; press('[aria-label="Fix shown on the right"]', b); setup(); }));
+  document.querySelectorAll('[data-s]').forEach(b => b.addEventListener('click', () => { speed = +b.dataset.s; press('[aria-label="Playback speed"]', b); }));
+  document.getElementById('replay').addEventListener('click', setup);
+  window.addEventListener('resize', fit);
+  if (matchMedia('(prefers-reduced-motion: reduce)').matches) speed = 1;
+  setup(); fit();
+  // open on a moment that shows the difference
+  for (let i = 0; i < 3 * 60; i++) stepAll();
+  requestAnimationFrame(frame);
+})();
+</script>

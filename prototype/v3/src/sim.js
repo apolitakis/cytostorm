@@ -12,22 +12,30 @@
 
 // Every tunable number. The dev panel and the tuner edit these; the sim reads them each tick.
 const DEFAULTS = {
-  marrow:     { rate: 10.8, neut: 1, net: 4, nk: 5, mac: 6 },
-  caps:       { cells: 540, mac: 54, nk: 36 },
+  marrow:     { rate: 10.8, neut: 1, net: 4, nk: 5, mac: 6, bcell: 5, eos: 4, plt: 2, dc: 6, treg: 5, ifn: 5, mast: 6 },
+  caps:       { cells: 540, mac: 54, nk: 36, bcell: 15, eos: 30, plt: 45, dc: 6, treg: 15, ifn: 18, mast: 9 },
   start:      { neut: 90, mac: 12 },
-  output:     { start: 0.5, min: 0.5, max: 2, rest: 1.15, tire: 1.2, recover: 1.2, curve: 0.585 },
+  output:     { start: 2 / 3, min: 0.25, max: 2, rest: 1.15, tire: 1.2, recover: 1.2, curve: 0.585 },
   fatigue:    { tired: 35, feverish: 60, exhausted: 85, tiredSpeed: 0.85, feverSpread: 0.3, feverLife: 0.7, exhaustedRing: 0.6, max: 150 },
   organs:     { dmg: 0.008, knee: 25, overRecover: 4, heal: 60, otherFloor: 1, wHeart: 1, wKidney: 0.8, wLungs: 0.6, wLiver: 0.6, wSpleen: 0.4, wBrain: 0.5, heart3: 1.75, heart2: 1.5, heart1: 1.25, kidney3: 0.75, kidney2: 0.5, kidney1: 0.25, lungs3: 0.9, lungs2: 0.8, lungs1: 0.7, liver3: 0.85, liver2: 0.7, liver1: 0.55, spleen3: 450, spleen2: 360, spleen1: 270, brain3: 1.2, brain2: 1.4, brain1: 1.6, brainJitter: 150, brainDelay: 3 },
   physics:    { stiff: 0.6, bounce: 0.25, flowGrip: 1.5, brownian: 45 },
   neutrophil: { speed: 52, accel: 320, radius: 3, range: 54, fireEvery: 0.7, life: 25, turnEvery: 0.3, zigzag: 1.4, stray: 0.2, standoff: 28, shotSpeed: 420, spread: 0.32, leash: 25 },
   net:        { speed: 64, radius: 3.4, burst: 30, damage: 1, fuse: 8, stick: 2.5 },
   nk:         { speed: 34, radius: 4, life: 60, reach: 9 },
+  // Campaign units (Alex, 2026-10-10; notes/campaign-features-brainstorm.md section 2): one new cell per level from 2 on
+  bcell:      { speed: 18, radius: 3.5, life: 60, every: 3.5, reach: 80, cloud: 24, cloudLife: 4, tag: 12, gulp: 0.5, clump: 1.5, slow: 0.6 },
+  eos:        { speed: 30, radius: 3.6, life: 60, reach: 8, charge: 2.5, pop: 16, domeDmg: 2, wormDmg: 33, splash: 2 },
+  plt:        { speed: 28, radius: 1.9, life: 90, hp: 8, gap: 9 },
+  dc:         { speed: 20, radius: 4.5, life: 90, boost: 1.5 },
+  treg:       { speed: 22, radius: 4, life: 90, calm: 0.05, calmMax: 0.4, drag: 0.025, dragMax: 0.2 },
+  ifn:        { speed: 22, radius: 3.5, life: 70, haze: 40, fluSlow: 0.5 },
+  mast:       { speed: 14, radius: 4.5, life: 120, reach: 60, mucus: 5, every: 12, slow: 0.5, ownSlow: 0.8 },
   macrophage: { speed: 22, radius: 8, eatEvery: 2, gulp: 0.45, reach: 12 },
-  support:    { ring: 50, speedMul: 1.5 },
-  bacteria:   { maxCount: 1350, drift: 10, crowdDrift: 0.08, crowdStart: 180, crowdRadius: 8, crowdMax: 5, jitter: 0.25, knock: 40, maxSpeed: 70 },
+  support:    { ring: 50, speedMul: 1.5, spread: 1.7, spreadSpeed: 30, cover: 0.8, uncover: 0.7, check: 0.5, upkeep: 0.5 },
+  bacteria:   { maxCount: 1350, drift: 10, driftSpread: 0.3, crowdDrift: 0, crowdStart: 180, crowdRadius: 8, crowdMax: 5, jitter: 0.25, knock: 40, maxSpeed: 70 },
   staph:      { hp: 3, doubling: 10, radius: 2.4 },
   mrsa:       { hp: 12, doubling: 20, radius: 3.2 },
-  pseudo:     { hp: 3, doubling: 20, radius: 2.6, settle: 6, domeMax: 30, domeGrow: 2, domeHp: 4, domeCap: 18, shield: 0.25 },
+  pseudo:     { hp: 3, doubling: 20, radius: 2.6, settle: 6, domeMax: 30, domeGrow: 2, domeHp: 4, domeCap: 18, shield: 0.25, drag: 0.3 },
   flu:        { radius: 1.6, speed: 24, split: 3 },
   spore:      { hatch: 30, radius: 2.2 },
   clos:       { hp: 2, doubling: 6, radius: 2.4 },
@@ -37,14 +45,15 @@ const DEFAULTS = {
   herpes:     { radius: 1.5, speed: 30, seek: 120, incubate: 8, burst: 8, life: 40 },
   worm:       { segments: 12, segHp: 99, radius: 9, cross: 120, tunedDamage: 5, wormletHp: 5, wormletSpeed: 26 },
   fungus:     { hp: 4, radius: 3, settle: 5, grow: 1.1, seg: 9, maxSegs: 45, branch: 0.12, wiggle: 0.35, budEvery: 20, highway: 2.5, reach: 7, wither: 3, chew: 3, cap: 2100 },
-  storm:      { kill: 0.7, friendly: 0.4, cost: 50, after: 8, afterRate: 2, worm: 0.15, stun: 3, windup: 1, charge: 5 },
+  storm:      { depth: [0.3, 0.55, 0.8, 0.95], friendly: 0.4, cost: 50, after: 8, afterRate: 2, worm: 0.15, stun: 3, windup: 1, charge: 5 },
   toxin:      { warn: 2, notice: 6, sweep: 0.6 },
-  quorum:     { n: 20, radius: 20, fuse: 6, pull: 45, suck: 70, pop: 100, germRadius: 20, germKill: 0.5, cooldown: 15, check: 0.5, badge: 36 },
+  quorum:     { n: 20, radius: 20, fuse: 6, pull: 45, suck: 70, pop: 100, core: 30, edgeKill: 0.6, germRadius: 20, germKill: 0.5, cooldown: 15, check: 0.5, badge: 36 },
   lymph:      { fill: 20, drain: 60, crowd: 0.033, crowdCap: 2, leak: 0.25 },
   wall:       { soft: 0.12 },
+  idle:       { half: 20 },
   unwatched:  { div: 2 },
-  trickle:    { mul: 2.6 },
-  wave:       { pour: 1.2 },
+  trickle:    { mul: 3.4, ebb: 0.5, ebbA: 37, ebbB: 16 },
+  wave:       { pour: 1.2, jitter: 10, gap: 12 },
   evolve:     { on: 1, share: 0.75, min: 60, max: 2, warn: 5, wall: 0.75, slick: 0.5, hardy: 0.5 },
   fever:      { on: 1, tired: 0.85, feverish: 0.6, exhausted: 0.45 },
 };
@@ -57,12 +66,12 @@ const HINTS = {
   'marrow.nk': 'Production cost of an NK cell, in neutrophils.',
   'marrow.mac': 'Production cost of a macrophage, in neutrophils.',
   'wall.soft': 'Vessel wall limit: how much one sector can take beyond its even share. Lower = focusing on fewer sectors wastes more output (0.12: 2 sectors on make 60%, 1 sector 33%).',
-  'unwatched.div': 'Unwatched tissue, Hard only (Alex, 2026-10-09): germs in a sector you switched off divide this many times faster (no new cells there means no sentinels).',
+  'unwatched.div': 'Unwatched tissue, both difficulties since V42 (Alex, 2026-10-09): germs in a sector you switched off divide this many times faster (no new cells there means no sentinels).',
   'evolve.on': 'Evolution on (1) or off (0): germs adapt to the way you mostly kill them.',
   'evolve.share': 'Before each wave, a germ kind evolves if one kill method did at least this share of its kills since the last wave.',
   'evolve.min': 'Kills of a kind since the last wave needed before it can evolve.',
   'evolve.max': 'Most traits one kind can evolve in a level.',
-  'evolve.warn': 'Seconds before the wave that the evolution is announced.',
+  'evolve.warn': 'Seconds before the earliest the wave can land (scripted time minus wave.jitter) that the evolution is announced.',
   'evolve.wall': 'Thick wall (vs plain shots): plain shots do this much damage.',
   'evolve.slick': 'Slick coat (vs Nets): Net damage multiplier.',
   'evolve.hardy': 'Hardy (vs the storm): storm kill chance multiplier.',
@@ -71,13 +80,27 @@ const HINTS = {
   'fever.feverish': 'Bacteria division speed while Feverish.',
   'fever.exhausted': 'Bacteria division speed while Exhausted.',
   'wave.pour': 'Seconds a wave takes to pour in (Alex, 2026-10-08: a big rush, not one frame). Most of it lands early: half in the first third.',
-  'trickle.mul': 'Multiplies every level\'s trickle between waves (Alex, 2026-10-08: it should pose a real threat).',
+  'wave.jitter': 'Each wave after the first lands up to this many seconds early or late, rolled per game (Alex, 2026-10-10: so you can\'t spike stress right before a known wave). The HUD shows waves left and what comes next, never when.',
+  'wave.gap': 'Jittered waves stay at least this many seconds apart, in their scripted order.',
+  'trickle.mul': 'Multiplies every level\'s trickle between waves (Alex, 2026-10-08: it should pose a real threat). 2.6 -> 3.4 on 2026-10-10 so sitting at 25% Stress between waves no longer pays.',
+  'trickle.ebb': 'The trickle swells and eases around its average by up to this share, unannounced, so the gaps between waves ebb and flow (Alex, 2026-10-10). 0 = perfectly steady.',
+  'trickle.ebbA': 'Period in seconds of the slow swell.',
+  'trickle.ebbB': 'Period in seconds of the quicker ripple on top.',
   'caps.cells': 'Most of your cells on the field at once.',
   'caps.mac': 'Most macrophages at once (Support is meant to be scarce).',
   'caps.nk': 'Most NK cells at once.',
+  'bcell.every': 'B cell: seconds between antibody clouds (only with a germ within bcell.reach).',
+  'bcell.tag': 'Seconds a germ stays tagged by antibodies. Tagged: macrophages swallow it in bcell.gulp of the time, MRSA becomes swallowable, and germs tagged by one cloud clump together and roll at bcell.slow of the flow.',
+  'eos.charge': 'Eosinophil: seconds it holds on to a big target (slime dome, Tapeworm segment, fungus) before it pops.',
+  'eos.domeDmg': 'Dome bites one eosinophil pop is worth (a macrophage chew is 1).',
+  'plt.hp': 'Platelet: seconds of germs pushing on it before it breaks. Platelets line up across the downstream edge of their sector into a clot wall.',
+  'dc.boost': 'Dendritic courier: when it carries a sample to the Lymph node, every hit on that germ kind does this much damage for the rest of the level.',
+  'treg.calm': 'Treg: each one cuts fatigue build-up and overload organ damage by this share (up to treg.calmMax), and slows your other cells\' firing and swallowing by treg.drag each (up to treg.dragMax).',
+  'ifn.haze': 'Interferon cell: radius of its haze. Your cells inside cannot be hijacked by Herpes; flu inside moves at ifn.fluSlow.',
+  'mast.mucus': 'Mast cell: seconds of mucus when a Tapeworm segment or Candida comes within mast.reach. Germs in that sector move at mast.slow, your cells at mast.ownSlow. Each mast cell waits mast.every between releases.',
   'start.neut': 'Neutrophils on the field at 0:00, spread over the zones.',
   'start.mac': 'Macrophages on the field at 0:00.',
-  'output.start': 'Stress slider position at 0:00 (0 = lowest, 1 = highest; 0.5 = 100%).',
+  'output.start': 'Stress slider position at 0:00 (0 = lowest, 1 = highest; 2/3 = 100%).',
   'output.min': 'Stress with the slider all the way down (1 = 100%).',
   'output.max': 'Stress with the slider all the way up.',
   'output.rest': 'Stress the body can sustain: above it fatigue builds, below it fatigue recovers.',
@@ -151,13 +174,22 @@ const HINTS = {
   'macrophage.speed': 'Units per second.',
   'macrophage.eatEvery': 'Seconds between swallows on Offense.',
   'pseudo.shield': 'Slime domes are a shield, not a wall (Alex, 2026-10-08): shots that hit a germ under a dome do this share of their damage (0.25: 12 plain hits on Pseudomonas, like MRSA; tuned shots do 1).',
+  'pseudo.drag': 'Germs under a slime dome ride the flow at this share of its speed (was 0.1; 0.3 since 2026-10-10, when the crowd push that used to flush domes was turned off and Lungs stalled with hundreds of germs parked under domes).',
   'macrophage.gulp': 'Seconds a swallow takes.',
   'macrophage.reach': 'How close it must get to swallow.',
   'support.ring': 'Radius of a Support macrophage ring.',
+  'support.upkeep': 'Inflammation: with every sector in use on Support, the sustainable stress (output.rest) drops by this much; half the sectors, half as much.',
   'support.speedMul': 'Speed multiplier for neutrophils inside a ring.',
+  'idle.half': 'Half-life in seconds of your cells standing in a switched-off sector, so a parked sector cannot stockpile macrophages (Alex, 2026-10-10). Stops when the sector is back on.',
+  'support.spread': 'Support macrophages push their posts apart until they are this many ring radii from each other, so the rings tile the sector (Alex, 2026-10-10).',
+  'support.spreadSpeed': 'How fast a Support macrophage walks its post away from a crowded neighbour.',
+  'support.cover': 'When Support rings cover more than this share of a sector, it stops making macrophages and spends their share on its other cells (Alex, 2026-10-10)...',
+  'support.uncover': '...and starts again once coverage drops below this.',
+  'support.check': 'Seconds between ring coverage checks.',
   'bacteria.maxCount': 'Antigens stop dividing at this many on the map.',
   'bacteria.drift': 'Lymph flow speed toward the Lymph node.',
-  'bacteria.crowdDrift': 'Extra drift per antigen in a zone beyond crowd start (spill-over).',
+  'bacteria.driftSpread': 'Each germ rides the lymph flow at its own pace, between 1 - this and 1 + this times the drift, so a wave smears into a stream instead of gliding as one block (Alex, 2026-10-10).',
+  'bacteria.crowdDrift': 'Extra drift for every germ in a sector per germ beyond crowd start (spill-over). 0 since 2026-10-10: at 0.08 with the 3x counts it pushed a big wave at 5x the lymph flow; collisions do the spilling now.',
   'bacteria.crowdStart': 'Zone count where crowding starts pushing antigens onward.',
   'bacteria.crowdRadius': 'Neighbour radius for the room-to-divide check.',
   'bacteria.crowdMax': 'An antigen will not divide with this many neighbours.',
@@ -201,7 +233,7 @@ const HINTS = {
   'worm.segments': 'Tapeworm segments.',
   'worm.segHp': 'Hits per tapeworm segment.',
   'worm.cross': 'Seconds the tapeworm takes to crawl the whole map.',
-  'storm.kill': 'Share of antigens the cytokine storm kills.',
+  'storm.depth': 'Share of antigens the cytokine storm kills in each sector, Wound to Lymph node: weak at the wound, near total deep in the body (Alex, 2026-10-10; was a flat 0.7 as storm.kill).',
   'storm.friendly': 'Share of your neutrophils it kills.',
   'storm.charge': 'Seconds the storm button must be held (real time) before releasing fires it. Bots wait this long in game time.',
   'storm.cost': 'Fatigue added at once by a storm.',
@@ -212,7 +244,9 @@ const HINTS = {
   'quorum.fuse': 'Seconds a crowd glows before it pops (it resets if the crowd drops below quorum).',
   'quorum.pull': 'While a crowd glows, its bubble pulls Staph-family germs within this distance toward its centre.',
   'quorum.suck': 'How hard the bubble pulls (speed gained per second).',
-  'quorum.pop': 'A pop kills every one of your cells within this distance.',
+  'quorum.pop': 'A pop reaches your cells within this distance.',
+  'quorum.core': 'Inside this distance a pop kills every cell; from here out to quorum.pop the kill chance falls off in a straight line (Alex, 2026-10-10)...',
+  'quorum.edgeKill': '...down to this chance at the edge, so the survivors are the cells on the rim.',
   'quorum.germRadius': 'A pop also kills germs this close to its centre (the colony spends itself)...',
   'quorum.germKill': '...each one with this chance.',
   'quorum.cooldown': 'Seconds before the same sector can pop again.',
@@ -247,7 +281,8 @@ const radiusOf = k => {
   const C = CONFIG;
   return { staph: C.staph.radius, mrsa: C.mrsa.radius, pseudo: C.pseudo.radius, flu: C.flu.radius, spore: C.spore.radius, clos: C.clos.radius, tb: C.tb.radius, toxic: C.toxic.radius, strep: C.strep.radius, virus: C.herpes.radius, worm: C.worm.radius, wormlet: 2.6, yeast: C.fungus.radius }[k];
 };
-const UNIT_NAMES = { neut: 'Neutrophils', net: 'Net neutrophils', nk: 'NK cells', mac: 'Macrophages' };
+const SPECIAL = { bcell: 'stepBcell', eos: 'stepEos', plt: 'stepPlt', dc: 'stepDc', treg: 'stepTreg', ifn: 'stepIfn', mast: 'stepMast' };
+const UNIT_NAMES = { neut: 'Neutrophils', net: 'Net neutrophils', nk: 'NK cells', mac: 'Macrophages', bcell: 'B cells', eos: 'Eosinophils', plt: 'Platelets', dc: 'Dendritic couriers', treg: 'Regulatory T cells', ifn: 'Interferon cells', mast: 'Mast cells' };
 
 // Levels. Waves: t plus a count per antigen kind (strep = chains, worm = worms).
 // V28 (Alex, 2026-10-08): every unit count on both sides x3 (caps, production, start, waves, trickle, spleen, quorum x2),
@@ -262,12 +297,12 @@ const LEVELS = {
     stream: { start: 2.88, end: 7.2, clump: 12, kinds: [{ k: 'staph', w: 1 }] }, // waves x1.2 (2026-10-08): with the second vessel, doing nothing won at x1. Quorum 14: at 10 the opening wave popped within seconds and gunners lost 3/4
   },
   hospital: {
-    name: 'Hospital visit', blurb: 'MRSA shrugs off plain shots and slips out of macrophages. Only Support rings kill it.', duration: 300, units: ['neut', 'mac'],
+    name: 'Hospital visit', blurb: 'MRSA shrugs off plain shots and slips out of macrophages. Only Support rings kill it.', duration: 300, units: ['neut', 'mac', 'bcell'],
     waves: [{ t: 0, staph: 195 }, { t: 50, staph: 156, mrsa: 31 }, { t: 110, staph: 312, mrsa: 47 }, { t: 170, staph: 234 }, { t: 240, staph: 390, mrsa: 70, final: true }],
     stream: { start: 1.8, end: 4.8, clump: 12, kinds: [{ k: 'staph', w: 1 }, { k: 'mrsa', w: 0.12, from: 60 }] },
   },
   pool: {
-    name: 'Pool water', blurb: 'Pseudomonas settles down and grows slime domes that shots cannot pierce. Macrophages tear them down.', duration: 300, units: ['neut', 'mac'],
+    name: 'Pool water', blurb: 'Pseudomonas settles down and grows slime domes that shots cannot pierce. Macrophages tear them down.', duration: 300, units: ['neut', 'mac', 'eos'],
     waves: [{ t: 0, staph: 156 }, { t: 40, pseudo: 47 }, { t: 90, staph: 234, mrsa: 31 }, { t: 150, pseudo: 47, staph: 156 }, { t: 240, staph: 234, pseudo: 39, mrsa: 31, final: true }],
     stream: { start: 1.5, end: 3.9, clump: 12, kinds: [{ k: 'staph', w: 1 }, { k: 'pseudo', w: 0.12, from: 30 }, { k: 'mrsa', w: 0.05, from: 90 }] },
   },
@@ -277,12 +312,12 @@ const LEVELS = {
     stream: { start: 3.456, end: 8.064, clump: 12, kinds: [{ k: 'staph', w: 1 }] }, // waves x1.6 (2026-10-07, breach clocks), then x1.2 (2026-10-08, second vessel): doing nothing won before each
   },
   soil: {
-    name: 'Soil cut', blurb: 'Clostridium spores sit harmless, then hatch all at once. Rest before the hatch, push hard on it.', duration: 300, units: ['neut', 'net', 'mac'],
+    name: 'Soil cut', blurb: 'Clostridium spores sit harmless, then hatch all at once. Rest before the hatch, push hard on it.', duration: 300, units: ['neut', 'net', 'mac', 'plt'],
     waves: [{ t: 0, staph: 187, spore: 187 }, { t: 70, mrsa: 62, staph: 187 }, { t: 110, spore: 312 }, { t: 180, staph: 312, mrsa: 62 }, { t: 220, spore: 374, staph: 250, final: true }],
     stream: { start: 1.92, end: 4.8, clump: 9, kinds: [{ k: 'staph', w: 1 }, { k: 'mrsa', w: 0.1, from: 60 }] }, // waves x1.6 (2026-10-08): with Deep tissue and plain shots hurting MRSA, doing nothing won
   },
   foot: {
-    name: "Athlete's foot", blurb: 'Fungus grows threads toward the Lymph node and germs ride them like a highway. Shots pass through the threads. Nets cut them; macrophages chew them slowly.', duration: 300, units: ['neut', 'net', 'mac'],
+    name: "Athlete's foot", blurb: 'Fungus grows threads toward the Lymph node and germs ride them like a highway. Shots pass through the threads. Nets cut them; macrophages chew them slowly.', duration: 300, units: ['neut', 'net', 'mac', 'dc'],
     waves: [{ t: 0, staph: 234 }, { t: 30, yeast: 23 }, { t: 80, staph: 281, yeast: 20 }, { t: 140, yeast: 39, staph: 187 }, { t: 200, staph: 328 }, { t: 240, yeast: 39, staph: 374, final: true }],
     stream: { start: 1.8, end: 4.68, clump: 12, kinds: [{ k: 'staph', w: 1 }, { k: 'yeast', w: 0.04, from: 60 }] }, // waves x1.2 (2026-10-08): with the second vessel, a random player won 1 in 6
   },
@@ -292,17 +327,17 @@ const LEVELS = {
     stream: { start: 1.2, end: 3.3, clump: 9, kinds: [{ k: 'staph', w: 1 }, { k: 'tb', w: 0.08, from: 30 }, { k: 'pseudo', w: 0.1, from: 60 }] },
   },
   throat: {
-    quorum: 36, name: 'Sore throat', blurb: 'Strep chains sprint for the Lymph node, and Toxic-shock Staph makes you tire twice as fast.', duration: 300, units: ['neut', 'net', 'mac'],
+    quorum: 36, name: 'Sore throat', blurb: 'Strep chains sprint for the Lymph node, and Toxic-shock Staph makes you tire twice as fast.', duration: 300, units: ['neut', 'net', 'nk', 'mac', 'treg'], // NK stays from Lungs on (Alex, 2026-10-10)
     waves: [{ t: 0, staph: 234 }, { t: 40, strep: 23 }, { t: 90, toxic: 140, staph: 187 }, { t: 140, strep: 39 }, { t: 200, toxic: 164, strep: 27 }, { t: 250, strep: 55, staph: 468, toxic: 140, final: true }],
     stream: { start: 2.52, end: 6.12, clump: 12, kinds: [{ k: 'staph', w: 1 }, { k: 'toxic', w: 0.1, from: 80 }] }, // waves x1.2 (2026-10-08): with the second vessel, doing nothing won at x1
   },
   coldsore: {
-    name: 'Cold sore', blurb: 'Herpes hides inside your own neutrophils and bursts out later. NK cells find and pop infected cells.', duration: 300, units: ['neut', 'net', 'nk', 'mac'],
-    waves: [{ t: 0, staph: 195 }, { t: 40, virus: 156 }, { t: 100, staph: 273, virus: 117 }, { t: 160, virus: 195 }, { t: 220, staph: 312, virus: 156, final: true }],
-    stream: { start: 1.5, end: 3.9, clump: 12, kinds: [{ k: 'staph', w: 1 }, { k: 'virus', w: 0.12, from: 60 }] },
+    name: 'Cold sore', blurb: 'Herpes hides inside your own neutrophils and bursts out later. NK cells find and pop infected cells.', duration: 300, units: ['neut', 'net', 'nk', 'mac', 'ifn'],
+    waves: [{ t: 0, staph: 195 }, { t: 40, virus: 156 }, { t: 100, staph: 273, virus: 117 }, { t: 160, virus: 195 }, { t: 220, staph: 273, virus: 156, final: true }],
+    stream: { start: 1.5, end: 3.2, clump: 12, kinds: [{ k: 'staph', w: 1 }, { k: 'virus', w: 0.12, from: 60 }] },
   },
   gut: {
-    name: 'Gut', blurb: 'A tapeworm crawls from the Wound to the Lymph node. Break it apart before it gets there.', duration: 300, units: ['neut', 'net', 'nk', 'mac'],
+    name: 'Gut', blurb: 'A tapeworm crawls from the Wound to the Lymph node. Break it apart before it gets there.', duration: 300, units: ['neut', 'net', 'nk', 'mac', 'mast'],
     waves: [{ t: 0, staph: 195 }, { t: 30, worm: 1 }, { t: 90, staph: 351 }, { t: 160, staph: 273, flu: 273 }, { t: 200, worm: 1 }, { t: 230, staph: 468, final: true }],
     stream: { start: 2.1, end: 5.1, clump: 12, kinds: [{ k: 'staph', w: 1 }] },
   },
@@ -328,8 +363,10 @@ const LEVEL_ORDER = ['papercut', 'hospital', 'pool', 'flu', 'soil', 'foot', 'lun
 // Difficulty (Alex, 2026-10-09): Normal is the V29 balance, untouched. Hard scales every level's waves and trickle
 // and switches on Unwatched tissue (sectors you turn off breed germs faster: CONFIG.unwatched.div).
 const DIFFICULTIES = {
-  normal: { name: 'Normal', waves: 1, trickle: 1, unwatched: false },
-  hard: { name: 'Hard', waves: 1.25, trickle: 1.25, unwatched: true, levels: { flu: 1 } }, // levels: wave/trickle scale for one level (Flu at x1.25: no bot won)
+  // V42 (Alex, 2026-10-10: "current hard difficulty is about right for a normal setting but we can make it much harder"):
+  // Normal = V41's Hard; Hard is a bigger step up again (waves and drip x1.6, not balanced yet).
+  normal: { name: 'Normal', waves: 1.25, trickle: 1.25, unwatched: true, levels: { flu: 1 } }, // levels: wave/trickle scale for one level (Flu at x1.25: no bot won)
+  hard: { name: 'Hard', waves: 1.6, trickle: 1.6, unwatched: true, levels: { flu: 1.25 } },
 };
 let DIFFICULTY = 'normal';
 function setDifficulty(d) { DIFFICULTY = DIFFICULTIES[d] ? d : 'normal'; return DIFFICULTY; }
@@ -384,6 +421,13 @@ class Grid {
   }
 }
 
+// Finer buckets just for collisions (perf, 2026-10-10): a dense crowd is checked against far fewer neighbours
+const CC = 8, CGC = Math.ceil(L / CC) + 1, CGR = Math.ceil(WIDTH / CC) + 1;
+class FineGrid {
+  constructor() { this.b = Array.from({ length: CGC * CGR }, () => []); this.used = []; }
+  clear() { for (const k of this.used) this.b[k].length = 0; this.used.length = 0; }
+  add(o) { const c = Math.max(0, Math.min(CGC - 1, Math.floor(o.u / CC))), r = Math.max(0, Math.min(CGR - 1, Math.floor(o.v / CC))), k = r * CGC + c, a = this.b[k]; if (!a.length) this.used.push(k); a.push(o); }
+}
 class Game {
   constructor(levelKey, seed, difficulty) {
     this.key = LEVELS[levelKey] ? levelKey : 'papercut';
@@ -400,10 +444,12 @@ class Game {
     this.units = this.lv.units.slice();
     this.seed = seed || 1;
     this.rand = mulberry32(this.seed * 9973 + 17);
+    if (this.lv === LEVELS[this.key]) this.lv = clone(this.lv);
+    this.rollWaves(this.seed * 7919 + 101 + 31 * LEVEL_ORDER.indexOf(this.key));
     this.t = 0;
     this.ag = [];      // antigens
     this.cells = [];   // your cells: {type: neut | net | nk | mac}
-    this.shots = []; this.domes = []; this.webs = [];
+    this.shots = []; this.domes = []; this.webs = []; this.clouds = []; this.primed = {}; this.mucus = new Array(NZ).fill(0);
     this.hyphae = []; this.fungi = []; this.gH = null;
     this.fx = [];
     const share = 1 / this.units.length;
@@ -413,8 +459,9 @@ class Game {
       for (const u of this.units) { mix[u] = u === 'neut' ? 0.8 : 0; prog[u] = 0; }
       const rest = this.units.includes('mac') ? ['mac'] : this.units.filter(u => u !== 'neut');
       for (const u of rest) mix[u] = 0.2 / rest.length;
-      return { name, mode: 'offense', on: true, count: 0, mix, prog, share };
+      return { name, mode: 'offense', on: true, count: 0, mix, prog, share, cover: 0, macPaused: false };
     });
+    this.coverAcc = 0;
     this.lymph = { timer: 0, peak: 0, reached: false }; // timer = the fullest breach clock
     this.clocks = {}; this.inNode = {}; // breach clock per organ (0-1), and how many of its germs sit in the node
     this.startState = () => ({ output: CONFIG.output.start, zones: this.zones.map(z => ({ mode: z.mode, on: z.on, mix: Object.fromEntries(this.units.map(u => [u, Math.round(z.mix[u] * 100)])) })) });
@@ -432,7 +479,7 @@ class Game {
     this.log = { inputs: [], events: [] }; this.tally = {};
     this.result = null;
     this.id = 1;
-    this.gA = new Grid(); this.gF = new Grid(); this.gH = new Grid();
+    this.gA = new Grid(); this.gF = new Grid(); this.gH = new Grid(); this.cA = new FineGrid(); this.cF = new FineGrid();
     for (let i = 0; i < CONFIG.start.neut; i++) {
       const u = 40 + this.rand() * (L - 120);
       this.spawnCell('neut', zoneOf(u), u, VESSEL + 20 + this.rand() * (WIDTH - FAR_VESSEL - VESSEL - 40)); // across the full width
@@ -517,7 +564,7 @@ class Game {
   // A few seconds before each wave: any kind that mostly died one way evolves that way's counter (applied when the wave lands)
   stepEvolve() {
     const E = CONFIG.evolve, w = this.lv.waves, ev = this.evo;
-    if (!E.on || this.lv.evolve === false || this.waveIdx >= w.length || ev.checked > this.waveIdx || this.t < w[this.waveIdx].t - E.warn || w[this.waveIdx].t <= 0) return;
+    if (!E.on || this.lv.evolve === false || this.waveIdx >= w.length || ev.checked > this.waveIdx || this.t < (w[this.waveIdx].t0 ?? w[this.waveIdx].t) - (CONFIG.wave.jitter || 0) - E.warn || w[this.waveIdx].t <= 0) return; // V43: off the scripted time minus the jitter, so the warning never dates the real arrival
     ev.checked = this.waveIdx + 1;
     for (const k in ev.win) {
       if (NO_EVOLVE.has(k) || !KINDS[k] || !KINDS[k].divides) continue; // bacteria and fungi evolve; viruses don't
@@ -578,13 +625,23 @@ class Game {
     if (this.organs[k] <= 0 && this.organLoss) this.finish(false, `Host failure. ${ORGAN_NAMES[k]} function lost ${cause === 'breach' ? 'to germs in the Lymph node' : cause === 'overload' ? `at fatigue ${Math.round(this.fatigue)}` : `(${cause})`}.`, 'host');
   }
   // Rough look ahead for the storm preview: fatigue path and the worst organ left, assuming nothing changes
+  // Inflammation upkeep: Support sectors lower the stress the body can sustain, by support.upkeep x (Support sectors /
+  // sectors in use). Holding everything on Support at the default stress tires you into overload; easing stress or
+  // switching quiet sectors to Offense keeps it in check. Counting sectors in use means switching sectors off doesn't dodge it.
+  restLevel() {
+    const O = CONFIG.output, k = CONFIG.support.upkeep;
+    if (!k) return O.rest;
+    let n = 0; for (const z of this.zones) if (z.on && z.mode === 'support') n++;
+    return O.rest - k * n / this.zonesOn();
+  }
   stormOutcome() {
     const C = CONFIG, S = C.storm, O = C.output, G = C.organs, F = C.fatigue;
     let f = Math.min(F.max, this.fatigue + S.cost), after = S.after, peak = f, worst = 4;
+    const rest = this.restLevel();
     const hp = Object.assign({}, this.organs), mul = this.effMul();
     for (let t = 0, dt = 0.2; t < 240; t += dt) {
       const kl = Math.max(0, Math.min(4, Math.ceil(hp.kidney - 1e-9))), rm = kl >= 4 ? 1 : G['kidney' + Math.max(1, kl)];
-      let df = mul > O.rest ? (mul - O.rest) * O.tire : (mul - O.rest) * O.recover * rm;
+      let df = mul > rest ? (mul - rest) * O.tire : (mul - rest) * O.recover * rm;
       if (after > 0) { after -= dt; df = Math.max(0, df) + S.afterRate * (this.output <= 0.001 ? 0.5 : 1); }
       else if (df < 0 && f > 100) df *= G.overRecover;
       f = Math.max(0, Math.min(F.max, f + df * dt)); peak = Math.max(peak, f);
@@ -594,7 +651,11 @@ class Game {
     }
     return { peak, worst, hurt: peak > 100, fatal: worst <= 0 };
   }
-  organRate(k, over) { const G = CONFIG.organs; return G.dmg * over * (1 + over / G.knee) * G[ORGAN_WKEY[k]]; }
+  organRate(k, over) { const G = CONFIG.organs; return G.dmg * over * (1 + over / G.knee) * G[ORGAN_WKEY[k]] * this.calmMul(); }
+  // Tregs (Alex, 2026-10-10): each live one calms the body a little, and slows your other cells a little
+  calmMul() { const T = CONFIG.treg, n = this.nTreg || 0; return 1 - Math.min(T.calmMax, n * T.calm); }
+  dragMul() { const T = CONFIG.treg, n = this.nTreg || 0; return 1 + Math.min(T.dragMax, n * T.drag); }
+  hazeAt(u, v) { if (!this.nIfn) return false; const R2 = CONFIG.ifn.haze ** 2; for (const c of this.cells) if (c.type === 'ifn' && !c.dead && (c.u - u) ** 2 + (c.v - v) ** 2 < R2) return true; return false; }
   // Cytokine storm: fires after a short wind-up, any time. Fatigue past 100 hurts every organ; an organ at 0 is Host failure.
   useStorm() { if (this.result || this.storm.wind > 0) return false; this.storm.wind = CONFIG.storm.windup; this.fx.push({ k: 'stormStart' }); this.logInput({ a: 'storm', fatigue: Math.round(this.fatigue) }); return true; }
   stormActive() { return this.storm.wind > 0 || this.storm.after > 0; }
@@ -640,7 +701,13 @@ class Game {
       if (q.glow[z] < Q.fuse) continue;
       q.glow[z] = 0; q.crowd[z] = null; q.cd[z] = Q.cooldown; q.pops++;
       let cells = 0, germs = 0;
-      for (const c of this.cells) if (!c.dead && (c.u - b.u) ** 2 + (c.v - b.v) ** 2 < Q.pop * Q.pop) { this.killCell(c, 'toxin'); this.stats.toxinDeaths++; cells++; }
+      for (const c of this.cells) {
+        if (c.dead) continue;
+        const d = Math.hypot(c.u - b.u, c.v - b.v);
+        if (d >= Q.pop) continue;
+        const kill = d <= Q.core ? 1 : 1 - (1 - Q.edgeKill) * (d - Q.core) / (Q.pop - Q.core); // falls off slightly toward the edge
+        if (kill >= 1 || this.rand() < kill) { this.killCell(c, 'toxin'); this.stats.toxinDeaths++; cells++; }
+      }
       for (const a of this.ag) if (!a.dead && !a.eaten && a.k !== 'worm' && a.k !== 'spore' && (a.u - b.u) ** 2 + (a.v - b.v) ** 2 < Q.germRadius * Q.germRadius && this.rand() < Q.germKill) {
         a.dead = true; germs++; this.tick('kill.quorum.' + a.k); if (a.k === 'strep') this.unlink(a, false);
         this.fx.push({ k: 'pop', u: a.u, v: a.v, kind: a.k });
@@ -658,14 +725,15 @@ class Game {
     }
     return null;
   }
-  // Progress-bar markers still to come: {t, kind: 'wave' | 'toxin' | 'hatch', kinds, final}
+  // Markers still to come: {t, t0, kind: 'wave' | 'toxin' | 'hatch', kinds, final}. t is the real (jittered) time, for the sim and
+  // tests only; t0 is the scripted time a player could learn. The HUD shows neither (V43). Hatches only for spores already landed.
   markers() {
     const out = [];
     for (let i = this.waveIdx; i < this.lv.waves.length; i++) {
       const w = this.lv.waves[i];
-      out.push({ t: w.t, kind: 'wave', final: !!w.final, kinds: Object.keys(KINDS).filter(k => w[k] > 0), armored: !!w.mrsa, quorum: this.waveQuorum(w) });
+      out.push({ t: w.t, t0: w.t0 ?? w.t, kind: 'wave', final: !!w.final, kinds: Object.keys(KINDS).filter(k => w[k] > 0), armored: !!w.mrsa, quorum: this.waveQuorum(w) });
     }
-    for (const w of this.lv.waves) if (w.spore && w.t + CONFIG.spore.hatch > this.t) out.push({ t: w.t + CONFIG.spore.hatch, kind: 'hatch' });
+    this.lv.waves.forEach((w, i) => { if (w.spore && i < this.waveIdx && w.t + CONFIG.spore.hatch > this.t) out.push({ t: w.t + CONFIG.spore.hatch, kind: 'hatch' }); });
     for (const tx of this.toxins) if (tx.state === 'coming') out.push({ t: tx.at, kind: 'toxin' });
     return out;
   }
@@ -676,6 +744,20 @@ class Game {
     for (const w of this.lv.waves) if (w.spore) ev.push({ t: w.t + CONFIG.spore.hatch, kind: 'hatch' });
     for (const tx of this.toxins) ev.push({ t: tx.at, kind: 'toxin' });
     return ev;
+  }
+  // Wave timing jitter (V43): every wave after the opening one moves by up to wave.jitter s, rolled from its own stream (so the
+  // rest of the game's randomness is unchanged). w.t0 keeps the scripted time; evolution warns off it. The constructor rolls from
+  // the seed (bots stay reproducible); Play re-rolls each game with a random jseed before the first step, because its seed is fixed.
+  rollWaves(jseed) {
+    const J = CONFIG.wave.jitter || 0, gap = CONFIG.wave.gap || 0, jr = mulberry32(jseed >>> 0);
+    this.jseed = jseed;
+    let prev = -Infinity;
+    for (const w of this.lv.waves) {
+      if (w.t0 == null) w.t0 = w.t;
+      w.t = w.t0;
+      if (w.t0 > 0 && J > 0) w.t = Math.round(Math.max(prev + gap, Math.min(this.duration - 20, w.t0 + (jr() * 2 - 1) * J)) * 10) / 10;
+      prev = w.t;
+    }
   }
   liveAg() { return this.ag.filter(a => !a.dead && !a.eaten); }
   count(type) { let n = 0; for (const c of this.cells) if (c.type === type && !c.dead) n++; return n; }
@@ -691,7 +773,7 @@ class Game {
     const c = {
       id: this.id++, type, home, u: 0, v: 0, vu: 0, vv: 0, r: 3, m: 1, age: 0, dead: false, stun: 0,
       head: Math.PI / 2, turn: 0, cd: r() * 0.5, boosted: false, infected: 0, target: null, retarget: 0, tu: -1, tv: -1,
-      pu: 0, pv: 0, mode: 'offense', gulp: 0, prey: null, flip: 0, tb: null,
+      pu: 0, pv: 0, mode: 'offense', gulp: 0, prey: null, flip: 0, tb: null, hp: 0, latch: null, charge: 0, sample: null, puff: 0,
     };
     if (type === 'mac') {
       const n = this.cells.filter(m => m.type === 'mac' && m.home === home).length, slot = n % POSTS.length;
@@ -699,6 +781,7 @@ class Game {
       c.r = C.macrophage.radius; c.m = 10; c.cd = 0;
       if (start) { c.u = c.pu; c.v = c.pv; }
     } else if (type === 'nk') { c.r = C.nk.radius; c.m = 2; }
+    else if (SPECIAL[type]) { c.r = C[type].radius; c.m = 2; c.cd = r() * 2; if (type === 'plt') c.hp = C.plt.hp; if (type === 'mast') { c.pu = zMid(home) + (r() - 0.5) * zLen(home) * 0.5; c.pv = VESSEL + (0.25 + r() * 0.5) * (WIDTH - VESSEL - FAR_VESSEL); } }
     else if (type === 'net') { c.r = C.net.radius; c.m = 1.6; }
     else { c.r = C.neutrophil.radius; c.m = 1.4; }
     if (!start) {
@@ -718,10 +801,14 @@ class Game {
     if (this.ag.length >= C.bacteria.maxCount + 780) return null;
     const K = KINDS[k];
     const hp = K.hp || (K.hpKey ? C[K.hpKey].hp : k === 'worm' ? C.worm.segHp : k === 'wormlet' ? C.worm.wormletHp : 1);
+    if (u == null && v == null) { // waves land as a round blob (an ellipse 100 long and 200 wide), not a box
+      const an = r() * 6.2832, d = Math.sqrt(r());
+      u = WOUND.u + Math.cos(an) * d * 50; v = WOUND.v + Math.sin(an) * d * 100;
+    }
     const a = {
       id: this.id++, k, u: u == null ? WOUND.u + (r() - 0.5) * 90 : u, v: v == null ? WOUND.v + (r() - 0.5) * 180 : v,
       vu: 0, vv: 0, r: radiusOf(k), hp, maxHp: hp, age: 0, div: this.divTime(k), flash: 0, blink: 0, rot: r() * 6.283,
-      dead: false, eaten: false, domed: false, prev: null, next: null, m: 1, split: false, anchored: false, hatchAt: 0,
+      dead: false, eaten: false, domed: false, tag: 0, cu: 0, cv: 0, prev: null, next: null, m: 1, split: false, anchored: false, hatchAt: 0,
     };
     a.m = Math.max(0.6, a.r * a.r / 6) * (k === 'worm' ? 3 : 1);
     if (extra) { if (extra.hatchAt) a.hatchAt = extra.hatchAt; if (extra.split) a.split = true; }
@@ -815,7 +902,9 @@ class Game {
     this.runWaves();
     if (t < this.duration) {
       const S = this.lv.stream, f = t / this.duration;
-      this.streamAcc += dt * (S.start + (S.end - S.start) * f) * C.trickle.mul;
+      // ebb and flow (Alex, 2026-10-10): two slow waves around 1, phases fixed by the seed (no rand() call), never announced
+      const E = C.trickle, ph = this.seed * 0.618, ebb = 1 + E.ebb * (0.6 * Math.sin(6.2832 * t / E.ebbA + ph * 6.2832) + 0.4 * Math.sin(6.2832 * t / E.ebbB + ph * 17.3));
+      this.streamAcc += dt * (S.start + (S.end - S.start) * f) * E.mul * Math.max(0, ebb);
       while (this.streamAcc >= 1) {
         const n = Math.max(1, Math.min(Math.floor(this.streamAcc), 1 + Math.floor(r() * S.clump)));
         this.streamAcc -= n;
@@ -837,7 +926,8 @@ class Game {
     const toxicAlive = this.ag.some(a => a.k === 'toxic' && !a.dead);
     this.toxicDrain = toxicAlive;
     // above rest fatigue builds; below it the body recovers (slower with hurt kidneys, much faster while in overload)
-    let df = mul > O.rest ? (mul - O.rest) * O.tire * (toxicAlive ? C.toxic.fatigueMul : 1) : (mul - O.rest) * O.recover * this.recoverMul() * (this.fatigue > 100 ? G.overRecover : 1);
+    const calm = this.calmMul(), rest = this.restLevel();
+    let df = mul > rest ? (mul - rest) * O.tire * calm * (toxicAlive ? C.toxic.fatigueMul : 1) : (mul - rest) * O.recover * this.recoverMul() * (this.fatigue > 100 ? G.overRecover : 1);
     if (this.storm.wind > 0) {
       this.storm.wind -= dt;
       if (this.storm.wind <= 0) this.fireStorm();
@@ -877,21 +967,28 @@ class Game {
     const warnTx = this.toxins.find(tx => tx.state === 'coming' && t >= tx.at - C.toxin.warn);
     this.warning = warnTx ? (warnTx.at - t) : 0;
     this.stepQuorum(dt);
+    this.stepCover(dt);
 
     // --- production: the marrow is shared evenly by the zones that are on, through each one's vessel wall, then split by its mix
     const rate0 = C.marrow.rate * this.prodMul() * this.makeMul();
-    const nMac = this.count('mac'), nNk = this.count('nk'), cellCap = this.cellCap();
+    const nMac = this.count('mac'), nNk = this.count('nk'), cellCap = this.cellCap(), nType = {}; for (const c of this.cells) if (!c.dead) nType[c.type] = (nType[c.type] || 0) + 1;
     let total = this.cells.length;
     for (let z = 0; z < NZ; z++) {
       const zn = this.zones[z];
       if (!zn.on) continue;
-      const mix = this.usedMix(zn, t), rate = rate0 * this.zoneOutput(z);
+      let mix = this.usedMix(zn, t);
+      const rate = rate0 * this.zoneOutput(z);
+      if (zn.macPaused && mix.mac > 0) { // rings already cover the sector: spend the macrophage share on the other cells, in the Response's proportions
+        const rest = 1 - mix.mac, m2 = {};
+        for (const u of this.units) m2[u] = u === 'mac' ? 0 : rest > 1e-6 ? mix[u] / rest : (u === 'neut' ? 1 : 0);
+        mix = m2;
+      }
       for (const u of this.units) {
         zn.prog[u] += dt * rate * mix[u] / C.marrow[u];
         if (zn.prog[u] >= 1) {
-          const capped = total >= cellCap || (u === 'mac' && nMac >= C.caps.mac) || (u === 'nk' && nNk >= C.caps.nk);
+          const capped = total >= cellCap || (u === 'mac' && nMac >= C.caps.mac) || (u === 'nk' && nNk >= C.caps.nk) || (SPECIAL[u] && (nType[u] || 0) >= C.caps[u]);
           if (capped) { zn.prog[u] = 1; continue; }
-          zn.prog[u] -= 1; total++; this.stats.made++;
+          zn.prog[u] -= 1; total++; this.stats.made++; if (SPECIAL[u]) nType[u] = (nType[u] || 0) + 1;
           const c = this.spawnCell(u, z);
           this.fx.push({ k: 'arrive', u: c.u, v: c.v, type: u });
         }
@@ -915,14 +1012,18 @@ class Game {
 
     // --- your cells (a hurt brain makes every cell wander)
     const wob = (this.wanderMul() - 1) * C.organs.brainJitter;
+    const fade = C.idle.half > 0 ? 1 - Math.pow(0.5, dt / C.idle.half) : 0;
+    this.nTreg = 0; this.nIfn = 0; for (const c of this.cells) if (!c.dead) { if (c.type === 'treg') this.nTreg++; else if (c.type === 'ifn') this.nIfn++; }
     for (const c of this.cells) {
       if (c.dead) continue;
+      if (fade && !this.zones[zoneOf(c.u)].on && this.rand() < fade) { this.killCell(c, 'fade'); continue; } // a switched-off sector lets its cells die off
       c.age += dt;
       c.stun = Math.max(0, c.stun - dt);
       if (c.type === 'mac') this.stepMac(c, dt, slow);
       else if (c.type === 'neut') this.stepNeut(c, dt, slow, tier);
       else if (c.type === 'net') this.stepNet(c, dt, slow);
       else if (c.type === 'nk') this.stepNk(c, dt, slow);
+      else if (SPECIAL[c.type]) { const ms = this.mucus[zoneOf(c.u)] > 0 ? C.mast.ownSlow : 1; this[SPECIAL[c.type]](c, dt, slow * ms); }
       if (wob > 0) { const an = this.rand() * 6.283; c.vu += Math.cos(an) * wob * dt; c.vv += Math.sin(an) * wob * dt; }
     }
     // integrate and keep in bounds
@@ -941,8 +1042,13 @@ class Game {
     // --- shots
     this.stepShots(dt);
 
+    // --- antibody clouds drift with the flow and tag what they touch; mucus wears off
+    this.stepClouds(dt);
+    for (let z = 0; z < NZ; z++) this.mucus[z] = Math.max(0, this.mucus[z] - dt);
+
     // --- antigens
     this.stepAntigens(dt);
+    if (this.cells.some(c => c.type === 'plt' && !c.dead)) this.clotWalls(dt);
 
     // --- collisions (your cells and antigens push each other around)
     this.collide();
@@ -990,7 +1096,7 @@ class Game {
       this.tally = {};
     }
     const hidden = this.cells.some(c => c.infected) || this.hyphae.length > 0;
-    if (t >= this.duration && live === 0 && !hidden && !this.pourQ.length) this.finish(true, 'The bar is full and every antigen is gone.');
+    if (t >= this.duration && live === 0 && !hidden && !this.pourQ.length) this.finish(true, 'Every wave is in and every antigen is gone.');
   }
 
   // Steer a body toward a desired velocity with limited acceleration
@@ -1035,7 +1141,7 @@ class Game {
       // germs under a slime dome are the last resort: shots only chip them (pseudo.shield)
       const aim = this.nearestAg(n.u, n.v, N.range, can) || this.nearestAg(n.u, n.v, N.range, a => this.hittable(a)) || this.nearestAg(n.u, n.v, N.range, a => !a.dead && !a.eaten && a.domed);
       if (aim) {
-        n.cd = N.fireEvery;
+        n.cd = N.fireEvery * this.dragMul();
         const d = Math.hypot(aim.u - n.u, aim.v - n.v), tt = d / N.shotSpeed;
         const au = aim.u + (aim.vu || 0) * tt, av = aim.v + (aim.vv || 0) * tt;
         const a = Math.atan2(av - n.v, au - n.u) + (r() - 0.5) * 2 * (N.spread + (tier >= 2 ? F.feverSpread : 0));
@@ -1110,6 +1216,149 @@ class Game {
       this.steer(c, (zMid(c.home) + Math.sin(this.t * 0.3 + c.id) * Math.min(90, zLen(c.home) * 0.3) - c.u) * 0.2, (NODE.v + Math.cos(this.t * 0.4 + c.id) * 120 - c.v) * 0.2, 80, dt);
     }
   }
+  // ---- campaign units (Alex, 2026-10-10). Each is made like the others and never steered.
+  // patrol near the middle of its sector (shared by the cells with nothing to chase)
+  patrol(c, sp, dt) { this.steer(c, (zMid(c.home) + Math.sin(this.t * 0.3 + c.id) * Math.min(90, zLen(c.home) * 0.3) - c.u) * 0.2, (MID_V + Math.cos(this.t * 0.4 + c.id) * 70 - c.v) * 0.2, 60, dt); }
+  // B cell: hangs back from the nearest germ and puffs antibody clouds at it
+  stepBcell(c, dt, slow) {
+    const C = CONFIG, K = C.bcell;
+    if (c.age >= K.life) { this.killCell(c, 'age'); return; }
+    c.puff = Math.max(0, c.puff - dt); c.cd -= dt;
+    const [lo, hi] = this.band(c.home);
+    const a = this.nearestAg(c.u, c.v, K.reach * 1.6, x => x.u >= lo && x.u < hi && x.k !== 'spore');
+    if (!a) { this.patrol(c, K.speed, dt); return; }
+    const du = a.u - c.u, dv = a.v - c.v, d = Math.hypot(du, dv) || 1, want = K.reach * 0.6;
+    this.steer(c, du / d * K.speed * slow * Math.sign(d - want), dv / d * K.speed * slow * Math.sign(d - want), 80, dt);
+    if (c.cd <= 0 && d < K.reach) {
+      c.cd = K.every; c.puff = 0.4;
+      const f = Math.min(1, (d - 6) / d), cl = { u: c.u + du * f, v: c.v + dv * f, r: K.cloud, life: K.cloudLife, max: K.cloudLife, id: this.id++ };
+      this.clouds.push(cl); this.fx.push({ k: 'puff', u: c.u, v: c.v, id: c.id });
+    }
+  }
+  stepClouds(dt) {
+    if (!this.clouds.length) return;
+    const C = CONFIG, K = C.bcell;
+    for (const cl of this.clouds) {
+      cl.life -= dt; cl.u += C.bacteria.drift * K.slow * dt;
+      const R2 = cl.r * cl.r;
+      this.gA.each(cl.u, cl.v, cl.r, a => { if (!a.dead && !a.eaten && a.k !== 'spore' && a.k !== 'worm' && (a.u - cl.u) ** 2 + (a.v - cl.v) ** 2 < R2) { if (a.tag <= 0) { a.cu = cl.u; a.cv = cl.v; this.tick('tag.' + a.k); } a.tag = K.tag; } });
+    }
+    this.clouds = this.clouds.filter(cl => cl.life > 0);
+  }
+  // Eosinophil: latches onto something big (slime dome, Tapeworm segment, fungus), charges, pops
+  stepEos(c, dt, slow) {
+    const C = CONFIG, K = C.eos;
+    if (c.age >= K.life && !c.latch) { this.killCell(c, 'age'); return; }
+    if (c.latch) {
+      const t = c.latch, gone = t.dome ? t.dome.hp <= 0 : t.ag ? t.ag.dead : t.h ? t.h.dead || t.h.wither : true;
+      if (gone) { c.latch = null; c.charge = 0; return; }
+      const tu = t.dome ? t.dome.u : t.ag ? t.ag.u : t.h.u, tv = t.dome ? t.dome.v : t.ag ? t.ag.v : t.h.v;
+      const rr = t.dome ? t.dome.r + c.r : (t.ag ? t.ag.r : 2) + c.r, d = Math.hypot(c.u - tu, c.v - tv) || 1;
+      c.u = tu + (c.u - tu) / d * rr; c.v = tv + (c.v - tv) / d * rr; c.vu = 0; c.vv = 0;
+      c.charge -= dt;
+      if (c.charge > 0) return;
+      // pop
+      if (t.dome) { t.dome.hp -= K.domeDmg; t.dome.r *= 0.75; }
+      else if (t.ag) this.damage(t.ag, K.wormDmg, 'eos');
+      const cut = []; this.gH && this.gH.each(c.u, c.v, K.pop, h => { if (!h.dead && (h.u - c.u) ** 2 + (h.v - c.v) ** 2 < K.pop * K.pop) cut.push(h); });
+      for (const h of cut) this.cutHypha(h);
+      this.gA.each(c.u, c.v, K.pop, a => { if (this.hittable(a) && a.k !== 'worm' && (a.u - c.u) ** 2 + (a.v - c.v) ** 2 < K.pop * K.pop) this.damage(a, K.splash, 'eos'); });
+      this.tick('eos.pop'); this.fx.push({ k: 'eosPop', u: c.u, v: c.v });
+      this.killCell(c, 'spent');
+      return;
+    }
+    const [lo, hi] = this.band(c.home);
+    let best = null, bd = Infinity;
+    const consider = (u, v, t) => { if (u < lo || u > hi) return; const d = (u - c.u) ** 2 + (v - c.v) ** 2; if (d < bd) { bd = d; best = t; } };
+    for (const d of this.domes) if (d.hp > 0) consider(d.u, d.v, { dome: d });
+    for (const a of this.ag) if (!a.dead && (a.k === 'worm' || a.k === 'yeast')) consider(a.u, a.v, { ag: a });
+    if (this.hyphae.length) for (const h of this.hyphae) if (!h.dead && !h.wither) consider(h.u, h.v, { h });
+    if (!best) { this.patrol(c, K.speed, dt); return; }
+    const tu = best.dome ? best.dome.u : best.ag ? best.ag.u : best.h.u, tv = best.dome ? best.dome.v : best.ag ? best.ag.v : best.h.v;
+    const rr = best.dome ? best.dome.r : best.ag ? best.ag.r : 2, d = Math.sqrt(bd) || 1;
+    if (d < rr + c.r + K.reach) { c.latch = best; c.charge = K.charge; this.fx.push({ k: 'latch', u: c.u, v: c.v, id: c.id }); return; }
+    this.steer(c, (tu - c.u) / d * K.speed * slow, (tv - c.v) / d * K.speed * slow, 120, dt);
+  }
+  // Platelets: line up across the downstream edge of their sector into a clot wall (clotWalls holds germs back)
+  stepPlt(c, dt, slow) {
+    const C = CONFIG, K = C.plt;
+    if (c.age >= K.life || c.hp <= 0) { this.killCell(c, c.hp <= 0 ? 'clot' : 'age'); return; }
+    const wu = Math.min(ZB[c.home + 1], L) - 8, n = Math.max(1, Math.floor((WIDTH - VESSEL - FAR_VESSEL) / K.gap));
+    const slot = ((c.id * 7) % n + n) % n, wv = VESSEL + (slot + 0.5) * K.gap;
+    this.steer(c, (wu - c.u) * 1.5, (wv - c.v) * 1.5, 120, dt);
+    const sp = Math.hypot(c.vu, c.vv); if (sp > K.speed * slow) { c.vu *= K.speed * slow / sp; c.vv *= K.speed * slow / sp; }
+  }
+  clotWalls(dt) {
+    const K = CONFIG.plt, R = K.gap * 0.75;
+    for (const c of this.cells) {
+      if (c.type !== 'plt' || c.dead) continue;
+      const wu = Math.min(ZB[c.home + 1], L) - 8;
+      if (Math.abs(c.u - wu) > 4) continue; // only a platelet in its place in the wall holds anything
+      this.gA.each(c.u, c.v, R, a => {
+        if (a.dead || a.eaten || a.k === 'worm' || a.k === 'flu' || a.k === 'virus') return;
+        if (Math.abs(a.v - c.v) < R && a.u > c.u - R && a.u < c.u + 2) { a.u = c.u - R; if (a.vu > 0) a.vu = 0; c.hp -= dt * 0.25; this.tick('plt.hold', dt); }
+      });
+    }
+  }
+  // Dendritic courier: takes a sample from the nearest germ of a kind nobody has carried yet, and walks it to the Lymph node
+  stepDc(c, dt, slow) {
+    const C = CONFIG, K = C.dc;
+    if (c.age >= K.life) { this.killCell(c, 'age'); return; }
+    if (c.sample) {
+      if (c.u >= ZB[LYMPH] + 10) { if (!this.primed[c.sample]) { this.primed[c.sample] = true; this.fx.push({ k: 'primed', kind: c.sample, u: c.u, v: c.v }); this.logEvent({ e: 'primed', kind: c.sample }); } this.killCell(c, 'spent'); return; }
+      const d = Math.hypot(NODE.u - c.u, NODE.v - c.v) || 1;
+      this.steer(c, (NODE.u - c.u) / d * K.speed * slow, (NODE.v - c.v) / d * K.speed * slow, 60, dt); return;
+    }
+    const [lo, hi] = this.band(c.home);
+    const a = this.nearestAg(c.u, c.v, 400, x => x.u >= lo && x.u < hi && !this.primed[x.k] && x.k !== 'spore' && x.k !== 'worm');
+    if (!a) { this.patrol(c, K.speed, dt); return; }
+    const du = a.u - c.u, dv = a.v - c.v, d = Math.hypot(du, dv) || 1;
+    if (d < c.r + a.r + 3) { c.sample = a.k; this.fx.push({ k: 'sample', u: c.u, v: c.v, id: c.id }); return; }
+    this.steer(c, du / d * K.speed * slow, dv / d * K.speed * slow, 80, dt);
+  }
+  // Treg: kills nothing; its effect is global (calmMul, dragMul). It drifts near your other cells.
+  stepTreg(c, dt, slow) { if (c.age >= CONFIG.treg.life) { this.killCell(c, 'age'); return; } this.patrol(c, CONFIG.treg.speed, dt); }
+  // Interferon cell: kills nothing; its haze (hazeAt) keeps Herpes out of your cells and slows flu. It stays among your neutrophils.
+  stepIfn(c, dt, slow) {
+    if (c.age >= CONFIG.ifn.life) { this.killCell(c, 'age'); return; }
+    let n = 0, su = 0, sv = 0; this.gF.each(c.u, c.v, 70, o => { if (o.type === 'neut' && !o.dead) { n++; su += o.u; sv += o.v; } });
+    if (n) this.steer(c, (su / n - c.u) * 0.6, (sv / n - c.v) * 0.6, 60, dt); else this.patrol(c, CONFIG.ifn.speed, dt);
+  }
+  // Mast cell: sits where it was made; a big germ close by sets off mucus that slows the whole sector for a few seconds
+  stepMast(c, dt, slow) {
+    const C = CONFIG, K = C.mast;
+    if (c.age >= K.life) { this.killCell(c, 'age'); return; }
+    this.steer(c, (c.pu - c.u) * 0.8, (c.pv - c.v) * 0.8, 40, dt);
+    c.cd -= dt;
+    if (c.cd > 0) return;
+    const R2 = K.reach * K.reach;
+    if (this.ag.some(a => !a.dead && (a.k === 'worm' || a.k === 'yeast') && (a.u - c.u) ** 2 + (a.v - c.v) ** 2 < R2)) {
+      const z = zoneOf(c.u); c.cd = K.every; c.puff = 0.5;
+      this.mucus[z] = Math.max(this.mucus[z], K.mucus);
+      this.fx.push({ k: 'mucus', u: c.u, v: c.v, z }); this.tick('mast.mucus');
+    } else c.cd = 0.5;
+  }
+  // Support coverage per sector (Alex, 2026-10-10): the share of a sector inside a live Support ring, sampled on a grid.
+  // Over support.cover the sector pauses macrophages (hysteresis down to support.uncover so it doesn't flicker).
+  stepCover(dt) {
+    const S = CONFIG.support;
+    if ((this.coverAcc -= dt) > 0) return;
+    this.coverAcc = S.check;
+    const R2 = (this.ringR || S.ring) ** 2, rings = this.cells.filter(m => m.type === 'mac' && !m.dead && !m.tb && m.mode === 'support' && m.stun <= 0);
+    const v0 = VESSEL, v1 = WIDTH - FAR_VESSEL, NU = 10, NV = 10;
+    for (let z = 0; z < NZ; z++) {
+      const zn = this.zones[z], u0 = ZB[z], u1 = ZB[z + 1], near = rings.filter(m => m.u > u0 - 60 && m.u < u1 + 60);
+      let hit = 0;
+      if (near.length) for (let i = 0; i < NU; i++) for (let j = 0; j < NV; j++) {
+        const u = u0 + (i + 0.5) / NU * (u1 - u0), v = v0 + (j + 0.5) / NV * (v1 - v0);
+        for (const m of near) if ((m.u - u) ** 2 + (m.v - v) ** 2 < R2) { hit++; break; }
+      }
+      zn.cover = hit / (NU * NV);
+      const was = zn.macPaused;
+      zn.macPaused = zn.mode === 'support' && (was ? zn.cover >= S.uncover : zn.cover > S.cover);
+      if (zn.macPaused !== was) this.logEvent({ e: 'macPause', z, on: zn.macPaused, cover: +zn.cover.toFixed(2) });
+    }
+  }
   stepMac(m, dt, slow) {
     const C = CONFIG, M = C.macrophage, r = this.rand;
     if (m.tb) {
@@ -1123,6 +1372,21 @@ class Game {
     if (mode !== m.mode) { m.mode = mode; m.flip = 0.4; if (mode === 'support' && m.prey) this.release(m); }
     m.flip = Math.max(0, m.flip - dt);
     m.cd = Math.max(0, m.cd - dt);
+    if (m.mode === 'support' && m.gulp <= 0) { // spread out (Alex, 2026-10-10): walk the post away from Support neighbours so the rings tile the sector
+      const S = C.support, want = (this.ringR || S.ring) * S.spread;
+      let pu = 0, pv = 0;
+      for (const o of this._macs || []) {
+        if (o === m || o.dead || o.tb || o.mode !== 'support') continue;
+        const du = m.u - o.u, dv = m.v - o.v, d = Math.hypot(du, dv);
+        if (d < want && d > 0.01) { const f = (want - d) / want; pu += du / d * f; pv += dv / d * f; }
+        else if (d <= 0.01) { pu += Math.cos(m.id); pv += Math.sin(m.id); }
+      }
+      if (pu || pv) {
+        const k = S.spreadSpeed * dt, z = m.home, edge = Math.min(20, zLen(z) * 0.25);
+        m.pu = Math.max(ZB[z] + edge, Math.min(ZB[z + 1] - edge, m.pu + pu * k));
+        m.pv = Math.max(VESSEL + 12, Math.min(WIDTH - FAR_VESSEL - 12, m.pv + pv * k));
+      }
+    }
     let tu = m.pu, tv = m.pv, sp = M.speed * slow;
     if (m.stun > 0) sp = 0;
     else if (m.gulp > 0) {
@@ -1144,7 +1408,7 @@ class Game {
       sp = 0;
     } else if (m.mode === 'offense' && m.cd <= 0) {
       const lo = ZB[m.home] - 10, hi = ZB[m.home + 1] + 10;
-      const b = this.nearestAg(m.u, m.v, 2000, a => KINDS[a.k].edible && !a.domed && a.u >= lo && a.u < hi);
+      const b = this.nearestAg(m.u, m.v, 2000, a => (KINDS[a.k].edible || a.tag > 0) && !a.domed && a.u >= lo && a.u < hi);
       let dome = null, dd = Infinity;
       for (const d of this.domes) if (d.u >= lo && d.u < hi) { const x = Math.hypot(d.u - m.u, d.v - m.v) - d.r; if (x < dd) { dd = x; dome = d; } }
       const bd = b ? Math.hypot(b.u - m.u, b.v - m.v) : Infinity;
@@ -1159,7 +1423,7 @@ class Game {
         if (dd < M.reach) { m.prey = { dome }; m.gulp = M.gulp; this.fx.push({ k: 'gulp', id: m.id, u: m.u, v: m.v }); sp = 0; }
       } else if (b) {
         tu = b.u; tv = b.v;
-        if (bd < M.reach + b.r) { m.prey = b; b.eaten = true; m.gulp = M.gulp; this.fx.push({ k: 'gulp', id: m.id, u: m.u, v: m.v }); sp = 0; }
+        if (bd < M.reach + b.r) { m.prey = b; b.eaten = true; m.gulp = M.gulp * (b.tag > 0 ? C.bcell.gulp : 1) * this.dragMul(); this.fx.push({ k: 'gulp', id: m.id, u: m.u, v: m.v }); sp = 0; }
       }
     }
     const du = tu - m.u, dv = tv - m.v, d = Math.hypot(du, dv);
@@ -1268,6 +1532,7 @@ class Game {
   // Apply damage; handles chains splitting, tapeworm pieces
   damage(a, n, how, hu, hv) {
     if (a.dead) return;
+    if (this.primed[a.k]) n *= CONFIG.dc.boost; // a dendritic courier carried this kind to the Lymph node
     a.hp -= n; a.flash = 0.12;
     if (a.hp > 0) { this.fx.push({ k: 'hit', u: hu == null ? a.u : hu, v: hv == null ? a.v : hv }); return; }
     a.dead = true;
@@ -1297,7 +1562,7 @@ class Game {
       for (let i = 0; i < CONFIG.herpes.burst; i++) { const a = this.spawnAg('virus', c.u, c.v); if (a) { a.blink = BLINK; const an = this.rand() * 6.283; a.vu = Math.cos(an) * 50; a.vv = Math.sin(an) * 50; } }
       this.fx.push({ k: 'virusBurst', u: c.u, v: c.v });
     }
-    this.fx.push({ k: why === 'age' ? 'expire' : 'die', u: c.u, v: c.v, who: c.type });
+    this.fx.push({ k: why === 'age' || why === 'fade' || why === 'spent' ? 'expire' : 'die', u: c.u, v: c.v, who: c.type });
   }
 
   stepAntigens(dt) {
@@ -1318,12 +1583,14 @@ class Game {
       // Unwatched tissue (Alex, 2026-10-09): a sector switched off has no fresh sentinels, so germs there divide faster
       a.age += K && K.divides ? dt * fev * (this.zones[z].on || !this.diff.unwatched ? 1 : C.unwatched.div) : dt;
       // what this antigen wants to do: a target velocity
-      let tu = B.drift + B.crowdDrift * Math.max(0, counts[z] - B.crowdStart), tv = 0, grip = P.flowGrip;
+      // each germ rides the flow at its own pace, fixed by its id (no rand() call)
+      const h = Math.sin(a.id * 12.9898) * 43758.5453 % 1, dm = 1 + B.driftSpread * (2 * (h < 0 ? h + 1 : h) - 1);
+      let tu = B.drift * dm + B.crowdDrift * Math.max(0, counts[z] - B.crowdStart), tv = 0, grip = P.flowGrip;
       const pool = z === LYMPH;
       if (a.k === 'flu' || a.k === 'wormlet') { const sp = a.k === 'flu' ? C.flu.speed : C.worm.wormletSpeed; const d = Math.hypot(NODE.u - a.u, NODE.v - a.v) || 1; tu = (NODE.u - a.u) / d * sp + B.drift; tv = (NODE.v - a.v) / d * sp + Math.sin(t * 3 + a.id) * 8; grip = 3; }
       else if (a.k === 'virus') {
         let host = null, bd = C.herpes.seek ** 2;
-        this.gF.each(a.u, a.v, C.herpes.seek, c => { if ((c.type === 'neut' || c.type === 'net') && !c.infected && !c.dead) { const d = (c.u - a.u) ** 2 + (c.v - a.v) ** 2; if (d < bd) { bd = d; host = c; } } });
+        this.gF.each(a.u, a.v, C.herpes.seek, c => { if ((c.type === 'neut' || c.type === 'net') && !c.infected && !c.dead && !this.hazeAt(c.u, c.v)) { const d = (c.u - a.u) ** 2 + (c.v - a.v) ** 2; if (d < bd) { bd = d; host = c; } } });
         if (host) {
           const d = Math.sqrt(bd) || 1;
           if (d < host.r + a.r + 1) { a.dead = true; host.infected = C.herpes.incubate; this.fx.push({ k: 'infect', u: host.u, v: host.v }); continue; }
@@ -1342,7 +1609,7 @@ class Game {
         const pull = (d - gap) * 8;
         tu = p.vu + du / d * pull; tv = p.vv + dv / d * pull; grip = 10;
       } else if (a.k === 'pseudo' && a.anchored) { tu = 0; tv = 0; grip = 8; }
-      else if (a.domed) { tu *= 0.1; }
+      else if (a.domed) { tu *= C.pseudo.drag; }
       else if (pool) { tu = (NODE.u - a.u) * 0.3; tv = (NODE.v - a.v) * 0.12; }
       if (a.k === 'spore') tu *= 0.5;
       if (K.slow) tu *= 0.5;
@@ -1352,6 +1619,10 @@ class Game {
         if (on) { tu = Math.max(tu, B.drift) * F.highway; grip = Math.max(grip, 3); }
       }
       if (a.pen) { if (a.pen.life <= 0) a.pen = null; else { tu *= 0.3; tv *= 0.3; } } // penned: sluggish, still pushing and colliding
+      // tagged by antibodies: germs from one cloud pull toward its drifting centre and roll as a clump
+      if (a.tag > 0) { a.tag -= dt; a.cu += B.drift * C.bcell.slow * dt; if (!K.chain) { tu = B.drift * C.bcell.slow + (a.cu - a.u) * C.bcell.clump; tv = (a.cv - a.v) * C.bcell.clump; grip = Math.max(grip, 3); } }
+      if (this.mucus[z] > 0) { tu *= C.mast.slow; tv *= C.mast.slow; } // mast cell mucus: the sector's flow and crawl slow down
+      if (a.k === 'flu' && this.hazeAt(a.u, a.v)) { tu *= C.ifn.fluSlow; tv *= C.ifn.fluSlow; }
       a.vu += (tu - a.vu) * Math.min(1, grip * dt);
       a.vv += (tv - a.vv) * Math.min(1, grip * dt);
       if (!K.chain) { a.vu += (r() - 0.5) * P.brownian * dt; a.vv += (r() - 0.5) * P.brownian * dt; }
@@ -1429,21 +1700,23 @@ class Game {
       }
     };
     // rebuild buckets after movement
-    this.gA.clear(); this.gF.clear();
-    for (const a of this.ag) if (!a.dead && !a.eaten) this.gA.add(a);
-    for (const c of this.cells) if (!c.dead) this.gF.add(c);
-    // Grid.each written out here so no closure is made per body per step; same buckets, same order, same pairs
+    this.gA.clear(); this.gF.clear(); this.cA.clear(); this.cF.clear();
+    let mA = 0, mF = 0;
+    for (const a of this.ag) if (!a.dead && !a.eaten) { this.gA.add(a); this.cA.add(a); if (a.r > mA) mA = a.r; }
+    for (const c of this.cells) if (!c.dead) { this.gF.add(c); this.cF.add(c); if (c.r > mF) mF = c.r; }
+    const SLACK = 1; // look only as far as the biggest body present (+1 for pushes made earlier in this pass); was a fixed +9
+    // Grid.each written out here so no closure is made per body per step (fine collision buckets, so pair order differs from v37)
     const near = (grid, o, after) => {
-      const u = o.u, v = o.v, rad = o.r + 9, id = o.id, B = grid.b;
-      const c0 = Math.max(0, Math.floor((u - rad) / CELL)), c1 = Math.min(GC - 1, Math.floor((u + rad) / CELL));
-      const r0 = Math.max(0, Math.floor((v - rad) / CELL)), r1 = Math.min(GR - 1, Math.floor((v + rad) / CELL));
-      for (let r = r0; r <= r1; r++) for (let c = c0; c <= c1; c++) { const a = B[r * GC + c]; for (let i = 0; i < a.length; i++) if (!after || a[i].id > id) pair(o, a[i]); }
+      const u = o.u, v = o.v, rad = o.r + (grid === this.cA ? mA : mF) + SLACK, id = o.id, B = grid.b;
+      const c0 = Math.max(0, Math.floor((u - rad) / CC)), c1 = Math.min(CGC - 1, Math.floor((u + rad) / CC));
+      const r0 = Math.max(0, Math.floor((v - rad) / CC)), r1 = Math.min(CGR - 1, Math.floor((v + rad) / CC));
+      for (let r = r0; r <= r1; r++) for (let c = c0; c <= c1; c++) { const a = B[r * CGC + c]; for (let i = 0; i < a.length; i++) if (!after || a[i].id > id) pair(o, a[i]); }
     };
-    for (const a of this.ag) { if (a.dead || a.eaten) continue; near(this.gA, a, true); }
+    for (const a of this.ag) { if (a.dead || a.eaten) continue; near(this.cA, a, true); }
     for (const c of this.cells) {
       if (c.dead) continue;
-      near(this.gF, c, true);
-      near(this.gA, c, false);
+      near(this.cF, c, true);
+      near(this.cA, c, false);
     }
   }
 
@@ -1453,7 +1726,7 @@ class Game {
     for (const a of this.ag) {
       if (a.dead || a.eaten || a.k === 'spore' || a.domed) continue;
       if (a.k === 'worm') { a.hp -= a.maxHp * S.worm; if (a.hp <= 0) this.damage(a, 0, 'storm'); continue; }
-      if (r() < S.kill * (this.hasTrait(a, 'hardy') ? C.evolve.hardy : 1)) { a.dead = true; kills++; this.tick('kill.storm.' + a.k); if (a.k === 'strep') this.unlink(a, false); this.fx.push({ k: 'pop', u: a.u, v: a.v, storm: true, kind: a.k }); }
+      if (r() < S.depth[zoneOf(a.u)] * (this.hasTrait(a, 'hardy') ? C.evolve.hardy : 1)) { a.dead = true; kills++; this.tick('kill.storm.' + a.k); if (a.k === 'strep') this.unlink(a, false); this.fx.push({ k: 'pop', u: a.u, v: a.v, storm: true, kind: a.k }); }
     }
     for (const c of this.cells) {
       if (c.dead) continue;
@@ -1480,4 +1753,4 @@ class Game {
   }
 }
 
-if (typeof module !== 'undefined') module.exports = { DIFFICULTIES, setDifficulty, BLINK, BLINK_WARN, ORGAN_KEYS, ORGAN_NAMES, Game, DEFAULTS, CONFIG, LEVELS, LEVEL_ORDER, KINDS, UNIT_NAMES, HINTS, mergeConfig, mulberry32, zoneOf, L, WIDTH, ZONE, ZB, NZ, LYMPH, zStart, zLen, zMid, VESSEL, FAR_VESSEL, MID_V, EVOLVE, WOUND, NODE, ZONES };
+if (typeof module !== 'undefined') module.exports = { SPECIAL, DIFFICULTIES, setDifficulty, BLINK, BLINK_WARN, ORGAN_KEYS, ORGAN_NAMES, Game, DEFAULTS, CONFIG, LEVELS, LEVEL_ORDER, KINDS, UNIT_NAMES, HINTS, mergeConfig, mulberry32, zoneOf, L, WIDTH, ZONE, ZB, NZ, LYMPH, zStart, zLen, zMid, VESSEL, FAR_VESSEL, MID_V, EVOLVE, WOUND, NODE, ZONES };

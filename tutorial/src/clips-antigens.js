@@ -153,7 +153,7 @@
   // ---- Clostridium spores (Soil cut) ----
   CYT_CLIPS.spore = {
     id: 'spore', title: 'Clostridium spores', dur: 12,
-    cap: [[0, 'Clostridium spores drift in and sit still.'], [1.8, 'Nothing can hurt a spore. Shots, nets and storms do nothing.'], [4.6, 'The bar on the left shows when they hatch. They all crack at once...'], [7.0, '...into bacteria that divide every 6 seconds. Rest before the hatch, then push hard on it.']],
+    cap: [[0, 'Clostridium spores drift in and sit still.'], [1.8, 'Nothing can hurt a spore. Shots, nets and storms do nothing.'], [4.6, 'A banner counts down to the hatch. They all crack at once...'], [7.0, '...into bacteria that divide every 6 seconds. Rest before the hatch, then push hard on it.']],
     hud: { rail: true },
     bg: { tile: 1.2 },
     hatch: 6.4,
@@ -180,9 +180,14 @@
       A.zoneCount(0, 400, K.count(st.spores, t) + K.count(st.all, t));
       if (t > 2.0 && t < 4.4) { const [u, v] = st.spores[3].pos(t); A.tag(u, v, "can't be hurt", A.PAL.wax, tagWin(t, 2.0, 4.4), -16); }
     },
-    hudFrame(t, st) {
-      const frac = 0.3 + t * 0.022, at = 0.3 + this.hatch * 0.022;
-      A.rail(frac, [{ at: 0.05, kind: 'wave' }, { at: 0.18, kind: 'wave' }, { at, kind: 'spore', ring: t > 4.6 && t < this.hatch ? A.PAL.wax : null }, { at: 0.72, kind: 'wave' }, { at: 0.9, kind: 'wave-final' }]);
+    // V43: the rail no longer dates the hatch; the game's banner counts down instead (from 12 s, in the clip's compressed time)
+    overlay(t) {
+      const H = this.hatch, b0 = 3.6;
+      if (t < b0 || t >= H + 0.25) return;
+      A.toast(`Spores hatch in ${Math.max(1, Math.ceil((H - t) / (H - b0) * 12))} s. Rest now, then push.`, A.seg(t, b0, b0 + 0.25) * (1 - A.seg(t, H, H + 0.25)));
+    },
+    hudFrame(t) {
+      A.rail(t < 0.8 ? 2 : 3, [{ kind: 'wave' }, { kind: 'wave' }, { kind: 'spore' }, { kind: 'wave' }, { kind: 'wave-final' }]);
     },
   };
 

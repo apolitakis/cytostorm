@@ -1,0 +1,12 @@
+level     casual       gunner       
+papercut  1/1 100%     1/1 0%       
+hospital  0/1 s1 100%  0/1 s1 100%  
+pool      0/1 s1 100%  0/1 s1 100%  
+flu       0/1 s1 100%  0/1 s1 100%  
+soil      0/1 s1 100%  0/1 s1 100%  
+foot      0/1 s1 100%  1/1 87%      
+lungs     0/1 s1 100%  0/1 s1 100%  
+throat    0/1 s1 100%  0/1 s1 100%  
+coldsore  0/1 s1 100%  0/1 s1 100%  
+gut       0/1 s1 100%  0/1 s1 100%  
+(wins/seeds, s = host-failure losses, then mean peak lymph timer)  310 s

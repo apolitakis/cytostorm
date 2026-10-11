@@ -75,3 +75,36 @@
 .coach b { font-size: 14px; color: var(--cell); }
 .coach p { margin: 0; font-size: 12.5px; text-wrap: pretty; }
 .coach .btn { padding: 5px 12px; font-size: 12.5px; }
+.goal { display: grid; gap: 8px; }
+.goal p { margin: 0; font-size: 13.5px; text-wrap: pretty; }
+.goal b { color: var(--cell); }
+.slotrow { flex-wrap: wrap; }
+.slotbtns { display: flex; gap: 6px; flex: none; }
+.ctog.on { border-color: var(--cell); color: var(--cell); }
+.ctog.del { color: var(--kill); }
+/* germ cards (Clinic "Coming in") */
+.incoming:has(.germs) { display: grid; gap: 6px; }
+.germs { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 6px; }
+.germ { display: grid; grid-template-columns: 30px 1fr; gap: 2px 8px; align-items: start; text-align: left; background: var(--panel2); border: 1px solid var(--line); border-radius: 9px; padding: 7px 9px; color: var(--ink); font: inherit; cursor: pointer; }
+.germ:hover, .germ:focus-visible { border-color: var(--cell); }
+.germ .gart { grid-row: 1 / span 4; width: 30px; height: 30px; }
+.germ .gname { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 6px; font-size: 13px; }
+.germ .gnew, .germ .gvax { font: 600 10px var(--mono); font-style: normal; letter-spacing: .04em; text-transform: uppercase; padding: 1px 5px; border-radius: 4px; }
+.germ .gnew { background: var(--gold); color: var(--void); }
+.germ .gvax { color: var(--repair); border: 1px solid var(--repair); }
+.germ .gdoes { font-size: 12px; color: var(--dim); line-height: 1.3; }
+.germ .gbeat { font-size: 12px; line-height: 1.3; }
+.germ .gbeat img { width: 16px; height: 16px; vertical-align: -3px; margin-right: 4px; }
+.germ .gbeat.miss { color: var(--kill); }
+.germ .gwhen { font: 11px var(--mono); color: var(--dim); }
+.mrow .new .gi { position: relative; display: inline-block; }
+.mrow .new .gi.vx::after { content: '✓'; position: absolute; right: -4px; bottom: -4px; font: 700 11px/1 var(--mono); color: var(--repair); }
+.unit.flash { outline: 1px solid var(--cell); outline-offset: 4px; border-radius: 6px; }
+/* Clinic QoL: loadout counter check, treatment "here" lines, shop undo */
+#mbox .cwarn { margin: 0; font-size: 12px; color: var(--kill); border-left: 2px solid var(--kill); padding: 2px 0 2px 8px; }
+.tcard .here { font-size: 12px; color: var(--cell); }
+.tcard .here.none { color: var(--dim); }
+.undo { justify-self: start; background: none; border: 1px solid var(--line); border-radius: 8px; padding: 5px 10px; color: var(--ink); font: 12px var(--display); cursor: pointer; }
+.undo:hover, .undo:focus-visible { border-color: var(--cell); }
+/* the stage's own new unit in the Loadout tab */
+.crow .gnew { font: 600 10px var(--mono); font-style: normal; letter-spacing: .04em; text-transform: uppercase; padding: 1px 5px; border-radius: 4px; background: var(--gold); color: var(--void); vertical-align: 1px; }

@@ -181,7 +181,7 @@ CYT_CLIPS.cards = {
 // ---- 3b. Switching a zone off ----
 CYT_CLIPS.shutoff = {
   id: 'shutoff', title: 'Switch a zone off', dur: 13.5,
-  cap: [[0, 'The Lymph node is quiet, but it still gets a quarter of your new cells.'], [1.4, 'Tap the power button beside it to switch it off. Its Response sheet has the same switch.'], [3.4, 'Cells already there stay and fight. No new ones are made.'], [5.4, 'Its share goes to the zones still on, so each makes a bit more. The Wound fills faster.'], [8.6, 'Switch the Tissue and Deep tissue off too, and the Wound makes the most it can. Its vessel walls only let so many cells through.'], [10.6, 'The last zone won\'t switch off. One zone always has to keep making cells.']],
+  cap: [[0, 'The Lymph node is quiet, but it still gets a quarter of your new cells.'], [1.4, 'Tap the power button beside it to switch it off. Its Response sheet has the same switch.'], [3.4, 'Cells already there fight on, but they slowly die off. No new ones are made.'], [5.4, 'Its share goes to the zones still on, so each makes a bit more. The Wound fills faster.'], [8.6, 'Switch the Tissue and Deep tissue off too, and the Wound makes the most it can. Its vessel walls only let so many cells through.'], [10.6, 'The last zone won\'t switch off. One zone always has to keep making cells.']],
   hud: { side: 'map' },
   bg: { wound: [55, 215], woundSize: 0.6, dividers: [120, 240, 360], lymph: [380, 175] },
   offAt: 2.7, off2At: 9.2, off3At: 9.8, noAt: 11.2,
@@ -203,6 +203,9 @@ CYT_CLIPS.shutoff = {
     for (let i = 0; i < 5; i++) deep.push(K.recruit('neutrophil', 4.2 + i * 1.0, 250 + r() * 100, 110 + r() * 160, { r: 4.8, wob: 6 }));
     K.fight(wound.filter(c => c.art === 'neutrophil'), st.germs.slice(0, 18).sort((a, b) => a.pos(4)[1] - b.pos(4)[1]), 1.2, { hp: 3, every: 0.75, seed: 34 });
     K.fight(tissue, st.germs.slice(18), 1.6, { hp: 3, every: 0.9, seed: 35 });
+    // V32: cells standing in a switched-off sector die off quietly (20 s half-life)
+    const fade = (list, off, picks) => picks.forEach(([i, dt]) => { const c = list[i]; if (c && c.t1 > off + dt) { c.t1 = off + dt; c.die = 'puff'; } });
+    fade(st.extra, this.offAt, [[0, 4.2], [2, 8.6]]); fade(tissue, this.off2At, [[0, 2.8]]); fade(deep, this.off3At, [[1, 2.2]]);
   },
   // making cells, per zone (Wound, Tissue, Deep tissue, Lymph node)
   on(t) { return [true, t < this.off2At, t < this.off3At, t < this.offAt]; },
@@ -240,9 +243,9 @@ CYT_CLIPS.shutoff = {
 
 // ---- 4. Offense and Support ----
 CYT_CLIPS.modes = {
-  id: 'modes', title: 'Offense or Support', dur: 13.5,
+  id: 'modes', title: 'Offense or Support', dur: 18.5,
   hud: { side: 'ctl' },
-  cap: [[0, 'Every zone is on Offense or Support, and your cells there fight to match. On Offense, macrophages swallow germs whole.'], [4.2, 'Tap the stance button beside a zone to switch it to Support.'], [5.8, 'On Support, macrophages stand still inside a ring. Neutrophils in the ring move faster and fire tuned shots.'], [9.6, 'A tuned shot kills in one hit, and it pierces armor.']],
+  cap: [[0, 'Every zone is on Offense or Support, and your cells there fight to match. On Offense, macrophages swallow germs whole.'], [4.2, 'Tap the stance button beside a zone to switch it to Support.'], [5.8, 'On Support, each macrophage holds a ring. Neutrophils in a ring move faster and fire tuned shots.'], [9.6, 'A tuned shot kills in one hit, and it pierces armor.'], [12.2, 'Support macrophages spread apart, so their rings tile the zone.'], [15.4, 'Once rings cover most of a zone, it stops making macrophages. Its Response button says Macs paused.']],
   bg: { tile: 1.2 },
   build(st) {
     const A = CYT.api, K = CYT_KIT, r = A.rng(3);
@@ -266,12 +269,22 @@ CYT_CLIPS.modes = {
     st.outside = outside;
     K.fight(st.neuts, st.germs.filter((g, i) => i !== 1), 6.0, { hp: 1, every: 0.55, tuned: true, seed: 4 });
     K.fight([outside], [st.germs[1]], 6.4, { hp: 3, every: 0.7, seed: 6 });
+    // V32: more Support macrophages arrive next to the first and walk apart until their rings tile the sector;
+    // once rings cover most of it, the sector stops making macrophages (the Response button reads "Macs paused")
+    const spots = [[85, 95], [85, 235], [320, 95], [320, 235], [205, 70]];
+    st.more = spots.map(([u, v], i) => {
+      const t0 = 12.2 + i * 0.5, near = [205 + Math.cos(i * 1.3) * 26, 190 + Math.sin(i * 1.3) * 22];
+      return A.ent({ art: 'macrophage-support', r: 17, layer: 1, die: 'puff', big: true, t0, arrive: A.COLORS.mac,
+        pos: A.path([[t0, near[0], A.VES - 4], [t0 + 0.7, near[0], near[1]], [t0 + 1.0, near[0], near[1]], [t0 + 2.6, u, v]], 2, 20 + i) });
+    });
+    st.pauseAt = 16.0;
   },
   frame(t, st, A) {
     const ringA = A.seg(t, st.ringOn, st.ringOn + 0.5);
     A.scene(t, {
       under: () => {
         if (ringA > 0) { const [u, v] = st.mac.pos(t), pulse = 1 + 0.03 * Math.sin(t * 6.283 / 1.6); A.spr('support-ring', u, v, 62 * ringA * pulse, null, 0.85 * ringA); }
+        for (const m of st.more) { const a = A.seg(t, m.t0 + 0.7, m.t0 + 1.2); if (a > 0) { const [u, v] = m.pos(t); A.spr('support-ring', u, v, 62 * a, null, 0.85 * a); } }
         // speed trails on boosted neutrophils
         if (ringA > 0) for (const n of st.neuts) if (A.alive(n, t) && t > n.t0 + 0.3) { const [a, b] = n.pos(t - 0.05), [c, d] = n.pos(t); if (Math.hypot(c - a, d - b) > 0.5) A.spr('speed-trail', c, d, 9, Math.atan2(d - b, c - a), 0.7); }
       },
@@ -282,7 +295,9 @@ CYT_CLIPS.modes = {
     A.zoneChip(0, 400, t < 4.6 ? 'offense' : 'support', A.seg(t, 4.6, 4.9));
     if (t > 6.4 && t < 8.6) { const [u, v] = st.outside.pos(t); A.tag(u, v, 'outside: 3 hits', A.PAL.antibody, A.seg(t, 6.4, 6.7) * (1 - A.seg(t, 8.3, 8.6))); }
     if (t > 9.6 && t < 12) { const [u, v] = st.mac.pos(t); A.tag(u - 40, v, 'inside: 1 hit', '#FFFFFF', A.seg(t, 9.6, 9.9) * (1 - A.seg(t, 11.7, 12)), -40); }
+    if (t > 13.4 && t < 15.6) A.tag(205, 150, 'spreading out', A.PAL.repair, A.seg(t, 13.4, 13.7) * (1 - A.seg(t, 15.3, 15.6)), -30);
   },
+  side(t, st, A) { return { mix: { neut: 0.6, mac: 0.4 }, paused: t > st.pauseAt }; },
   fingers(t, st, A) {
     const K = CYT_KIT;
     const b = () => (A.R.hud.ctl ? A.R.hud.ctl.mode[0] : [0, 0]);
@@ -355,19 +370,19 @@ function organTable(dur, f0, hp0, step, gs = () => 1) {
 }
 CYT_CLIPS.organs = {
   id: 'organs', title: 'Organs and overload', dur: 19,
-  cap: [[0, 'The organ button shows your six organs. Each one has 4 bars to lose.'], [3.0, 'Tap it, or press O, to pause and see what each hurt organ is costing you.'], [7.4, 'Push fatigue past 100 and you\'re in Overload. Every organ loses health, the heart fastest.'], [11.6, 'Ease off. Above 100 your body recovers 4 times faster.'], [13.9, 'Once you\'re Fine, your liver and lungs grow back. The others stay hurt.'], [16.6, 'If any organ hits 0 bars, that\'s Host failure.']],
+  cap: [[0, 'The organ button shows your six organs. Each one has 4 bars to lose.'], [3.0, 'Tap it, or press O, to see what each hurt organ is costing you. The fight keeps going behind it.'], [7.4, 'Push fatigue past 100 and you\'re in Overload. Every organ loses health, the heart fastest.'], [11.6, 'Ease off. Above 100 your body recovers 4 times faster.'], [13.9, 'Once you\'re Fine, your liver and lungs grow back. The others stay hurt.'], [16.6, 'If any organ hits 0 bars, that\'s Host failure.']],
   hud: { bottom: true },
   bg: { wound: [48, 205], woundSize: 0.6, dividers: [120, 240, 360], lymph: [380, 175] },
   openAt: 3.5, closeAt: 7.0, up: [7.6, 8.1], down: [11.6, 12.0], ff: [13.9, 16.5],
   outAt(t) { const A = CYT.api; return 0.12 + 0.78 * A.ease(A.seg(t, ...this.up)) - 0.9 * A.ease(A.seg(t, ...this.down)); },
-  sceneT(t) { const p = this.closeAt - this.openAt; return t < this.openAt ? t : t < this.closeAt ? this.openAt : t - p; },
+  sceneT(t) { return t; }, // V35: the organ window no longer pauses the fight
   build(st) {
     const A = CYT.api, K = CYT_KIT;
     stormScene(st, 70, A, K);
     K.fight(st.neuts, st.germs, 0.6, { hp: 3, every: 0.9, seed: 71 });
     st.tab = organTable(this.dur, 70, [3, 4, 2, 3, 4, 4],
       (t, f, hp, d) => f + fatigueRate(Math.min(0.5 * Math.pow(4, this.outAt(t)), heartCap(hp[0])), f, hp[1]) * d,
-      t => (t >= this.openAt && t < this.closeAt ? 0 : t >= this.up[1] && t < 9.6 ? 30 : t >= 9.6 && t < this.down[0] ? 8 : t >= this.down[0] && t < this.ff[0] ? 3 : t >= this.ff[0] && t < this.ff[1] ? 60 : 1));
+      t => (t >= this.openAt && t < this.closeAt ? 1 : t >= this.up[1] && t < 9.6 ? 30 : t >= 9.6 && t < this.down[0] ? 8 : t >= this.down[0] && t < this.ff[0] ? 3 : t >= this.ff[0] && t < this.ff[1] ? 60 : 1));
   },
   frame(t, st, A) {
     const ts = this.sceneT(t);
@@ -499,7 +514,7 @@ CYT_CLIPS.toxin = {
   Q: 20, FUSE: 6, CORE: 26, BLAST: 130, // clip units: the game's 20 / 100 at this stage's scale
   C1: [112, 104], C2: [268, 196], glow2: 8.4,
   realtime: [[9.0, 13.8]], // the wick burns in real seconds
-  cap: [[0, 'The bar on the left is the level\'s script. Each badge is a wave. A ringed badge is a Staph wave big enough to crowd up.'], [2.5, 'When a Staph crowd gets big enough, a red bubble forms and pulls more in. Its wick burns down for 6 seconds.'], [4.0, 'Thin the crowd in time and the bubble goes out. A Net pen is the natural answer.'], [7.0, 'Leave a crowd alone and the wick burns down...'], [14.4, '...until it pops. Every cell of yours nearby dies, and half the crowd at its core dies too.'], [17.2, 'That zone can\'t pop again for 15 seconds. Thin Staph crowds early.']],
+  cap: [[0, 'The bar on the left lists the waves to come, in order, but not when. A ringed badge is a Staph wave big enough to crowd up.'], [2.5, 'When a Staph crowd gets big enough, a red bubble forms and pulls more in. Its wick burns down for 6 seconds.'], [4.0, 'Thin the crowd in time and the bubble goes out. A Net pen is the natural answer.'], [7.0, 'Leave a crowd alone and the wick burns down...'], [14.4, '...until it pops. Every cell of yours close to it dies, and most of those farther out. Half the crowd at its core dies too.'], [17.2, 'That zone can\'t pop again for 15 seconds. Thin Staph crowds early.']],
   hud: { rail: true },
   bg: { wound: [120, 210], woundSize: 1.2, tile: 1.1 },
   build(st) {
@@ -542,7 +557,9 @@ CYT_CLIPS.toxin = {
     const [cu, cv] = this.C2;
     for (const c of st.n2.concat([st.mac], st.n1)) {
       const [u, v] = c.pos(st.pop), d = Math.hypot(u - cu, v - cv);
-      if (d < this.BLAST && c.t1 > st.pop) { c.t1 = st.pop + d / 600; c.deathAt = null; if (c.r > 10) c.big = true; }
+      // V32 falloff: certain death inside the core (30 game units = 39 here), then a chance falling to 60% at the edge
+      const pk = d < 39 ? 1 : 1 - 0.4 * (d - 39) / (this.BLAST - 39), roll = (Math.sin(c.id * 91.7) * 43758.5453 % 1 + 1) % 1;
+      if (d < this.BLAST && c.t1 > st.pop && roll < pk) { c.t1 = st.pop + d / 600; c.deathAt = null; if (c.r > 10) c.big = true; }
     }
     let k = 0;
     for (const g of st.b) {
@@ -612,9 +629,9 @@ CYT_CLIPS.toxin = {
     A.toast(`Staph crowd in the Wound: pops in ${Math.max(1, left)} s. Thin it.`, fd * A.seg(t, f2 ? this.glow2 : 2.3, (f2 ? this.glow2 : 2.3) + 0.25));
   },
   hudFrame(t, st, A) {
-    // the rail rings a Staph wave big enough to reach quorum on arrival (steady, never blinking)
-    const frac = 0.36 + t * 0.011, big = 0.47;
-    A.rail(frac, [{ at: 0.02, kind: 'wave' }, { at: 0.19, kind: 'wave' }, { at: big, kind: 'wave', ring: A.PAL.toxin }, { at: 0.66, kind: 'wave' }, { at: 0.86, kind: 'wave-final' }]);
+    // the rail (V43) lists the waves in order, no times; a ring marks a Staph wave big enough to reach quorum on
+    // arrival (steady, never blinking). That wave is the second clump, so it lands at 5.6.
+    A.rail(t < 5.6 ? 2 : 3, [{ kind: 'wave' }, { kind: 'wave' }, { kind: 'wave', ring: A.PAL.toxin }, { kind: 'wave' }, { kind: 'wave-final' }]);
   },
 };
 
@@ -632,8 +649,9 @@ function stormScene(st, seed, A, K) {
 }
 function stormHit(st, hitT, A, K, seed, noFight) {
   const r = A.rng(seed);
-  // about 70% of germs (all of the ones in the Lymph node here) and 40% of neutrophils die on the hit
-  st.germs.forEach((g, i) => { if (g.pos(hitT)[0] > 360 || r() < 0.62) { g.t1 = hitT + r() * 0.15; g.die = 'storm'; } });
+  // V32: the storm kills by depth (storm.depth 30% Wound, 55% Tissue, 80% Deep tissue, 95% Lymph node); 40% of neutrophils die too
+  const DEPTH = [0.3, 0.55, 0.8, 0.95];
+  st.germs.forEach((g, i) => { const u = g.pos(hitT)[0], z = u < 120 ? 0 : u < 240 ? 1 : u < 360 ? 2 : 3; if (r() < DEPTH[z]) { g.t1 = hitT + r() * 0.15; g.die = 'storm'; } });
   st.neuts.forEach(n => { if (r() < 0.4) { n.t1 = hitT + r() * 0.15; n.die = 'storm'; } });
   if (noFight) return;
   const left = st.germs.filter(g => g.t1 > hitT + 1);
@@ -676,7 +694,7 @@ function stormDraw(t, st, A, o) {
 const chargeShake = q => q > 0.6 ? 0.45 * (q - 0.6) / 0.4 : 0;
 CYT_CLIPS.storm = {
   id: 'storm', title: 'The Cytokine storm', dur: 15,
-  cap: [[0, 'Overrun? The Cytokine storm is your nuclear option.'], [1.0, 'Press and hold the button. It takes 5 full seconds to charge, so you only fire it on purpose.'], [4.6, 'While it charges, the heart shows where your fatigue would land. Fully charged, it fires when you let go.'], [8.4, 'It kills about 70% of germs and 40% of your own neutrophils.'], [10.8, 'Fatigue jumps, then keeps climbing for 8 seconds. That\'s the afterburn.'], [12.8, 'Keep it under 100. Past that, your organs start taking damage.']],
+  cap: [[0, 'Overrun? The Cytokine storm is your nuclear option.'], [1.0, 'Press and hold the button. It takes 5 full seconds to charge, so you only fire it on purpose.'], [4.6, 'While it charges, the heart shows where your fatigue would land. Fully charged, it fires when you let go.'], [8.4, 'It kills more germs the deeper they are, from about 30% in the Wound to 95% in the Lymph node. It also kills 40% of your neutrophils.'], [10.8, 'Fatigue jumps, then keeps climbing for 8 seconds. That\'s the afterburn.'], [12.8, 'Keep it under 100. Past that, your organs start taking damage.']],
   hud: { bottom: true },
   bg: { wound: [48, 205], woundSize: 0.6, dividers: [120, 240, 360], lymph: [380, 175] },
   press: 2.0, release: 7.4, hit: 8.4, realtime: [[2.0, 7.4]], // the hold runs in real seconds
@@ -739,5 +757,58 @@ CYT_CLIPS.stormRisk = {
     const K = CYT_KIT, b = () => A.R.hud.storm || [0, 0], [h1, h2] = this.holds;
     A.finger(t, [[0.3, K.off], [0.7, b], [h1[0], b, true], [h1[1], b, true], [h1[1] + 0.2, b, false, 'out']]);
     A.finger(t, [[15.9, K.off], [16.3, b], [h2[0], b, true], [h2[1], b, true], [h2[1] + 0.2, b, false, 'out']]);
+  },
+};
+
+// ---- 8. The adrenaline surge (v3 V35, Alex 2026-10-10) ----
+// The syringe above Pause: tap it and the fight runs 10x slower for 10 real seconds (3 per map, no combat effect);
+// the button drains as the surge runs out, and a second tap ends it early. Scene time (ts) slows to 0.1x between
+// onAt and offAt while captions keep clip time.
+CYT_CLIPS.surge = {
+  id: 'surge', title: 'Adrenaline surge', dur: 13,
+  cap: [[0, 'Too much going on? The syringe above Pause is an adrenaline surge. You get 3 per map.'], [2.5, 'Tap it and the whole fight slows to a tenth of its speed for 10 seconds. It does nothing else.'], [4.6, 'Use the time to change a Response, flip a stance or switch a zone off.'], [8.2, 'The syringe drains as the time runs out. Tap it again to end the surge early.'], [9.8, 'Back to full speed, and the Wound now makes only neutrophils.']],
+  hud: { side: 'map', bottom: true },
+  bg: { wound: [48, 205], woundSize: 0.6, dividers: [120, 240, 360], lymph: [380, 175] },
+  onAt: 2.4, offAt: 9.4, fullAt: 5.6, doneAt: 7.1, realtime: [[2.4, 9.4]],
+  ts(t) { return t < this.onAt ? t : t < this.offAt ? this.onAt + 0.1 * (t - this.onAt) : this.onAt + 0.1 * (this.offAt - this.onAt) + (t - this.offAt); },
+  build(st) {
+    const A = CYT.api, K = CYT_KIT, r = A.rng(35), back = this.ts(this.offAt);
+    st.germs = [].concat(K.crowd(16, [10, 80, 115, 270], 36, { r: 4.6, vu: 6, wob: 5 }), K.crowd(7, [130, 90, 230, 260], 37, { r: 4.6, vu: 4, wob: 5 }));
+    st.neuts = [];
+    for (let i = 0; i < 7; i++) st.neuts.push(K.recruit('neutrophil', -3, 20 + r() * 210, 70 + r() * 200, { r: 4.8, wob: 7, seed: i * 1.9 }));
+    // half the Wound's share was macrophages until the change
+    st.macs = [0.3, 1.1, 1.9].map((t0, i) => K.recruit('macrophage-offense', t0, 30 + i * 30, 100 + i * 60, { r: 9.5, wob: 2 }));
+    K.fight(st.neuts, st.germs.slice().sort((a, b) => a.pos(1)[0] - b.pos(1)[0]).slice(0, 10), 0.3, { hp: 3, every: 0.8, seed: 38 });
+    // after the surge, a stream of neutrophils pours into the Wound
+    st.fresh = [];
+    for (let i = 0; i < 12; i++) st.fresh.push(K.recruit('neutrophil', back + 0.1 + i * 0.25, 12 + r() * 105, 80 + r() * 190, { r: 4.8, wob: 7, travel: 0.7 }));
+    K.fight(st.fresh, st.germs.filter(g => g.t1 > back + 0.5), back + 0.5, { hp: 3, every: 0.6, seed: 39 });
+  },
+  mixAt(t) { const A = CYT.api, q = A.ease(A.seg(t, this.fullAt, this.fullAt + 0.2)); return { neut: 0.5 + 0.5 * q, mac: 0.5 - 0.5 * q }; },
+  frame(t, st, A) {
+    const ts = this.ts(t);
+    A.scene(ts);
+    const counts = A.MAP.map(([u0, u1]) => st.germs.filter(g => A.alive(g, ts) && g.pos(ts)[0] >= u0 && g.pos(ts)[0] < u1).length);
+    A.mapLabels({ t: ts, counts });
+  },
+  side(t, st, A) { const m = this.mixAt(t); return { mix: [m, { neut: 0.7, mac: 0.3 }, { neut: 0.7, mac: 0.3 }, { neut: 0.7, mac: 0.3 }], open: t > 3.95 && t < this.doneAt + 0.2 ? 0 : -1, press: t > 3.9 && t < 4.05 ? { resp: 0 } : null }; },
+  surge(t) {
+    const on = t >= this.onAt && t < this.offAt, pr = (a) => t > a && t < a + 0.15;
+    return { left: t >= this.onAt ? 2 : 3, on, drain: on ? 1 - (t - this.onAt) / 10 : 0, press: pr(this.onAt) || pr(this.offAt) ? 'surge' : null };
+  },
+  hudFrame(t, st, A) {
+    A.hudOutput(A.R.bottom, Object.assign(st, { out: 0.5, f: 28, cellCount: 214 }), this.ts(t));
+    A.hudSheet({ tabs: true, zone: 'Wound', units: ['neut', 'mac'], mix: this.mixAt(t), power: 'on', stance: 'offense', show: A.seg(t, 4.0, 4.3) - A.seg(t, this.doneAt, this.doneAt + 0.15) });
+  },
+  overlay(t, st, A) {
+    const toast = (at, end, text) => A.toast(text, A.seg(t, at + 0.05, at + 0.25) - A.seg(t, end, end + 0.3));
+    toast(this.onAt, 3.8, 'Adrenaline surge: time slows 10× for 10 s. 2 left');
+    toast(this.offAt, 11.0, 'Surge over: back to full speed');
+  },
+  fingers(t, st, A) {
+    const K = CYT_KIT, sy = () => A.R.hud.surge || [0, 0], resp = () => (A.R.hud.ctl ? A.R.hud.ctl.resp[0] : [0, 0]);
+    const full = () => (A.R.hud.pills && A.R.hud.pills.neut ? A.R.hud.pills.neut.full : [0, 0]), done = () => A.R.hud.done || [0, 0];
+    A.finger(t, [[1.6, K.off], [2.25, sy], [this.onAt, sy, true], [this.onAt + 0.15, sy], [3.75, resp], [3.9, resp, true], [4.05, resp], [5.4, full], [this.fullAt, full, true], [this.fullAt + 0.15, full],
+      [6.9, done], [this.doneAt, done, true], [this.doneAt + 0.15, done], [9.2, sy], [this.offAt, sy, true], [this.offAt + 0.15, sy], [9.9, sy, false, 'out']]);
   },
 };

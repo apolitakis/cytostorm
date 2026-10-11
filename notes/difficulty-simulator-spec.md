@@ -1,6 +1,6 @@
 # Difficulty simulator: spec
 
-Draft for Alex to react to (2026-10-08). Nothing below is built yet unless it says "exists".
+Spec written 2026-10-08. Alex replied 2026-10-10: the targets are weighted parts of a score, not hard rules, and he takes every recommendation below. Steps 1–3 are being built in `tools/difficulty-sim/` on releases/v35 (its sim is identical to v34). Single maps only; the campaign layer belongs to the Campaign strategy simulator (tools/campaign-sim/).
 
 ## Short answer: did we build it?
 
@@ -19,21 +19,23 @@ Why it hasn't been doing the job since:
 
 So the idea exists, but there's nothing current that solves for winning ranges. The rest of this doc is the version worth building.
 
-## What "difficulty" should mean, as tests
+## Difficulty score (a utility function, not pass/fail rules)
 
-Your balance rules from project memory, turned into numbers a simulator can check. The thresholds are my proposal; change any of them.
+Alex, 2026-10-10: the balance rules are components of one score, not hard rules, so the tool can never insist on something like "at least 3 winning styles" when a level is fun without it. Each component maps a measurement to 0–1 along a smooth curve. The level's score is the weighted average, out of 100. The report shows which components cost the most points, and that's the to-do list. Nothing ever reads "FAIL" or blocks a publish.
 
-| Your rule | Measured as | Proposed target |
-|---|---|---|
-| Idle and random play must lose | idle, random and storm-spam bots, 8 seeds | 0 wins (hard fail) |
-| No trivial focus wins | best **set-and-forget** strategy: one Response, sectors and stances picked at the start and never touched | ≤10% on Papercut, 0% from Pool water on |
-| Many strategies win | share of the strategy space that wins at least half its seeds | 25–60% early levels, 10–35% late |
-| ...and they're actually different | distinct **winning styles** (clusters of winners by how they killed: shots, swallows, Nets, NK, storm; which sectors carried the fight) | ≥2 per level, ≥3 once NK is in |
-| Challenging, not impossible | the good bot (smart) | wins 80–100% |
-| Challenging | how close winners come: peak breach clock, organ bars lost, peak fatigue | from Soil cut on, the median winner loses ≥1 organ bar or fills a breach clock past half |
-| No unsalvageable situations | **point of no return**: how long before a loss the game was already decided | in most losses, under ~45 s |
-| Authored pressure, no rubber-banding | nothing to measure; the simulator never changes the level while it plays | (rule for the tool) |
-| Difficulty rises across the campaign | skill needed to win (see Level 3), level by level | mostly rising along LEVEL_ORDER, no cliffs |
+| Component | Your rule | Measured as | Scores 1 when | Weight |
+|---|---|---|---|---|
+| Must-lose bots lose | Idle and random play must lose | win rate of idle, random and storm-spam bots | none of them win; falls straight to 0 at 100% | 3 |
+| No trivial wins | No trivial focus wins | best **set-and-forget** setup (one Response, sectors, stances and stress picked at the start, never touched) | it wins ≤10%; 0 at ≥60% | 2 |
+| Many ways to win | Many strategies win | average win rate across the sampled reactive strategies | it's 15–60%; 0 at 0% and at ≥90% | 2 |
+| Good player wins | Challenging, not impossible | the good bot (smart) | it wins ≥90%; 0 at ≤50% | 2 |
+| Variety | ...and they're different | distinct **winning styles** (winners labelled by how most kills happened: neutrophil shots, Support rings, swallows, Nets) | 2 or more styles. 1 style still scores 0.6. A third style adds nothing. | 1 |
+| Skill matters | Random play loses, good play wins | smart's win rate minus the beginner bot's | the gap is ≥50 points | 1 |
+| Feels close | Challenging | the median winner's closeness: the larger of organ bars lost / 4 and the peak breach clock | closeness ≥0.5; half weight on the first three levels, which teach | 1 |
+
+Not scored yet: salvageability (Level 4), and difficulty rising across the campaign (the skill floor from Level 3). Both are shown as plain numbers until they have a fair curve.
+
+The weights and curves live in one table in `tools/difficulty-sim/score.js`, so changing what "fun" means is a one-line edit.
 
 ## The ladder of simulation levels
 
@@ -170,8 +172,8 @@ All code in `tools/difficulty-sim/`. It reads a frozen release, `prototype/v3/re
 
 Steps 1–3 are a solid first version. V27 (Evolution) should land before step 1's numbers matter much, since Evolution exists to punish one-method play. The tool runs on V26 now and re-runs when V27 publishes.
 
-## Questions for you
+## Decisions (Alex, 2026-10-10)
 
-1. **Build steps 1–3 now?** *Recommended: yes.* Steps 4–6 wait until you've seen the first map.
-2. **Are the targets in the table right?** The two that most shape the game are "≤10% for the best set-and-forget strategy" and "the median late-level winner loses ≥1 organ bar".
-3. **Should the simulator ever block a publish,** or only report? *Recommended: only report.* This matches your 10-minute rule: flag "not balanced yet" and ship.
+1. Build steps 1–3 now. Steps 4–6 wait for the first Difficulty map.
+2. The targets are components of a utility function, not hard rules (see Difficulty score).
+3. The tool only reports. It never blocks a publish.

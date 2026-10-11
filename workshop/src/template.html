@@ -132,6 +132,11 @@ img.ico { width: 18px; height: 18px; flex: none; }
 .mlabel span.cut { color: #C77DFF; }
 .mlabel span { font: 500 11px var(--mono); font-variant-numeric: tabular-nums; }
 /* Side columns: each sector's numbers (left of the map) and its controls (right) */
+#strain { position: absolute; inset: 0; z-index: 1; pointer-events: none; opacity: 0; transition: opacity .8s; --clear: 74%; background: radial-gradient(ellipse 72% 62% at 50% 50%, transparent var(--clear), rgba(170, 8, 18, .3) calc(var(--clear) + 20%), rgba(215, 18, 28, .62) 100%); }
+#strain::after { content: ''; position: absolute; inset: 0; opacity: 0; background: radial-gradient(ellipse 72% 62% at 50% 50%, transparent calc(var(--clear) + 8%), rgba(230, 30, 40, .5) 100%); }
+#strain.thump::after { animation: thump .38s ease-out; }
+@keyframes thump { 0% { opacity: 0; } 18% { opacity: 1; } 100% { opacity: 0; } }
+@media (prefers-reduced-motion: reduce) { #strain.thump::after { animation: none; } }
 #sideL, #sideR { position: absolute; inset: 0; pointer-events: none; z-index: 2; }
 .sinfo { position: absolute; width: 46px; display: grid; justify-items: center; align-content: center; gap: 0; text-align: center; }
 .sinfo img { width: 18px; height: 18px; opacity: .85; }
@@ -148,6 +153,8 @@ img.ico { width: 18px; height: 18px; flex: none; }
 .sresp.open { border-color: var(--cell); } .sresp.open .rl { color: var(--cell); }
 .sresp.off { border-style: dashed; } .sresp.off .mix i { filter: grayscale(1) brightness(.6); }
 .sresp.copied { animation: copied .7s ease-out; }
+.sresp.paused .mix i[data-u="mac"] { background: repeating-linear-gradient(135deg, rgba(255,255,255,.5) 0 2px, transparent 2px 4px) !important; box-shadow: none; opacity: .55; }
+.sresp.paused .rl { color: var(--repair, #7FF3B0); }
 .srow { display: flex; justify-content: space-between; }
 .sstance { width: 33px; height: 33px; display: grid; place-items: center; padding: 0; border-radius: 50%; background: rgba(10,13,24,.82); border: 1.5px solid var(--kill); box-shadow: 0 0 8px rgba(255,122,61,.35); }
 .sstance img { width: 19px; height: 19px; pointer-events: none; }
@@ -161,10 +168,11 @@ img.ico { width: 18px; height: 18px; flex: none; }
 .sctl.thin .sresp { min-width: 20px; }
 .sctl.thin .sstance img { width: 15px; height: 15px; } .sctl.thin .zpwr svg { width: 13px; height: 13px; }
 /* Stress presets beside the slider (Alex, 2026-10-09) */
-.spresets { display: grid; grid-template-columns: repeat(4, 1fr); gap: 4px; }
+.spresets { display: grid; grid-template-columns: repeat(5, 1fr); gap: 3px; }
 .spresets button { background: var(--panel2); border: 1px solid var(--line); border-radius: 7px; padding: 3px 0; font: 500 11.5px var(--mono); font-variant-numeric: tabular-nums; color: var(--dim); }
 .spresets button[aria-pressed="true"] { border-color: var(--gold); color: var(--gold); }
 .spresets button:disabled { opacity: .35; text-decoration: line-through; }
+@media (max-width: 400px) { .spresets { gap: 2px; } .spresets button { font-size: 10px; letter-spacing: -.02em; } } /* five presets at 375 px: keep the labels off the borders */
 /* Your cells against the cell limit (Alex, 2026-10-09): the dark end of the bar is what the spleen has cut */
 .cells { grid-column: 1 / -1; display: flex; align-items: center; gap: 6px; font-size: 11.5px; color: var(--dim); }
 .cells img { width: 15px; height: 15px; }
@@ -263,6 +271,15 @@ img { -webkit-touch-callout: none; -webkit-user-drag: none; user-drag: none; }
 @keyframes stormReadyRisky { from { box-shadow: 0 0 4px rgba(255,138,61,.4); } to { box-shadow: 0 0 18px rgba(255,138,61,.95); } }
 #stormBtn.burning { border-color: var(--kill); color: var(--kill); }
 #pauseBtn { height: auto; min-width: 44px; border-radius: 12px; }
+.pcol { flex: none; display: grid; grid-template-rows: 1fr 1fr; gap: 6px; }
+.pcol .hbtn { height: auto; min-height: 0; }
+#surgeBtn { position: relative; overflow: hidden; display: grid; place-items: center; min-width: 44px; border-radius: 12px; color: #7FD8FF; --left: 0; }
+#surgeBtn > * { position: relative; }
+#surgeBtn::before { content: ''; position: absolute; inset: auto 0 0 0; height: calc(var(--left) * 100%); background: linear-gradient(to top, rgba(127,216,255,.4), rgba(127,216,255,.12)); pointer-events: none; }
+#surgeBtn b { position: absolute; right: 4px; bottom: 2px; font: 600 10px/1 var(--mono); }
+#surgeBtn.on { border-color: #7FD8FF; box-shadow: 0 0 10px rgba(127,216,255,.5); }
+#surgeBtn:disabled { opacity: .35; }
+#stage.surging::after { content: ''; position: absolute; inset: 0; z-index: 1; pointer-events: none; border-radius: 6px; box-shadow: inset 0 0 0 2px rgba(127,216,255,.55), inset 0 0 24px rgba(127,216,255,.18); }
 .output { flex: 1 1 240px; min-width: 0; display: grid; grid-template-columns: 54px minmax(0, 1fr); column-gap: 10px; row-gap: 2px; align-content: center; background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 6px 10px; }
 .output .mlabel { display: flex; align-items: center; gap: 6px; }
 .output .mlabel span { margin-left: auto; }
@@ -297,7 +314,13 @@ img { -webkit-touch-callout: none; -webkit-user-drag: none; user-drag: none; }
 .stats div { display: grid; gap: 1px; }
 .stats b { font: 500 16px var(--mono); font-variant-numeric: tabular-nums; }
 .stats span { font-size: 11px; color: var(--dim); }
-#graph { width: 100%; height: 130px; display: block; }
+#graph { width: 100%; height: 150px; display: block; touch-action: manipulation; cursor: pointer; }
+.gviews { display: flex; gap: 4px; margin-bottom: -4px; }
+.gviews button { flex: 1; background: none; border: 1px solid var(--line); border-radius: 999px; padding: 4px 6px; font: 500 11.5px var(--display); color: var(--dim); }
+.gviews button[aria-selected="true"] { border-color: var(--cell); color: var(--ui, #DDE6F5); }
+.legend i { font-style: normal; opacity: .7; font-family: var(--mono); font-size: 10.5px; }
+.legend em { flex-basis: 100%; font-style: normal; font-size: 11px; opacity: .7; }
+.legend .mk.wave::before { width: 0; height: 0; background: none; border: 5px solid transparent; border-top-color: rgba(221,230,245,.5); border-bottom: 0; }
 .legend { display: flex; flex-wrap: wrap; gap: 4px 14px; font-size: 11.5px; color: var(--dim); margin-top: -6px; }
 .legend span::before { content: ""; display: inline-block; width: 10px; height: 3px; margin-right: 5px; vertical-align: middle; background: var(--c); }
 /* Pause card and feedback */
@@ -443,7 +466,7 @@ img { -webkit-touch-callout: none; -webkit-user-drag: none; user-drag: none; }
   .output { grid-template-columns: 44px minmax(0, 1fr); column-gap: 8px; }
   #heart { grid-row: 1 / span 3; width: 44px; height: 44px; }
   .output .fatigue { grid-column: 1 / -1; } /* full width, so the cell count never clips */
-  #pauseBtn { min-width: 40px; }
+  #pauseBtn, #surgeBtn { min-width: 40px; }
   #stormBtn { min-width: 52px; }
 }
 /* Short landscape phones: tighten the chrome so the map keeps its height */
@@ -479,8 +502,9 @@ img { -webkit-touch-callout: none; -webkit-user-drag: none; user-drag: none; }
   </header>
 
   <main id="stage">
-    <canvas id="prog" aria-label="Level progress, top to bottom: waves and toxin bursts still to come"></canvas>
-    <canvas id="cv" aria-label="The map: Wound, Tissue, Deep tissue and Lymph node. Tap a zone to flip its stance between Offense and Support; double-tap to zoom in on it."></canvas>
+    <canvas id="prog" aria-label="Waves still to come, in order, top to bottom"></canvas>
+    <canvas id="cv" aria-label="The map: Wound, Tissue, Deep tissue and Lymph node. Double-tap a sector to zoom in on it; drag to look around while zoomed in."></canvas>
+    <div id="strain" aria-hidden="true"></div>
     <div id="sideL" aria-label="Germs and cell output per sector"></div>
     <div id="sideR" aria-label="Controls per sector"></div>
     <button id="zoomOut" class="zoomout" type="button" hidden>Watching <b>Tissue</b> · zoom out</button>
@@ -494,13 +518,16 @@ img { -webkit-touch-callout: none; -webkit-user-drag: none; user-drag: none; }
       <canvas id="heart" role="img" aria-label="Fatigue: the heart fills and beats faster as your body tires"></canvas>
       <div class="mlabel"><img class="ico" data-art="body-output" alt=""><b>Stress</b><span id="outVal">100%</span></div>
       <input type="range" id="output" min="0" max="100" step="5" value="50" aria-label="Stress: how hard your body pushes to make cells">
-      <div class="spresets" role="group" aria-label="Stress presets"><button type="button" data-stress="0.5">50%</button><button type="button" data-stress="1">100%</button><button type="button" data-stress="1.5">150%</button><button type="button" data-stress="2">200%</button></div>
+      <div class="spresets" role="group" aria-label="Stress presets"><button type="button" data-stress="0.25">25%</button><button type="button" data-stress="0.5">50%</button><button type="button" data-stress="1">100%</button><button type="button" data-stress="1.5">150%</button><button type="button" data-stress="2">200%</button></div>
       <div class="fatigue" id="fatigue" data-tier="0"><span id="fTier">Fine</span><button id="bodyBtn" class="bodybtn" type="button" aria-label="Organ status"></button></div>
       <div class="fatigue toxrow" id="toxRow" hidden><span>Toxin</span><div class="toxbar"><i id="toxFill"></i><b id="toxMark"></b></div><span id="toxVal">0</span></div>
       <div class="cells" id="cells" title="Your cells on the field, against the most you can have"><img class="ico" data-art="neutrophil" alt=""><span class="cl">Cells</span><span class="cbar" aria-hidden="true"><i id="cellFill"></i><i id="cellCut"></i></span><span id="cellCount">0/540</span></div>
     </div>
     <button id="stormBtn" type="button" aria-label="Cytokine storm: hold 5 seconds to charge, release to fire"><img id="stormIcon" alt="" draggable="false"><span id="stormLbl">Storm</span></button>
-    <button id="pauseBtn" class="hbtn" type="button" aria-label="Pause"><img data-art="pause" alt=""></button>
+    <div class="pcol">
+      <button id="surgeBtn" class="hbtn" type="button" aria-label="Adrenaline surge"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M18 2l4 4M20 4l-3 3M15 5l4 4M17 7L8.5 15.5 6 16l.5-2.5L15 5M11 9l2 2M9 11l2 2M6 16l-4 4"/></svg><b id="surgeN">3</b></button>
+      <button id="pauseBtn" class="hbtn" type="button" aria-label="Pause"><img data-art="pause" alt=""></button>
+    </div>
   </footer>
 </div>
 

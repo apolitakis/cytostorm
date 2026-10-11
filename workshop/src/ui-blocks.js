@@ -86,9 +86,12 @@
   const MAIN_SLIDERS = [ // the sim's own rules, so the same numbers as the Tune list
     [CONFIG, 'fever', 'tired', 'Division speed when Tired', 0.1, 1, 0.05], [CONFIG, 'fever', 'feverish', 'When Feverish', 0.1, 1, 0.05], [CONFIG, 'fever', 'exhausted', 'When Exhausted', 0.1, 1, 0.05],
     [CONFIG, 'quorum', 'n', 'Quorum: germs in one crowd', 4, 40, 1], [CONFIG, 'quorum', 'fuse', 'Quorum: seconds of glow before it pops', 1, 15, 0.5], [CONFIG, 'quorum', 'pop', 'Quorum: pop kills your cells within', 20, 200, 5],
-    [CONFIG, 'wall', 'soft', 'Vessel wall softness', 0.02, 1, 0.02], [CONFIG, 'trickle', 'mul', 'Trickle between waves ×', 0, 5, 0.25],
+    [CONFIG, 'wall', 'soft', 'Vessel wall softness', 0.02, 1, 0.02], [CONFIG, 'trickle', 'mul', 'Trickle between waves ×', 0, 6, 0.1], [CONFIG, 'trickle', 'ebb', 'Trickle ebb and flow (0 = steady)', 0, 1, 0.05], [CONFIG, 'wave', 'jitter', 'Wave timing jitter ± s (from the next game)', 0, 30, 1],
     [CONFIG, 'output', 'curve', 'Stress curve (1 = straight line)', 0.2, 1, 0.005], [CONFIG, 'pseudo', 'shield', 'Slime dome lets through', 0, 1, 0.05],
     [CONFIG, 'evolve', 'share', 'Evolution: one kill method’s share', 0.3, 1, 0.05], [CONFIG, 'evolve', 'wall', 'Evolved thick wall: plain shot damage', 0.1, 1, 0.05],
+    [CONFIG, 'idle', 'half', 'Cells in a switched-off sector: half-life (s)', 5, 120, 5], [CONFIG, 'support', 'spread', 'Support rings: spread', 1, 3, 0.1], [CONFIG, 'support', 'upkeep', 'Support upkeep: rest line drop with every sector on Support', 0, 1, 0.05],
+    [CONFIG, 'bacteria', 'drift', 'Germ drift toward the Lymph node (a blob’s speed)', 0, 40, 1], [CONFIG, 'bacteria', 'driftSpread', 'Drift spread: each germ rides at 1 ± this', 0, 0.9, 0.05],
+    [CONFIG, 'pseudo', 'drag', 'Under a slime dome, germs drift at this × the flow', 0, 1, 0.05],
   ];
   const ORGAN_SLIDERS = [
     [WS, 'organs', 'kidneyToxAt', 'Kidneys hurt above toxin', 0, 100, 1], [WS, 'organs', 'kidneyToxBars', 'Kidney bars lost per second there', 0, 0.2, 0.005],

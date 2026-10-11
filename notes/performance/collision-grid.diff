@@ -1,0 +1,60 @@
+--- releases/v38/sim.js
++++ sim.js (perf proposal)
+@@ -398,6 +398,13 @@
+   }
+ }
+ 
++// Finer buckets just for collisions (perf, 2026-10-10): a dense crowd is checked against far fewer neighbours
++const CC = 8, CGC = Math.ceil(L / CC) + 1, CGR = Math.ceil(WIDTH / CC) + 1;
++class FineGrid {
++  constructor() { this.b = Array.from({ length: CGC * CGR }, () => []); this.used = []; }
++  clear() { for (const k of this.used) this.b[k].length = 0; this.used.length = 0; }
++  add(o) { const c = Math.max(0, Math.min(CGC - 1, Math.floor(o.u / CC))), r = Math.max(0, Math.min(CGR - 1, Math.floor(o.v / CC))), k = r * CGC + c, a = this.b[k]; if (!a.length) this.used.push(k); a.push(o); }
++}
+ class Game {
+   constructor(levelKey, seed, difficulty) {
+     this.key = LEVELS[levelKey] ? levelKey : 'papercut';
+@@ -447,7 +454,7 @@
+     this.log = { inputs: [], events: [] }; this.tally = {};
+     this.result = null;
+     this.id = 1;
+-    this.gA = new Grid(); this.gF = new Grid(); this.gH = new Grid();
++    this.gA = new Grid(); this.gF = new Grid(); this.gH = new Grid(); this.cA = new FineGrid(); this.cF = new FineGrid();
+     for (let i = 0; i < CONFIG.start.neut; i++) {
+       const u = 40 + this.rand() * (L - 120);
+       this.spawnCell('neut', zoneOf(u), u, VESSEL + 20 + this.rand() * (WIDTH - FAR_VESSEL - VESSEL - 40)); // across the full width
+@@ -1503,21 +1510,23 @@
+       }
+     };
+     // rebuild buckets after movement
+-    this.gA.clear(); this.gF.clear();
+-    for (const a of this.ag) if (!a.dead && !a.eaten) this.gA.add(a);
+-    for (const c of this.cells) if (!c.dead) this.gF.add(c);
+-    // Grid.each written out here so no closure is made per body per step; same buckets, same order, same pairs
++    this.gA.clear(); this.gF.clear(); this.cA.clear(); this.cF.clear();
++    let mA = 0, mF = 0;
++    for (const a of this.ag) if (!a.dead && !a.eaten) { this.gA.add(a); this.cA.add(a); if (a.r > mA) mA = a.r; }
++    for (const c of this.cells) if (!c.dead) { this.gF.add(c); this.cF.add(c); if (c.r > mF) mF = c.r; }
++    const SLACK = 1; // look only as far as the biggest body present (+1 for pushes made earlier in this pass); was a fixed +9
++    // Grid.each written out here so no closure is made per body per step (fine collision buckets, so pair order differs from v37)
+     const near = (grid, o, after) => {
+-      const u = o.u, v = o.v, rad = o.r + 9, id = o.id, B = grid.b;
+-      const c0 = Math.max(0, Math.floor((u - rad) / CELL)), c1 = Math.min(GC - 1, Math.floor((u + rad) / CELL));
+-      const r0 = Math.max(0, Math.floor((v - rad) / CELL)), r1 = Math.min(GR - 1, Math.floor((v + rad) / CELL));
+-      for (let r = r0; r <= r1; r++) for (let c = c0; c <= c1; c++) { const a = B[r * GC + c]; for (let i = 0; i < a.length; i++) if (!after || a[i].id > id) pair(o, a[i]); }
++      const u = o.u, v = o.v, rad = o.r + (grid === this.cA ? mA : mF) + SLACK, id = o.id, B = grid.b;
++      const c0 = Math.max(0, Math.floor((u - rad) / CC)), c1 = Math.min(CGC - 1, Math.floor((u + rad) / CC));
++      const r0 = Math.max(0, Math.floor((v - rad) / CC)), r1 = Math.min(CGR - 1, Math.floor((v + rad) / CC));
++      for (let r = r0; r <= r1; r++) for (let c = c0; c <= c1; c++) { const a = B[r * CGC + c]; for (let i = 0; i < a.length; i++) if (!after || a[i].id > id) pair(o, a[i]); }
+     };
+-    for (const a of this.ag) { if (a.dead || a.eaten) continue; near(this.gA, a, true); }
++    for (const a of this.ag) { if (a.dead || a.eaten) continue; near(this.cA, a, true); }
+     for (const c of this.cells) {
+       if (c.dead) continue;
+-      near(this.gF, c, true);
+-      near(this.gA, c, false);
++      near(this.cF, c, true);
++      near(this.cA, c, false);
+     }
+   }
+ 

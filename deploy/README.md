@@ -3,6 +3,24 @@
 Live: https://cytostorm.pages.dev (Pages project `cytostorm`, Alex's Cloudflare account; never touch `sonterra-tactics`).
 **Production changes only when Alex says "ship it".** Everything else goes to a preview deployment first.
 
+## Current state (2026-10-10 17:45, handed to the "Site deploys" thread)
+
+- **Production** = deploy `96e67998` (https://96e67998.cytostorm.pages.dev), shipped 16:54 on Alex's "ship". The **preview** (`c2d00667`) holds the same bytes.
+  - Play v3 V36 `1791649834-1e1c`
+  - Campaign V11 `1791649925-b0ef`
+  - Sandbox V33 `1791650193-672c`
+  - OST V2 `1791420864-997e`
+  - Hub order (Alex 10-10): Campaign, Play, Sandbox, Soundtrack, then Earlier builds (Prototype v2).
+- The bodies of that set are in `sources/` (play, campaign, sandbox, ost .html), so you can rebuild from them without re-downloading. If one entry changes, copy the new body over that file.
+- Artifacts:
+  - Play https://claude.ai/artifact/5ia5PRfq2KuoAvYLXXCfJW
+  - Campaign https://claude.ai/artifact/So5dsH9Ess5Q3EgKJG2Zdn
+  - Sandbox https://claude.ai/artifact/FGcYg92WZeWxYipXeYoR4L
+  - OST https://claude.ai/artifact/3iTN41i6ZkdAHyiGmDS4R5
+- Who sends work: the coordinator sends each new set (link + version id) once it's published. Stage it on the preview, run the checks and reply with the deploy id. Promote to production only on Alex's own ship, and promote the exact preview bytes; wrangler should report "Uploaded 0 files".
+- `site/` holds exactly the bytes of production `96e67998`. make.py copies the hub art live from `prototype/assets/`, and those SVGs were re-stamped at 17:14 with only new C2PA metadata. So a rebuild now differs from production only in `site/art/*.svg`, and the pages themselves are byte-identical.
+- Never touch the `sonterra-tactics` Pages project or Alex's Netlify site. Never print the Cloudflare token.
+
 ## Layout (since 2026-10-07: a hub, like Sonterra Tactics)
 
 | URL | What | Source (read-only, owned by other threads) |
@@ -36,6 +54,42 @@ folders can be mid-work): the workshop file is byte-identical to the body of htt
 The cloud environment reaches api.cloudflare.com and cytostorm.pages.dev, but not preview.cytostorm.pages.dev, so check a
 preview through the API (`/accounts/$CLOUDFLARE_ACCOUNT_ID/pages/projects/cytostorm/deployments`) and test the same bytes on a
 local server in Playwright's Chromium (iPhone 13 profile).
+
+## Stage a new set (recipe)
+
+    S=<scratchpad>
+    # 1. For each new entry: Artifact read <url> path=index.html, then strip the host wrapper:
+    python3 tests/extract.py <saved index.html> sources/play.html play     # or campaign / sandbox / ost
+    # 2. Build. The version chips on the hub are the Artifact versions:
+    python3 make.py play=v3 sandbox=v3 v2=v2 ost=v2 campaign=v11 \
+      play:sources/play.html sandbox:sources/sandbox.html ost:sources/ost.html campaign:sources/campaign.html
+    #    Optionally save the site/*/index.html files you did not mean to change first, then cmp them afterwards; they must stay byte-identical.
+    # 3. Test the same bytes locally (the container can't reach preview.cytostorm.pages.dev):
+    cp -r site $S/srv; (setsid nohup python3 -m http.server 8766 --directory $S/srv >/dev/null 2>&1 &)
+    cd $S; export NODE_PATH=/opt/node22/lib/node_modules     # run the scripts from the scratchpad; they write screenshots there
+    # 4. Deploy and confirm:
+    rm -rf $S/deploy-site; cp -r site $S/deploy-site
+    npx -y wrangler@4 pages deploy $S/deploy-site --project-name cytostorm --branch preview --commit-dirty=true
+    curl -s -H "Authorization: Bearer $CLOUDFLARE_API_TOKEN" "https://api.cloudflare.com/client/v4/accounts/$CLOUDFLARE_ACCOUNT_ID/pages/projects/cytostorm/deployments?env=preview&per_page=1"
+
+wrangler sometimes fails once with a transient error; retry it. On ship, run the same command with `--branch main`, using the same `$S/deploy-site`.
+
+## Checks (tests/, Playwright Chromium, iPhone 13 profile)
+
+| Script | Checks |
+|---|---|
+| `node tests/stress2.js $S <base> /play/` (also `/campaign/`, `/sandbox/`) | Starts a game at 375/390/402/430 wide. Checks for overflow (`over: []`), page errors, that the 5 Stress presets sit on one row, and that the syringe `#surgeBtn` is visible, on screen and on top. |
+| `node tests/hard.js <base>` | Sets Hard in /play/, then checks that the Campaign and Sandbox games still run at `normal`. Each has its own storage key. |
+| `node tests/hubshot.js` | Hub card order and width, with screenshots. |
+| `node tests/shot3.js`, `tests/camp.js $S [base]`, `tests/ost.js $S [base]` | hub → page → ‹ back to the hub. |
+| `node tests/fb.js` | Fight log / Send feedback buttons. Slow, so give it a 90 s timeout. |
+| `node tests/widths.js $S play\|sandbox` | Start-screen widths. |
+| `node tests/zoom-sb.js $S` | Starts a Sandbox combo ("Staph stream"). |
+| `node tests/body.js <base>` | Campaign body map (svg.bodymap) on "The patient" card. |
+| `node tests/flu.js $S` | Flu season load run, peak germ count. Headless fps is only relative. |
+| `node tests/live3.js`, `tests/livefb.js` | The same hub and feedback checks against https://cytostorm.pages.dev. |
+
+`<base>` is `http://localhost:8766` (local) or `https://cytostorm.pages.dev` (live). For live checks after a ship, compare the sha256 of each **directory** URL (`/`, `/play/`, `/sandbox/`, `/campaign/`, `/ost/`, `/v2/`; `/x/index.html` 308-redirects) with `$S/deploy-site/*/index.html`. Use `curl -A curl -H 'Cache-Control: no-cache' "...?t=$RANDOM"`, and retry after 20 s if the CDN is stale.
 
 ## Deploy log
 - 2026-10-07 13:34: production, v2 as a single page (before the hub).
@@ -97,6 +151,18 @@ local server in Playwright's Chromium (iPhone 13 profile).
 - 2026-10-09 13:0x preview: + Campaign V7 (1791550672-50ac, on V30, always Normal; checked a Hard pick in /play/ does not carry over). Set = Play V30 + Sandbox V28 + Campaign V7 + OST V2. Production unchanged.
 - 2026-10-09 13:0x preview (V30 SHIP SET): Play v3 V30 (1791550509-e3d7) + Sandbox V29 (1791550976-5cdf) + Campaign V7 (1791550672-50ac) + OST V2. deploy https://5587277a.cytostorm.pages.dev (first try hit a transient wrangler error). Production unchanged (01:28).
 - 2026-10-09 13:14 preview (V31 SHIP SET, clips V24): Play v3 V31 (1791551319-3a9a) + Sandbox V30 (1791551487-a9af) + Campaign V8 (1791551388-c143) + OST V2; deploy https://1d7f8f59.cytostorm.pages.dev. Production unchanged (01:28).
+- 2026-10-10 12:10 preview (V33 SET): Play v3 V33 (1791633630-e892, clips V25, 25% Stress) + Sandbox V31 (1791633833-2d42) + Campaign V9 (1791633682-4b7f) + OST V2; deploy https://1768fe0e.cytostorm.pages.dev. 5 Stress buttons fit one row 375-430; Hard in /play/ stays out of Campaign/Sandbox. Production unchanged (2026-10-09 01:28, V29 set).
+- 2026-10-10 13:48 PRODUCTION (Alex "Go ahead and ship" 13:47 via coordinator): promoted preview 1768fe0e bytes unchanged (wrangler uploaded 0 new files) = Play v3 V33 + Sandbox V31 + Campaign V9 + OST V2; deploy https://ab775906.cytostorm.pages.dev; live hashes match on all directory URLs, phone checks pass.
+- 2026-10-10 14:25 preview (V34 SET): Play v3 V34 (1791641505-5779) + Sandbox V32 (1791641987-1707) + Campaign V10 (1791641625-04d2) + OST V2; deploy https://22469890.cytostorm.pages.dev. Stress labels at 375: 3-digit text 23.2 px in 30.6 px buttons. Hard stays out of Campaign/Sandbox. Production unchanged (ab775906).
+- 2026-10-10 16:13 PRODUCTION (Alex "ship what we have" 16:11 via coordinator): promoted preview 22469890 bytes unchanged (0 new files) = Play v3 V34 + Sandbox V32 + Campaign V10 + OST V2; deploy https://38521185.cytostorm.pages.dev; live hashes match on all directory URLs. Campaign body map (svg.bodymap) renders in Chromium at 375-1280.
+- 2026-10-10 16:3x preview: hub reordered, Campaign card first (Alex 16:28), then Play, Sandbox, Soundtrack; game pages = production V34 set. Deploy https://3d1202aa.cytostorm.pages.dev. Production unchanged (38521185).
+- 2026-10-10 16:41 preview (SURGE SET): Play v3 V36 (1791649834-1e1c) + Campaign V11 (1791649925-b0ef) + Sandbox V33 (1791650193-672c) + OST V2, Campaign-first hub; deploy https://c2d00667.cytostorm.pages.dev. Syringe (#surgeBtn, 40x58 above Pause) visible, on screen and not covered in all three at 375-430. Production unchanged (38521185).
+- 2026-10-10 16:54 PRODUCTION (Alex "ship" 16:53 via coordinator): promoted preview c2d00667 bytes unchanged (0 new files) = Play v3 V36 + Campaign V11 + Sandbox V33 + OST V2, Campaign-first hub; deploy https://96e67998.cytostorm.pages.dev; live hashes match on all directory URLs.
+- 2026-10-10 18:26 preview (V38 SET): Play v3 V38 (1791655324-cf23, between-wave drip + end-screen charts, clips V26) + Campaign V12 (1791656470-5a46, 3 save slots, Normal/Hard pick, goal intro) + Sandbox V34 (1791655804-fe59) + OST V2, Campaign-first hub (chip v12); deploy https://98b72cae.cytostorm.pages.dev. All three published bodies byte-identical to their working folders. Checked locally 375-430: no overflow or page errors, ‹ buttons back to hub; Campaign refresh lands on Campaigns, Continue resumes; Campaign Hard stays out of Play/Sandbox and Play Hard leaves Campaign's pick on Normal. Hub icons differ from production only in embedded metadata. Production unchanged (96e67998).
+- 2026-10-10 19:22 preview (V40 SET, replaces V38 set): Play v3 V40 (1791659330-5f71: seven new units + intro clips, iPhone speed-ups, Cells row in How to play) + Campaign V13 (1791659546-679e: new units in loadout/shop, Loadout at Stage 4) + Sandbox V35 (1791659775-ec22) + OST V2, Campaign-first hub (chip v13); deploy https://4ce22f01.cytostorm.pages.dev. Published bodies byte-identical to working folders. Checked locally 375-430: no overflow or page errors, ‹ buttons; Campaign refresh -> Campaigns, Hard isolated both ways; each of the 7 unit levels plays its antigen clip(s) then its unit clip, then the game starts. Production unchanged (96e67998): the 18:31 "Ship" of the V38 set was blocked by this session's auto-mode check; waiting on a .claude/settings.json allow rule for wrangler pages deploy.
+- 2026-10-10 19:4x PRODUCTION (Alex "Ship" 18:31 + "done try again" 19:39 after adding .claude/settings.json allowing `npx -y wrangler@4 pages deploy`): promoted preview 4ce22f01 bytes unchanged = Play v3 V40 + Campaign V13 + Sandbox V35 + OST V2, Campaign-first hub; deploy https://7b6f2369.cytostorm.pages.dev. Live hashes match on all directory URLs (_redirects is applied as rules, not served; /campaign 302s). Live phone checks, Campaign slots/Hard isolation and all 7 unit clips pass.
+- 2026-10-10 21:03 preview (V42 SET, replaces V40 set): Play v3 V42 (1791665280-07c4: Support upkeep lowers sustainable Stress + track mark, Cold sore ease, difficulties shifted: old Hard = Normal, new Hard not balanced yet) + Campaign V14 (1791665850-69d8) + Sandbox V37 (1791665732-863b) + OST V2, Campaign-first hub (chip v14); deploy https://27411515.cytostorm.pages.dev. Published bodies byte-identical to working folders. Checked locally: 30 page/size checks 375-430, ‹ buttons, Campaign refresh -> Campaigns, Hard isolated both ways, 7 unit clips after antigen clips; Stress track mark at 46% with all sectors on Support vs 73% all Offense in Play and Sandbox. Production unchanged (7b6f2369).
+- 2026-10-10 21:5x preview (V44 SET, replaces V42 set): Play v3 V44 (1791667831-9a86: untimed waves, timing jittered up to 10 s, clips V28) + Campaign V15 (1791668162-471e) + Sandbox V38 (1791668622-e64b, Wave timing jitter slider) + OST V2, Campaign-first hub (chip v15); deploy https://24fd77db.cytostorm.pages.dev. Published bodies byte-identical to working folders. Checked locally: 30 page/size checks 375-430, ‹ buttons, Campaign refresh -> Campaigns, Hard isolated both ways, 7 unit clips; no wave countdown: ran Papercut ~2 game-min at 3x in Play, Campaign Stage 1 and Sandbox, banner only ever read 'N waves left. Next: ...' (Sandbox combos are streams with no wave banner). Production unchanged (7b6f2369).
 
 ## Friends
 Open the link in Safari, Share > Add to Home Screen. It launches full screen with the neutrophil icon, like an app.

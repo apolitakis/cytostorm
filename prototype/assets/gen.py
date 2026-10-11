@@ -1286,6 +1286,185 @@ for _n, _r in {"hepatitis": 4, "rabies": 4.5, "rabies-budding": 5.3, "e-coli": 6
                **{f"{o}-{s[0]}": 19 for o, *_ in ORGANS for s in ORGAN_STATES}}.items():
     ASSETS[_n]["worldR"] = _r
 
+
+# ======================= CAMPAIGN UNITS (notes/campaign-features-brainstorm.md section 2, 2026-10-10) =======================
+# One new friendly unit per stage. All cyan bodies (friendly), each with one accent that says its job.
+MUCUS = "#7FB8FF"
+
+
+def cell_defs(pfx, a0=.5, a1=.14):
+    return halo(f"{pfx}-h", P["cell"], a0, a1) + body_grad(f"{pfx}-b", "#9FF4FF", P["cell"], .5, .18)
+
+
+def cell_body(pfx, r=14, cx=32, cy=32, sw=1.8):
+    return (f'<circle cx="{cx}" cy="{cy}" r="{r + 14}" fill="url(#{pfx}-h)"/>'
+            f'<circle cx="{cx}" cy="{cy}" r="{r}" fill="url(#{pfx}-b)" stroke="#7FF0FF" stroke-width="{sw}"/>')
+
+
+def ys_around(r, n, col, start=0, cx=32, cy=32, size=1):
+    out = ""
+    for i in range(n):
+        a = start + 360 * i / n
+        t = math.radians(a)
+        px, py = cx + r * math.cos(t), cy + r * math.sin(t)
+        out += (f'<g transform="translate({f(px)} {f(py)}) rotate({f(a + 90)}) scale({size})">'
+                f'<path d="M0 0V-2.6M0 -2.6L-1.8 -4.6M0 -2.6L1.8 -4.6" fill="none" stroke="{col}" '
+                f'stroke-width="1.2" stroke-linecap="round"/></g>')
+    return out
+
+
+# --- B cell (stage 2): a round lymphocyte, one big nucleus, studded with gold antibody Ys (its receptors).
+def bcell(pfx, puff=False):
+    s = cell_body(pfx, 12.5) + f'<circle cx="31" cy="31.5" r="8.6" fill="{P["cellHi"]}" opacity=".92"/>'
+    s += f'<path d="M27 29Q31 27 34 30M28.5 34Q31.5 35.5 34.5 33" fill="none" stroke="#7FF0FF" stroke-width="1" opacity=".7"/>'
+    s += ys_around(12.6, 10, P["antibody"], 9)
+    if puff:
+        s += ("".join(f'<circle cx="{x}" cy="{y}" r="{r}" fill="url(#{pfx}-p)"/>' for x, y, r in ((50, 22, 9), (55, 35, 7), (46, 46, 6))) +
+              "".join(f'<g transform="translate({x} {y}) rotate({a})"><path d="M0 1.6V-.4M0 -.4L-1.3 -1.9M0 -.4L1.3 -1.9" fill="none" '
+                      f'stroke="{P["antibody"]}" stroke-width="1" stroke-linecap="round"/></g>'
+                      for x, y, a in ((49, 21, 20), (53, 25, -30), (56, 34, 60), (52, 38, 10), (46, 45, -50), (59, 31, 100))))
+    return s
+
+
+add("b-cell", "unit", svg(64, bcell("bce"), cell_defs("bce")),
+    64, 15, "B cell (stage 2): a round lymphocyte with one big nucleus, studded with gold antibody Ys. Slow; sits back and puffs "
+            "antibody-cloud (existing art), which tags germs (bacterium-opsonized). Draw about neutrophil size.")
+add("b-cell-puff", "unit", svg(64, bcell("bcp", True), cell_defs("bcp") + halo("bcp-p", P["antibody"], .45, .15, .5)),
+    64, 15, "B cell mid-puff: a gold haze and loose Ys streaming off one side. Show for ~0.4 s each time it releases a cloud, "
+            "facing downstream (+x), then spawn an antibody-cloud there.")
+
+
+# --- Eosinophil (stage 3): two-lobed nucleus and big orange granules. Latches onto big targets, pulses, pops.
+_eo_gran = ((22, 24), (27, 21), (35, 21), (41, 25), (43, 33), (40, 40), (33, 43), (25, 42), (21, 36), (31, 37), (36, 36), (24, 31))
+
+
+def eo_granules(pts, r=1.7):
+    return "".join(f'<circle cx="{x}" cy="{y}" r="{r}" fill="{P["kill"]}" stroke="#FFD2B8" stroke-width=".6"/>' for x, y in pts)
+
+
+def eo_nucleus(cx=32, cy=30):
+    return (f'<path d="M{cx - 6} {cy}Q{cx} {cy + 3.5} {cx + 6} {cy}" fill="none" stroke="{P["cellHi"]}" stroke-width="2.2"/>'
+            f'<circle cx="{cx - 6}" cy="{cy}" r="4.6" fill="{P["cellHi"]}"/><circle cx="{cx + 6}" cy="{cy}" r="4.6" fill="{P["cellHi"]}"/>')
+
+
+add("eosinophil", "unit", svg(64, '<circle cx="32" cy="32" r="24" fill="url(#eos-o)"/>' + cell_body("eos", 14) + eo_nucleus() +
+    eo_granules(_eo_gran, 2.1), cell_defs("eos") + halo("eos-o", P["kill"], .3, .12, .6)),
+    64, 14, "Eosinophil (stage 3): a two-lobed nucleus and big orange granules (its payload). Ignores small germs; swims to big "
+            "ones (slime domes, Tapeworm, fungus threads). Draw about 1.05x a neutrophil.")
+
+_lat_body = smooth_closed([(16, 36), (16, 27), (21, 19.5), (32, 17), (43, 19.5), (48, 27), (48, 36), (40, 38.5), (24, 38.5)])
+_lat_gran = ((22, 34), (27, 35.5), (33, 36), (39, 35.5), (43, 33), (25, 30), (31, 31.5), (37, 31), (41, 28), (21, 28))
+add("eosinophil-latched", "unit", svg(64,
+    f'<circle cx="32" cy="32" r="30" fill="url(#eol-h)"/>'
+    f'<path d="{_lat_body}" fill="url(#eol-b)" stroke="#7FF0FF" stroke-width="1.8" stroke-linejoin="round"/>' +
+    stroke("M20 38.5L18.5 44M26 39L25.5 45M32 39V45.5M38 39L38.5 45M44 38.5L45.5 44", "#7FF0FF", 1.6) +
+    eo_nucleus(32, 25.5) + eo_granules(_lat_gran, 2) +
+    f'<ellipse cx="32" cy="30" rx="21" ry="16" fill="none" stroke="{P["kill"]}" stroke-width="1.6" stroke-dasharray="3 2.5" opacity=".85"/>',
+    halo("eol-h", P["kill"], .42, .14, .5) + body_grad("eol-b", "#9FF4FF", P["cell"], .5, .18)),
+    64, 14, "Eosinophil latched on: flattened against the target with gripping feet, granules massed at the contact side, an orange "
+            "dashed ring. The flat side is +y: rotate so +y points at the target. Pulse its scale and the ring's alpha for the "
+            "few seconds before it pops.")
+
+_pop_shards = "".join(
+    f'<g transform="rotate({a} 32 32)"><path d="M32 {32 - r0}L33.6 {32 - r0 - 5}L32 {32 - r0 - 8}L30.4 {32 - r0 - 5}Z" fill="{P["kill"]}"/></g>'
+    for a, r0 in ((0, 14), (40, 17), (75, 13), (115, 16), (150, 14), (190, 18), (230, 13), (265, 16), (305, 15), (335, 18)))
+add("eosinophil-pop", "effect", svg(64,
+    f'<circle cx="32" cy="32" r="31" fill="url(#eop-h)"/>'
+    f'<circle cx="32" cy="32" r="12" fill="none" stroke="{P["kill"]}" stroke-width="3" opacity=".9"/>'
+    f'<circle cx="32" cy="32" r="18" fill="none" stroke="#FFD2B8" stroke-width="1.2" opacity=".7"/>' + _pop_shards +
+    eo_granules(((44, 22), (20, 42), (47, 41), (18, 23), (32, 50), (31, 13)), 1.8) +
+    f'<circle cx="32" cy="32" r="6" fill="url(#eop-c)"/>',
+    halo("eop-h", P["kill"], .55, .16, .45) +
+    '<radialGradient id="eop-c"><stop offset="0" stop-color="#FFFFFF"/><stop offset="1" stop-color="#FFD2B8" stop-opacity="0"/></radialGradient>'),
+    64, 24, "Eosinophil pop: the heavy-damage burst when a latched eosinophil goes off. Scale 0.5 to 1.4 over ~0.35 s and fade, "
+            "on the contact point. Orange, like the other kill effects.")
+
+
+# --- First sketches for the later batches (in build order) ---
+# Platelets (stage 5): tiny pale discs that stick into a wall.
+add("platelet", "unit", svg(64,
+    f'<ellipse cx="32" cy="32" rx="14" ry="10" fill="url(#plt-h)"/>'
+    f'<ellipse cx="32" cy="32" rx="8" ry="5" fill="url(#plt-b)" stroke="{P["cellHi"]}" stroke-width="1.3"/>'
+    + "".join(f'<circle cx="{x}" cy="{y}" r=".9" fill="{P["cellHi"]}"/>' for x, y in ((29, 31), (33, 33.5), (35.5, 30.5))),
+    cell_defs("plt") + halo("plt-h", P["cell"], .4, .1, .45)),
+    64, 8, "Platelet (stage 5, first sketch): a tiny pale disc. Drifts to the downstream edge of its sector. Draw small (~0.4x a neutrophil).")
+_plt_star = blob(32, 32, lambda t: 8 + 3.2 * max(0, math.cos(5 * t)) ** 3 + 1.2 * math.sin(3 * t), 40)
+add("platelet-stuck", "unit", svg(64,
+    f'<circle cx="32" cy="32" r="16" fill="url(#pls-h)"/>'
+    f'<path d="{_plt_star}" fill="url(#pls-b)" stroke="{P["cellHi"]}" stroke-width="1.3" stroke-linejoin="round"/>' +
+    stroke("M42 32H50M22 32H14M32 22V15M32 42V49", P["cellHi"], 1, ' opacity=".6" stroke-dasharray="1.5 1.5"'),
+    cell_defs("pls") + halo("pls-h", P["cell"], .45, .12, .45)),
+    64, 11, "Platelet stuck into the clot wall (first sketch): spiky, with sticky threads reaching for its neighbours. Swap in once it joins the wall.")
+
+# Dendritic couriers (stage 6): long branching arms; carries a magenta sample to the Lymph node.
+_dc_arms = ("M37 28L46 18L52 16M46 18L47 11", "M39 35L50 39L56 37M50 39L52 46", "M30 40L27 50L22 54M27 50L31 56",
+            "M25 33L14 36L9 33M14 36L12 43", "M28 25L22 15L16 13M22 15L24 8")
+
+
+def dendritic(pfx, carry=False):
+    s = f'<circle cx="32" cy="32" r="28" fill="url(#{pfx}-h)"/>' + "".join(stroke(d, "#7FF0FF", 2.2) for d in _dc_arms)
+    s += f'<circle cx="32" cy="32" r="9.5" fill="url(#{pfx}-b)" stroke="#7FF0FF" stroke-width="1.8"/>'
+    s += f'<path d="M27 31C27 26 33 25 36 28C38 30 36 32 34 33C32 34 33 37 30 37C28 37 27 34 27 31Z" fill="{P["cellHi"]}"/>'
+    if carry:
+        s += (f'<circle cx="53" cy="15" r="7" fill="url(#{pfx}-g)"/>'
+              f'<rect x="49" y="12.5" width="8.5" height="5" rx="2.5" fill="{P["germ"]}" stroke="{P["germHi"]}" stroke-width="1" '
+              f'transform="rotate(-30 53 15)"/>')
+    return s
+
+
+add("dendritic-cell", "unit", svg(64, dendritic("dcl"), cell_defs("dcl")),
+    64, 22, "Dendritic courier (stage 6, first sketch): a small body with long branching arms. Grabs a sample, then walks to the Lymph node.")
+add("dendritic-carrying", "unit", svg(64, dendritic("dcc", True), cell_defs("dcc") + halo("dcc-g", P["germ"], .6, .2, .5)),
+    64, 22, "Dendritic courier carrying a sample (first sketch): a glowing magenta fragment held up in one arm, so the player can follow the VIP.")
+
+# Tregs (stage 8): a lymphocyte wrapped in a soft green calming ring.
+add("treg", "unit", svg(64,
+    f'<circle cx="32" cy="32" r="29" fill="url(#trg-g)"/>' + cell_body("trg", 11.5) +
+    f'<circle cx="31.5" cy="31.5" r="8" fill="{P["cellHi"]}" opacity=".92"/>'
+    f'<circle cx="32" cy="32" r="17.5" fill="none" stroke="{P["repair"]}" stroke-width="1.6" stroke-dasharray="6 4" opacity=".8"/>' +
+    stroke("M20 49Q24 46 28 49T36 49T44 49", P["repair"], 1.2, ' opacity=".7"'),
+    cell_defs("trg") + halo("trg-g", P["repair"], .3, .1, .55)),
+    64, 18, "Treg (stage 8, first sketch): a lymphocyte in a soft green dashed ring with a calm wave under it. Kills nothing; slows fatigue.")
+
+# Interferon cells (stage 9): a lymphocyte giving off a pale haze that protects cells from Herpes.
+_ifn_dots = "".join(f'<circle cx="{f(32 + d * math.cos(a))}" cy="{f(32 + d * math.sin(a))}" r="{r}" fill="#E6FFFF"/>'
+                    for a, d, r in ((.2, 19, 1.3), (1.1, 22, 1), (2.0, 18, 1.2), (2.9, 23, 1), (3.8, 19, 1.3), (4.7, 22, 1), (5.6, 18, 1.1)))
+add("interferon-cell", "unit", svg(64,
+    cell_body("ifn", 11.5) + f'<circle cx="31.5" cy="31.5" r="7.5" fill="{P["cellHi"]}" opacity=".92"/>' + _ifn_dots +
+    stroke("M44 20L48 16M20 44L16 48M44 44L48 48M20 20L16 16", "#E6FFFF", 1.1, ' opacity=".7"'),
+    cell_defs("ifn")),
+    64, 15, "Interferon cell (stage 9, first sketch): a lymphocyte shedding pale specks. Draw interferon-haze around it.")
+add("interferon-haze", "field", svg(128,
+    f'<circle cx="64" cy="64" r="63" fill="url(#ifh-g)"/>'
+    f'<circle cx="64" cy="64" r="58" fill="none" stroke="#E6FFFF" stroke-width="1" stroke-dasharray="2 5" opacity=".5"/>' +
+    "".join(f'<circle cx="{f(64 + d * math.cos(a))}" cy="{f(64 + d * math.sin(a))}" r="1.2" fill="#E6FFFF" opacity=".55"/>'
+            for a, d in [(i * 0.9, 18 + (i * 13) % 38) for i in range(22)]),
+    '<radialGradient id="ifh-g"><stop offset="0" stop-color="#BFF6FF" stop-opacity=".22"/>'
+    '<stop offset=".8" stop-color="#BFF6FF" stop-opacity=".1"/><stop offset="1" stop-color="#BFF6FF" stop-opacity="0"/></radialGradient>'),
+    128, 58, "Interferon haze (first sketch): pale, speckled, faint. Cells inside can't be hijacked by Herpes. Scale to the haze radius; draw under the cells.")
+
+# Mast cells (stage 10): a big cell packed with granules; releases mucus that slows everything in its sector.
+_mast_gr = "".join(f'<circle cx="{f(32 + d * math.cos(a))}" cy="{f(32 + d * 0.8 * math.sin(a))}" r="1.4" fill="{MUCUS}" '
+                   f'stroke="#E0EEFF" stroke-width=".5"/>' for a, d in [(i * 2.39996, 4 + (i * 7) % 11) for i in range(26)])
+add("mast-cell", "unit", svg(64,
+    f'<ellipse cx="32" cy="32" rx="29" ry="25" fill="url(#mst-h)"/>'
+    f'<ellipse cx="32" cy="32" rx="16" ry="13" fill="url(#mst-b)" stroke="#7FF0FF" stroke-width="1.8"/>'
+    f'<ellipse cx="29" cy="31" rx="4.5" ry="3.8" fill="{P["cellHi"]}" opacity=".9"/>' + _mast_gr,
+    cell_defs("mst")),
+    64, 16, "Mast cell (stage 10, first sketch): a big oval cell packed with blue granules. Sits where it's made; releases mucus near big germs.")
+_muc = blob(64, 64, lambda t: 52 + 6 * math.sin(3 * t + .4) + 3 * math.sin(7 * t), 48)
+add("mucus", "field", svg(128,
+    f'<path d="{_muc}" fill="url(#muc-g)" stroke="{MUCUS}" stroke-width="1.4" stroke-opacity=".5"/>' +
+    "".join(stroke(f"M{x} {y}q8 -4 16 0t16 0", MUCUS, 1.2, ' opacity=".35"') for x, y in ((30, 46), (52, 66), (34, 84), (66, 92), (70, 40))),
+    f'<radialGradient id="muc-g"><stop offset="0" stop-color="{MUCUS}" stop-opacity=".22"/>'
+    f'<stop offset="1" stop-color="{MUCUS}" stop-opacity=".08"/></radialGradient>'),
+    128, 56, "Mucus (first sketch): a slow blue gel with flow streaks. Everything in it, the Tapeworm and your own cells, moves slower. Draw under the cells.")
+
+for _n, _r in {"b-cell": 8, "b-cell-puff": 8, "eosinophil": 8.5, "eosinophil-latched": 8.5, "eosinophil-pop": 14, "platelet": 4,
+               "platelet-stuck": 4.4, "dendritic-cell": 12, "dendritic-carrying": 12, "treg": 9.5, "interferon-cell": 8,
+               "interferon-haze": 40, "mast-cell": 10, "mucus": 50}.items():
+    ASSETS[_n]["worldR"] = _r
+
 # ---- write ----
 os.makedirs(OUT, exist_ok=True)
 for name, a in ASSETS.items():

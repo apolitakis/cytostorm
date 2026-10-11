@@ -9,6 +9,7 @@ const V3 = process.env.V3 || path.join(__dirname, '../../prototype/v3/src');
 Object.assign(global, require(path.join(V3, 'sim.js')));
 Object.assign(global, require(path.join(V3, 'bots.js')));
 const CAMPAIGN = require('./campaign.js');
+CAMPAIGN.setUnits(['neut', 'net', 'nk', 'mac', ...Object.keys(SPECIAL || {})]); // the UI does this from its UNIT table at boot
 const BASE = JSON.parse(JSON.stringify(CONFIG));
 
 function buildState(name) {
@@ -17,7 +18,8 @@ function buildState(name) {
   if (name === 'third') for (const id of ['marrow', 'trigger', 'gulp', 'rings', 'recover', 'stamina']) st.upgrades[id] = 1;
   if (name === 'third') st.upgrades.marrow = 2;
   // about what a first run has earned by the last map (~2000 Samples): every upgrade once, the core ones twice, one vaccine
-  if (name === 'late') { for (const u of CAMPAIGN.UPGRADES) st.upgrades[u.id] = 1; for (const id of ['marrow', 'trigger', 'gulp', 'stamina', 'recover']) st.upgrades[id] = 2; st.vaccines.staph = true; }
+  // (the twelve V12 lines only, so it stays about 2000 Samples now that each new unit has a line too)
+  if (name === 'late') { for (const id of ['marrow', 'heart', 'trigger', 'life', 'nets', 'gulp', 'rings', 'macs', 'nk', 'recover', 'stamina', 'cool']) st.upgrades[id] = 1; for (const id of ['marrow', 'trigger', 'gulp', 'stamina', 'recover']) st.upgrades[id] = 2; st.vaccines.staph = true; }
   if (name === 'full') { for (const u of CAMPAIGN.UPGRADES) st.upgrades[u.id] = 2; for (const k of new Set(Object.values(CAMPAIGN.VACCINE_OF))) st.vaccines[k] = true; }
   return st;
 }
@@ -28,7 +30,8 @@ function run(level, policy, seed, buildName, treat) {
   CAMPAIGN.applyConfig(CONFIG, BASE, st, treat);
   const orig = LEVELS[level];
   LEVELS[level] = CAMPAIGN.scaleLevel(orig, process.env.P === 'ramp' ? CAMPAIGN.pressure(LEVEL_ORDER.indexOf(level), LEVEL_ORDER.length) : +process.env.P || 1);
-  LEVELS[level].units = CAMPAIGN.unitsFor(CAMPAIGN.loadout(st, LEVELS, LEVEL_ORDER));
+  // the stage's default loadout (its own unit, then counters), or env LOADOUT=bcell,eos
+  LEVELS[level].units = CAMPAIGN.unitsFor(process.env.LOADOUT ? process.env.LOADOUT.split(',') : CAMPAIGN.loadout(st, LEVELS, LEVEL_ORDER, level));
   const m = startMatch(level, policy, seed);
   LEVELS[level] = orig;
   const tr = CAMPAIGN.instrument(m.game, st, treat);

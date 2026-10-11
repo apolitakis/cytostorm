@@ -1,0 +1,1120 @@
+<title>Cytostorm OST</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Instrument+Sans:wdth,wght@75..100,400..700&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+/* Layout: a single phone-width column. Player on top (scope, transport, intensity), track list under it.
+   Same single dark theme and tokens as the Sound Lab and the Cytostorm hub. */
+:root {
+  color-scheme: dark;
+  --void: #04050A; --panel: #0A0D18; --panel2: #10152A; --line: #1E2540;
+  --ink: #DDE6F5; --dim: #7A86A0; --cell: #3FE6FF; --germ: #FF3DCB; --gold: #FFD23F;
+  --risky: #FF9A3C; --lethal: #FF4057;
+  --display: "Instrument Sans", "Helvetica Neue", Arial, sans-serif;
+  --mono: "IBM Plex Mono", ui-monospace, Menlo, monospace;
+}
+* { box-sizing: border-box; }
+html { background: var(--void); }
+body {
+  margin: 0; color: var(--ink); font: 16px/1.45 var(--display);
+  background: radial-gradient(120% 50% at 50% -10%, rgba(63,230,255,.10), transparent 60%), var(--void);
+  padding-inline: 16px; padding-block: 0 48px;
+  -webkit-tap-highlight-color: transparent;
+}
+main { max-width: 560px; margin: 0 auto; display: grid; gap: 22px; }
+header { display: grid; gap: 8px; padding-top: 28px; }
+.kicker { font: 500 12px var(--mono); letter-spacing: .18em; text-transform: uppercase; color: var(--dim); margin: 0; }
+h1 { font: 700 48px/1 var(--display); font-stretch: 85%; margin: 0; letter-spacing: -.01em; }
+h1 span { color: var(--germ); text-shadow: 0 0 18px rgba(255,61,203,.45); }
+p { margin: 0; color: var(--dim); text-wrap: pretty; max-width: 62ch; }
+.tip { font-size: 14px; border-left: 2px solid var(--gold); padding-left: 10px; }
+
+.player { display: grid; gap: 14px; padding: 16px; background: var(--panel); border: 1px solid var(--line); border-radius: 16px; }
+.now { display: grid; grid-template-columns: 1fr auto; gap: 2px 12px; align-items: end; }
+.now b { font: 650 24px/1.15 var(--display); font-stretch: 90%; }
+.now small { font: 500 12px var(--mono); letter-spacing: .08em; color: var(--dim); text-transform: uppercase; }
+.time { font: 500 14px var(--mono); color: var(--dim); font-variant-numeric: tabular-nums; grid-row: span 2; }
+canvas { width: 100%; height: 96px; display: block; border-radius: 10px; background: var(--void); }
+.bars { display: grid; grid-template-columns: repeat(var(--n, 8), 1fr); gap: 4px; }
+.bars i { height: 4px; border-radius: 2px; background: var(--line); }
+.bars i.on { background: var(--cell); box-shadow: 0 0 8px rgba(63,230,255,.5); }
+.transport { display: flex; flex-wrap: wrap; align-items: center; gap: 10px 14px; }
+button { font: inherit; color: inherit; cursor: pointer; touch-action: manipulation; }
+button:focus-visible, input:focus-visible { outline: 2px solid var(--cell); outline-offset: 2px; }
+.big {
+  width: 56px; height: 56px; border-radius: 50%; border: 1px solid var(--cell); background: var(--panel2);
+  display: grid; place-items: center; box-shadow: 0 0 16px rgba(63,230,255,.25);
+}
+.big::before { content: ""; border-left: 16px solid var(--cell); border-top: 10px solid transparent; border-bottom: 10px solid transparent; margin-left: 4px; }
+.big.on::before { border: 0; margin: 0; width: 16px; height: 18px; background: linear-gradient(90deg, var(--cell) 0 35%, transparent 35% 65%, var(--cell) 65%); }
+.chip { min-height: 36px; padding: 0 12px; border-radius: 999px; border: 1px solid var(--line); background: none; color: var(--dim); font: 600 14px var(--display); }
+.chip[aria-pressed=true] { color: var(--ink); border-color: var(--cell); }
+.vol { display: flex; align-items: center; gap: 8px; flex: 1 1 140px; min-width: 0; font: 500 12px var(--mono); letter-spacing: .1em; text-transform: uppercase; color: var(--dim); }
+.vol input { flex: 1; min-width: 0; accent-color: var(--cell); }
+
+.heat { display: grid; gap: 8px; }
+.heat[hidden] { display: none !important; }
+.heat .lbl { font: 500 12px var(--mono); letter-spacing: .1em; text-transform: uppercase; color: var(--dim); }
+.seg { display: flex; flex-wrap: wrap; gap: 6px; }
+.seg button { min-height: 34px; padding: 0 12px; border-radius: 999px; border: 1px solid var(--line); background: none; color: var(--dim); font: 600 14px var(--display); }
+.seg button[aria-pressed=true] { color: var(--void); background: var(--cell); border-color: var(--cell); }
+.seg button[data-k="2"][aria-pressed=true] { background: var(--risky); border-color: var(--risky); }
+.seg button[data-k="3"][aria-pressed=true], .seg button[data-k="4"][aria-pressed=true] { background: var(--lethal); border-color: var(--lethal); }
+.seg button.auto[aria-pressed=true] { background: var(--germ); border-color: var(--germ); color: var(--void); }
+
+ol.tracks { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; counter-reset: t; }
+.track {
+  width: 100%; text-align: left; display: grid; grid-template-columns: 32px 1fr auto; gap: 2px 12px; align-items: center;
+  padding: 14px; border-radius: 14px; border: 1px solid var(--line); background: var(--panel);
+}
+.track .no { font: 500 14px var(--mono); color: var(--dim); grid-column: 1; grid-row: 1 / span 2; font-variant-numeric: tabular-nums; }
+.track b { font: 650 18px/1.2 var(--display); grid-column: 2; grid-row: 1; }
+.track span { font-size: 14px; color: var(--dim); grid-column: 2; grid-row: 2; }
+.track em { font: 500 12px var(--mono); font-style: normal; color: var(--dim); grid-row: 1 / span 2; grid-column: 3; font-variant-numeric: tabular-nums; }
+.track.main b::after { content: "Main theme"; margin-left: 8px; padding: 2px 8px; border-radius: 999px; border: 1px solid var(--germ); color: var(--germ); font: 500 11px var(--mono); letter-spacing: .06em; text-transform: uppercase; vertical-align: 3px; white-space: nowrap; display: inline-block; }
+.track[aria-current=true] { border-color: var(--cell); background: var(--panel2); }
+.track[aria-current=true] .no { color: var(--cell); }
+footer p { font-size: 14px; }
+@media (max-width: 420px) { h1 { font-size: 40px; } }
+@media (prefers-reduced-motion: reduce) { canvas { display: none; } }
+</style>
+
+<main>
+  <header>
+    <p class="kicker">Cytostorm · Original soundtrack</p>
+    <h1>The sound of a <span>storm</span></h1>
+    <p>Music from Cytostorm. Every track is played live in your browser by code, and each one loops the way it does in the game. Bloodstream follows the fight: it gets louder and meaner as the danger rises.</p>
+    <p class="tip">No sound on iPhone? Flip the silent switch off and turn the volume up.</p>
+  </header>
+
+  <section class="player" aria-label="Player">
+    <div class="now">
+      <small id="nowsub">Pick a track</small>
+      <span class="time" id="time">0:00</span>
+      <b id="nowname">Bloodstream</b>
+    </div>
+    <canvas id="scope" width="1040" height="192" aria-hidden="true"></canvas>
+    <div class="bars" id="bars" aria-hidden="true"></div>
+    <div class="transport">
+      <button class="big" id="play" type="button" aria-label="Play"></button>
+      <button class="chip" id="loop" type="button" aria-pressed="true">Loop</button>
+      <label class="vol" for="vol">Vol <input id="vol" type="range" min="0" max="1" step="0.01" value="0.8"></label>
+    </div>
+    <div class="heat" id="heat">
+      <span class="lbl">Danger level</span>
+      <div class="seg" id="seg"></div>
+      <p id="heatnote">Auto walks through a whole fight, from a calm start to a crisis and back. Pick a level to hold it.</p>
+    </div>
+  </section>
+
+  <section aria-label="Tracks">
+    <ol class="tracks" id="tracks"></ol>
+  </section>
+
+  <footer><p>Made for Cytostorm, a tower defense game about your immune system.</p></footer>
+</main>
+
+<script>
+// Cytostorm sound engine: every sound is synthesized with Web Audio, no samples.
+// Works on any BaseAudioContext, so the same code plays live on the page and
+// renders to files offline (render.js). Exposes one global: CytoSound.
+(function (G) {
+'use strict';
+
+// ---------- helpers ----------
+const mtof = m => 440 * Math.pow(2, (m - 69) / 12);
+function rng(seed) { let s = seed >>> 0 || 1; return () => ((s = (s * 1664525 + 1013904223) >>> 0) / 4294967296); }
+let R = Math.random;  // swapped for a seeded rng during offline renders
+
+const noiseCache = new WeakMap();
+function noiseBuf(ctx) {
+  let b = noiseCache.get(ctx);
+  if (!b) {
+    b = ctx.createBuffer(1, ctx.sampleRate * 2, ctx.sampleRate);
+    const d = b.getChannelData(0), r = rng(7);
+    for (let i = 0; i < d.length; i++) d[i] = r() * 2 - 1;
+    noiseCache.set(ctx, b);
+  }
+  return b;
+}
+function noise(ctx, t, dur) {
+  const s = ctx.createBufferSource();
+  s.buffer = noiseBuf(ctx); s.loop = true;
+  s.start(t, R() * 1.5); s.stop(t + dur + 0.05);
+  return s;
+}
+function osc(ctx, type, f, t, dur) {
+  const o = ctx.createOscillator();
+  o.type = type; o.frequency.setValueAtTime(f, t);
+  o.start(t); o.stop(t + dur + 0.05);
+  return o;
+}
+function filt(ctx, type, f, q) {
+  const n = ctx.createBiquadFilter();
+  n.type = type; n.frequency.value = f; if (q != null) n.Q.value = q;
+  return n;
+}
+// Percussive envelope: quick attack to peak, exponential decay to silence by t+dur.
+function perc(ctx, t, peak, a, dur) {
+  const g = ctx.createGain();
+  g.gain.setValueAtTime(0.0001, t);
+  g.gain.linearRampToValueAtTime(peak, t + a);
+  g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+  return g;
+}
+// Sustained envelope: attack, hold at level, release.
+function adsr(ctx, t, peak, a, hold, rel) {
+  const g = ctx.createGain();
+  g.gain.setValueAtTime(0.0001, t);
+  g.gain.linearRampToValueAtTime(peak, t + a);
+  g.gain.setValueAtTime(peak, t + a + hold);
+  g.gain.exponentialRampToValueAtTime(0.0001, t + a + hold + rel);
+  return g;
+}
+function sweep(param, t, from, to, dur) {
+  param.setValueAtTime(from, t);
+  param.exponentialRampToValueAtTime(Math.max(to, 0.01), t + dur);
+}
+function chain(...nodes) { for (let i = 0; i < nodes.length - 1; i++) nodes[i].connect(nodes[i + 1]); return nodes[nodes.length - 1]; }
+function panner(ctx, p) {
+  if (!ctx.createStereoPanner) return ctx.createGain();
+  const n = ctx.createStereoPanner(); n.pan.value = Math.max(-1, Math.min(1, p || 0)); return n;
+}
+function shaper(ctx, amt) {
+  const n = ctx.createWaveShaper(), c = new Float32Array(1024);
+  for (let i = 0; i < 1024; i++) { const x = i / 511.5 - 1; c[i] = Math.tanh(x * amt) / Math.tanh(amt); }
+  n.curve = c; return n;
+}
+
+// ---------- mixer ----------
+// out = { sfx, music, verb, ctx }. Each sound connects into o.dest (dry) and o.verb (reverb send).
+function makeBus(ctx, dest) {
+  const master = ctx.createGain(); master.gain.value = 0.9;
+  const comp = ctx.createDynamicsCompressor();
+  comp.threshold.value = -14; comp.knee.value = 10; comp.ratio.value = 4; comp.attack.value = 0.004; comp.release.value = 0.2;
+  chain(master, comp, dest || ctx.destination);
+  const verb = ctx.createConvolver();
+  const len = Math.floor(ctx.sampleRate * 2.4), ir = ctx.createBuffer(2, len, ctx.sampleRate), r = rng(11);
+  for (let ch = 0; ch < 2; ch++) {
+    const d = ir.getChannelData(ch);
+    for (let i = 0; i < len; i++) d[i] = (r() * 2 - 1) * Math.pow(1 - i / len, 3.2);
+  }
+  verb.buffer = ir;
+  const verbIn = ctx.createGain(); verbIn.gain.value = 0.32;
+  const verbTone = filt(ctx, 'lowpass', 5200);
+  chain(verbIn, verb, verbTone, master);
+  const sfx = ctx.createGain(); sfx.gain.value = 0.75; sfx.connect(master);   // effects sit a little under the music (Alex)
+  const music = ctx.createGain(); music.gain.value = 0.62; music.connect(master);
+  return { ctx, master, sfx, music, verb: verbIn };
+}
+// A per-sound output: pan + volume, with optional reverb send.
+function voice(bus, t, opts, wet) {
+  const ctx = bus.ctx, o = opts || {};
+  const g = ctx.createGain(); g.gain.value = o.v == null ? 1 : o.v;
+  const p = panner(ctx, o.pan);
+  chain(g, p, o.dest || bus.sfx);
+  if (wet) { const s = ctx.createGain(); s.gain.value = wet; p.connect(s); s.connect(bus.verb); }
+  return g;
+}
+
+// ---------- sound effects ----------
+// Each play(bus, t, opts) schedules everything at audio time t and returns its length in seconds.
+// opts.p = pitch multiplier, opts.pan, opts.v = volume; swarm mode varies them per hit.
+const SFX = {};
+
+SFX.shotPew = (b, t, o = {}) => {           // neutrophil shot: bright laser pew
+  const c = b.ctx, out = voice(b, t, o, 0.08), p = o.p || 1;
+  const s = osc(c, 'square', 1500 * p, t, 0.11);
+  sweep(s.frequency, t, 1500 * p, 240 * p, 0.09);
+  chain(s, filt(c, 'lowpass', 3800, 1), perc(c, t, 0.16, 0.002, 0.11), out);
+  const n = noise(c, t, 0.02);
+  chain(n, filt(c, 'highpass', 3000), perc(c, t, 0.12, 0.001, 0.02), out);
+  return 0.15;
+};
+SFX.shotSpit = (b, t, o = {}) => {          // neutrophil shot: wet organic spit
+  const c = b.ctx, out = voice(b, t, o, 0.06), p = o.p || 1;
+  const n = noise(c, t, 0.09), bp = filt(c, 'bandpass', 3800 * p, 2.2);
+  sweep(bp.frequency, t, 4200 * p, 800 * p, 0.08);
+  chain(n, bp, perc(c, t, 0.7, 0.002, 0.09), out);
+  const s = osc(c, 'sine', 700 * p, t, 0.07);
+  sweep(s.frequency, t, 700 * p, 160 * p, 0.06);
+  chain(s, perc(c, t, 0.32, 0.002, 0.07), out);
+  return 0.12;
+};
+SFX.gulp = (b, t, o = {}) => {              // macrophage swallow: one deep gulp
+  const c = b.ctx, out = voice(b, t, o, 0.1), p = o.p || 1;
+  const s = osc(c, 'sine', 200 * p, t, 0.34);
+  s.frequency.setValueAtTime(200 * p, t);
+  s.frequency.linearRampToValueAtTime(430 * p, t + 0.045);
+  s.frequency.exponentialRampToValueAtTime(75 * p, t + 0.3);
+  chain(s, filt(c, 'lowpass', 1400), perc(c, t, 0.55, 0.012, 0.32), out);
+  const n = noise(c, t, 0.22), bp = filt(c, 'bandpass', 700 * p, 5);
+  sweep(bp.frequency, t, 900 * p, 260 * p, 0.2);
+  chain(n, bp, perc(c, t + 0.02, 0.35, 0.02, 0.22), out);
+  return 0.38;
+};
+SFX.slurp = (b, t, o = {}) => {             // macrophage swallow: two-stage wobbly slurp
+  const c = b.ctx, out = voice(b, t, o, 0.1), p = o.p || 1;
+  [[0, 320, 1], [0.1, 190, 0.85]].forEach(([dt, f, v]) => {
+    const s = osc(c, 'triangle', f * p, t + dt, 0.2);
+    sweep(s.frequency, t + dt, f * 1.6 * p, f * 0.55 * p, 0.16);
+    const lfo = osc(c, 'sine', 34, t + dt, 0.2), depth = c.createGain(); depth.gain.value = f * 0.25 * p;
+    chain(lfo, depth, s.frequency);
+    chain(s, filt(c, 'lowpass', 1600), perc(c, t + dt, 0.45 * v, 0.01, 0.18), out);
+  });
+  return 0.34;
+};
+SFX.blink = (b, t, o = {}) => {             // germ about to divide: soft blink blips
+  const c = b.ctx, out = voice(b, t, o, 0.15), p = o.p || 1;
+  [0, 0.12].forEach(dt => {
+    const s = osc(c, 'sine', 1760 * p, t + dt, 0.06);
+    chain(s, perc(c, t + dt, 0.12, 0.004, 0.06), out);
+  });
+  return 0.25;
+};
+SFX.divideSquelch = (b, t, o = {}) => {     // germ divides: blink, blink, squelch
+  const c = b.ctx, p = o.p || 1;
+  SFX.blink(b, t, o);
+  const out = voice(b, t, o, 0.1), t2 = t + 0.28;
+  const car = osc(c, 'sine', 260 * p, t2, 0.22), mod = osc(c, 'sine', 390 * p, t2, 0.22), idx = c.createGain();
+  sweep(car.frequency, t2, 260 * p, 900 * p, 0.16);
+  sweep(mod.frequency, t2, 390 * p, 1350 * p, 0.16);
+  idx.gain.setValueAtTime(600 * p, t2); idx.gain.exponentialRampToValueAtTime(20, t2 + 0.18);
+  chain(mod, idx, car.frequency);
+  chain(car, perc(c, t2, 0.3, 0.01, 0.2), out);
+  const n = noise(c, t2, 0.12), bp = filt(c, 'bandpass', 600, 3);
+  sweep(bp.frequency, t2, 600, 2400, 0.12);
+  chain(n, bp, perc(c, t2, 0.25, 0.005, 0.12), out);
+  return 0.55;
+};
+SFX.divideBubble = (b, t, o = {}) => {      // germ divides: blink, then bloop-bloop
+  const c = b.ctx, p = o.p || 1;
+  SFX.blink(b, t, o);
+  const out = voice(b, t, o, 0.12);
+  [[0.28, 380], [0.37, 520]].forEach(([dt, f]) => {
+    const s = osc(c, 'sine', f * p, t + dt, 0.1);
+    sweep(s.frequency, t + dt, f * p, f * 2.6 * p, 0.05);
+    chain(s, perc(c, t + dt, 0.32, 0.004, 0.09), out);
+  });
+  return 0.5;
+};
+SFX.pop = (b, t, o = {}) => {               // kill: bubble pop
+  const c = b.ctx, out = voice(b, t, o, 0.05), p = o.p || 1;
+  const s = osc(c, 'sine', 480 * p, t, 0.08);
+  sweep(s.frequency, t, 480 * p, 1700 * p, 0.03);
+  chain(s, perc(c, t, 0.4, 0.002, 0.07), out);
+  const n = noise(c, t, 0.012);
+  chain(n, filt(c, 'highpass', 2500), perc(c, t, 0.18, 0.001, 0.012), out);
+  return 0.1;
+};
+SFX.crunch = (b, t, o = {}) => {            // kill: crisp crunch
+  const c = b.ctx, out = voice(b, t, o, 0.05), p = o.p || 1;
+  const n = noise(c, t, 0.07);
+  chain(n, filt(c, 'bandpass', 1900 * p, 1.1), perc(c, t, 0.8, 0.001, 0.06), out);
+  const s = osc(c, 'square', 170 * p, t, 0.04);
+  sweep(s.frequency, t, 170 * p, 70 * p, 0.04);
+  chain(s, filt(c, 'lowpass', 900), perc(c, t, 0.3, 0.001, 0.04), out);
+  return 0.09;
+};
+// Big burst, kept small and dry (Alex: effects should be subtle, the first splat was too big and loose).
+SFX.burstPops = (b, t, o = {}) => {         // a quick cluster of tiny pops
+  const c = b.ctx, out = voice(b, t, o, 0.03), p = o.p || 1;
+  for (let i = 0; i < 5; i++) {
+    const dt = i * 0.022 + R() * 0.012, f = (520 + R() * 500) * p, s = osc(c, 'sine', f, t + dt, 0.05);
+    sweep(s.frequency, t + dt, f, f * 2.4, 0.025);
+    chain(s, perc(c, t + dt, 0.2, 0.002, 0.045), panner(c, (R() - 0.5) * 0.5), out);
+  }
+  const th = osc(c, 'sine', 180 * p, t, 0.09);
+  sweep(th.frequency, t, 180 * p, 90 * p, 0.07);
+  chain(th, perc(c, t, 0.3, 0.002, 0.08), out);
+  return 0.16;
+};
+SFX.burstTight = (b, t, o = {}) => {        // one short, tight splat
+  const c = b.ctx, out = voice(b, t, o, 0.03), p = o.p || 1;
+  const n = noise(c, t, 0.1), bp = filt(c, 'bandpass', 2200 * p, 1.4);
+  sweep(bp.frequency, t, 2600 * p, 900 * p, 0.08);
+  chain(n, bp, perc(c, t, 0.55, 0.001, 0.09), out);
+  const th = osc(c, 'sine', 220 * p, t, 0.08);
+  sweep(th.frequency, t, 220 * p, 110 * p, 0.06);
+  chain(th, perc(c, t, 0.3, 0.002, 0.07), out);
+  return 0.12;
+};
+// Net traps, dry and fast like the NK zap.
+SFX.netSnap = (b, t, o = {}) => {           // a quick zip that snaps shut
+  const c = b.ctx, out = voice(b, t, o, 0), p = o.p || 1;
+  const n = noise(c, t, 0.06), bp = filt(c, 'bandpass', 1500 * p, 3);
+  sweep(bp.frequency, t, 1500 * p, 6000 * p, 0.05);
+  chain(n, bp, perc(c, t, 0.45, 0.004, 0.055), out);
+  const s = osc(c, 'square', 900 * p, t + 0.045, 0.03);
+  chain(s, filt(c, 'lowpass', 3500), perc(c, t + 0.045, 0.12, 0.001, 0.03), out);
+  return 0.09;
+};
+SFX.netCinch = (b, t, o = {}) => {          // two tight zips, like a drawstring pulled closed
+  const c = b.ctx, out = voice(b, t, o, 0), p = o.p || 1;
+  [[0, 1200, 3400], [0.06, 1800, 5200]].forEach(([dt, f0, f1]) => {
+    const n = noise(c, t + dt, 0.04), bp = filt(c, 'bandpass', f0 * p, 4);
+    sweep(bp.frequency, t + dt, f0 * p, f1 * p, 0.035);
+    chain(n, bp, perc(c, t + dt, 0.4, 0.003, 0.04), out);
+  });
+  const s = osc(c, 'triangle', 1300 * p, t + 0.1, 0.04);
+  chain(s, perc(c, t + 0.1, 0.14, 0.001, 0.035), out);
+  return 0.15;
+};
+SFX.zap = (b, t, o = {}) => {               // NK cell strike: electric zap
+  const c = b.ctx, out = voice(b, t, o, 0.12), p = o.p || 1;
+  const s = osc(c, 'sawtooth', 2200 * p, t, 0.18);
+  sweep(s.frequency, t, 2200 * p, 110 * p, 0.16);
+  const am = c.createGain(); am.gain.value = 0.5;
+  const lfo = osc(c, 'square', 70, t, 0.18), ld = c.createGain(); ld.gain.value = 0.5;
+  chain(lfo, ld, am.gain);
+  const bp = filt(c, 'bandpass', 1800, 1.4);
+  sweep(bp.frequency, t, 3000 * p, 400 * p, 0.16);
+  chain(s, bp, am, perc(c, t, 0.45, 0.002, 0.18), out);
+  chain(noise(c, t, 0.015), filt(c, 'highpass', 4000), perc(c, t, 0.3, 0.001, 0.015), out);
+  return 0.22;
+};
+
+// Cytokine storm: charge() returns a live handle so the page can mirror the game's
+// hold-5-seconds-then-release control. fire() is the release, cancel() an early let-go.
+SFX.stormCharge = (b, t, o = {}) => {
+  const c = b.ctx, out = voice(b, t, o, 0.2), HOLD = 5;
+  const bus = c.createGain(); bus.gain.value = 1; bus.connect(out);
+  const lp = filt(c, 'lowpass', 180, 6);
+  sweep(lp.frequency, t, 180, 3800, HOLD);
+  const trem = c.createGain(); trem.gain.value = 0.6;
+  const tl = osc(c, 'sine', 3, t, 60), td = c.createGain(); td.gain.value = 0.4;
+  tl.frequency.setValueAtTime(3, t); tl.frequency.exponentialRampToValueAtTime(18, t + HOLD);
+  chain(tl, td, trem.gain);
+  const env = c.createGain(); env.gain.setValueAtTime(0.0001, t); env.gain.exponentialRampToValueAtTime(0.5, t + HOLD);
+  chain(lp, trem, env, bus);
+  const srcs = [tl];
+  [0, 7, 12.1].forEach(det => {
+    const s = osc(c, 'sawtooth', 55, t, 60);
+    s.frequency.setValueAtTime(55 * Math.pow(2, det / 12), t);
+    s.frequency.exponentialRampToValueAtTime(220 * Math.pow(2, det / 12), t + HOLD);
+    s.connect(lp); srcs.push(s);
+  });
+  const n = noise(c, t, 60), hp = filt(c, 'highpass', 2000);
+  const ng = c.createGain(); ng.gain.setValueAtTime(0.0001, t); ng.gain.exponentialRampToValueAtTime(0.18, t + HOLD);
+  chain(n, hp, ng, bus); srcs.push(n);
+  // Warning ticks once the charge turns Risky (orange) then Lethal (red).
+  const ticks = [];
+  for (let k = 0; k < 18; k++) {
+    const tt = t + 2 + k * (k < 8 ? 0.25 : 0.14); if (tt > t + HOLD) break;
+    const s = osc(c, 'square', k < 8 ? 1320 : 1760, tt, 0.04);
+    chain(s, filt(c, 'lowpass', 4000), perc(c, tt, 0.07, 0.002, 0.04), bus); ticks.push(s);
+  }
+  // Fully charged: a held high whine until release.
+  const ready = osc(c, 'sine', 1760, t + HOLD, 60), rg = c.createGain();
+  rg.gain.setValueAtTime(0, t); rg.gain.setValueAtTime(0, t + HOLD); rg.gain.linearRampToValueAtTime(0.06, t + HOLD + 0.05);
+  chain(ready, rg, bus); srcs.push(ready);
+  const stopAll = (at) => { srcs.concat(ticks).forEach(s => { try { s.stop(at); } catch (e) {} }); };
+  return {
+    start: t, hold: HOLD,
+    fire(at) {
+      at = Math.max(at, c.currentTime);
+      bus.gain.setValueAtTime(1, at); bus.gain.linearRampToValueAtTime(0.0001, at + 0.06); stopAll(at + 0.1);
+      return SFX.stormBlast(b, at, o);
+    },
+    cancel(at) {
+      at = Math.max(at, c.currentTime);
+      srcs.forEach(s => { if (s.frequency) s.frequency.cancelScheduledValues(at), s.frequency.setValueAtTime(s.frequency.value || 110, at), s.frequency.exponentialRampToValueAtTime(30, at + 0.35); });
+      bus.gain.setValueAtTime(1, at); bus.gain.exponentialRampToValueAtTime(0.0001, at + 0.4); stopAll(at + 0.45);
+      return 0.5;
+    }
+  };
+};
+SFX.stormBlast = (b, t, o = {}) => {        // storm released: shockwave, crackle, ringing afterburn
+  const c = b.ctx, out = voice(b, t, o, 0.45);
+  const crack = osc(c, 'sawtooth', 90, t, 0.25);
+  chain(crack, shaper(c, 6), filt(c, 'lowpass', 2400), perc(c, t, 0.5, 0.001, 0.22), out);
+  const boom = osc(c, 'sine', 95, t, 1.6);
+  sweep(boom.frequency, t, 95, 24, 1.4);
+  chain(boom, perc(c, t, 1.0, 0.004, 1.5), out);
+  const n = noise(c, t, 2.4), lp = filt(c, 'lowpass', 9000, 0.7);
+  sweep(lp.frequency, t, 9000, 160, 2.2);
+  chain(n, lp, perc(c, t, 0.8, 0.005, 2.3), out);
+  for (let i = 0; i < 26; i++) {               // shards
+    const dt = 0.08 + Math.pow(R(), 1.6) * 1.6, f = 2000 + R() * 5000;
+    const s = osc(c, 'sine', f, t + dt, 0.03);
+    chain(s, perc(c, t + dt, 0.05 + R() * 0.06, 0.001, 0.03), panner(c, R() * 2 - 1), out);
+  }
+  const ring = osc(c, 'triangle', 330, t + 0.3, 3.2), ring2 = osc(c, 'triangle', 349, t + 0.3, 3.2);  // afterburn: a sour minor-second hum
+  const rg = adsr(c, t + 0.3, 0.07, 0.6, 1.2, 1.4);
+  ring.connect(rg); ring2.connect(rg); chain(rg, filt(c, 'lowpass', 1200), out);
+  return 3.6;
+};
+
+SFX.organMonitor = (b, t, o = {}) => {      // organ loses a bar: cold two-tone monitor drop + thud
+  const c = b.ctx, out = voice(b, t, o, 0.25);
+  [[0, 880], [0.2, 659.3]].forEach(([dt, f]) => {
+    const s = osc(c, 'sine', f, t + dt, 0.2);
+    chain(s, adsr(c, t + dt, 0.22, 0.01, 0.13, 0.05), out);
+  });
+  const th = osc(c, 'sine', 70, t + 0.2, 0.45);
+  sweep(th.frequency, t + 0.2, 70, 40, 0.4);
+  chain(th, perc(c, t + 0.2, 0.7, 0.005, 0.45), out);
+  return 0.75;
+};
+SFX.organCrack = (b, t, o = {}) => {        // organ loses a bar: brittle metallic crack
+  const c = b.ctx, out = voice(b, t, o, 0.3);
+  const car = osc(c, 'sine', 1180, t, 0.9), mod = osc(c, 'sine', 1180 * 3.51, t, 0.9), idx = c.createGain();
+  idx.gain.setValueAtTime(2600, t); idx.gain.exponentialRampToValueAtTime(30, t + 0.8);
+  chain(mod, idx, car.frequency);
+  chain(car, perc(c, t, 0.22, 0.001, 0.9), out);
+  chain(noise(c, t, 0.12), filt(c, 'highpass', 3500), perc(c, t, 0.4, 0.001, 0.1), out);
+  const th = osc(c, 'sine', 55, t, 0.5);
+  chain(th, perc(c, t, 0.6, 0.004, 0.5), out);
+  return 1.0;
+};
+// Organ loses a bar: short hospital flatlines (Alex 2026-10-08; the synthesized oofs didn't work).
+// Kept short so they read as a warning; the long flatline stays reserved for Host failure.
+function monitorTone(c, out, t, dur, v, f) {
+  const s = osc(c, 'sine', f || 960, t, dur + 0.05), g = c.createGain();
+  g.gain.setValueAtTime(0.0001, t); g.gain.linearRampToValueAtTime(v, t + 0.01);
+  const rel = Math.min(0.12, dur * 0.4);
+  g.gain.setValueAtTime(v, t + dur - rel); g.gain.linearRampToValueAtTime(0.0001, t + dur);
+  chain(s, g, out);
+}
+SFX.flatShort = (b, t, o = {}) => {         // one beep, then a short flat tone
+  const c = b.ctx, out = voice(b, t, o, 0.08);
+  monitorTone(c, out, t, 0.1, 0.12);
+  monitorTone(c, out, t + 0.35, 0.9, 0.13);
+  return 1.3;
+};
+SFX.flatBlip = (b, t, o = {}) => {          // just a brief flat tone, quietest
+  const c = b.ctx, out = voice(b, t, o, 0.06);
+  monitorTone(c, out, t, 0.55, 0.11);
+  return 0.6;
+};
+SFX.flatAlarm = (b, t, o = {}) => {         // three quick alarm beeps, then the flat tone
+  const c = b.ctx, out = voice(b, t, o, 0.08);
+  [0, 0.14, 0.28].forEach(dt => monitorTone(c, out, t + dt, 0.09, 0.1, 880));
+  monitorTone(c, out, t + 0.5, 0.8, 0.13);
+  return 1.35;
+};
+
+// One breach-clock tick (o.k alternates tick/tock) and the buzzer when a clock fills.
+// The game plays ticks faster as a clock fills, then breachLand, then the organ-hit sound.
+SFX.breachTick = (b, t, o = {}) => {
+  const c = b.ctx, out = voice(b, t, o, 0.08), s = osc(c, 'sine', o.k % 2 ? 1500 : 1900, t, 0.03);
+  chain(s, perc(c, t, 0.18, 0.001, 0.03), out);
+  chain(noise(c, t, 0.02), filt(c, 'bandpass', 3000, 4), perc(c, t, 0.12, 0.001, 0.02), out);
+  return 0.05;
+};
+SFX.breachLand = (b, t, o = {}) => {
+  const c = b.ctx, out = voice(b, t, o, 0.08), buzz = c.createGain();
+  [110, 116.5].forEach(f => osc(c, 'square', f, t, 0.7).connect(buzz));
+  chain(buzz, filt(c, 'lowpass', 1000), adsr(c, t, 0.18, 0.01, 0.45, 0.2), out);
+  return 0.7;
+};
+SFX.breachTicks = (b, t, o = {}) => {       // demo: a clock filling over 4 s
+  const FILL = 4;
+  let tt = t, k = 0;
+  while (tt < t + FILL) {
+    SFX.breachTick(b, tt, Object.assign({}, o, { k }));
+    const prog = (tt - t) / FILL; tt += 0.5 - prog * 0.4; k++;
+  }
+  SFX.breachLand(b, tt, o);
+  SFX.organMonitor(b, tt + 0.1, o);
+  return tt - t + 0.9;
+};
+SFX.breachPulse = (b, t, o = {}) => {       // breach clock: rising pulse tone instead of ticks
+  const c = b.ctx, out = voice(b, t, o, 0.1), FILL = 4;
+  const s = osc(c, 'triangle', 220, t, FILL + 0.1);
+  s.frequency.setValueAtTime(220, t); s.frequency.exponentialRampToValueAtTime(520, t + FILL);
+  const am = c.createGain(); am.gain.value = 0.5;
+  const lfo = osc(c, 'sine', 3, t, FILL + 0.1), ld = c.createGain(); ld.gain.value = 0.5;
+  lfo.frequency.setValueAtTime(3, t); lfo.frequency.exponentialRampToValueAtTime(14, t + FILL);
+  chain(lfo, ld, am.gain);
+  const env = c.createGain(); env.gain.setValueAtTime(0.0001, t); env.gain.exponentialRampToValueAtTime(0.22, t + FILL); env.gain.setValueAtTime(0.22, t + FILL); env.gain.linearRampToValueAtTime(0.0001, t + FILL + 0.05);
+  chain(s, filt(c, 'lowpass', 1800), am, env, out);
+  SFX.organMonitor(b, t + FILL, o);
+  return FILL + 0.8;
+};
+
+// Heartbeat for the fatigue meter. rate = seconds between beats.
+const HEART = {
+  fine: { gap: 0.95, label: 'Fine' },
+  tired: { gap: 0.72, label: 'Tired' },
+  feverish: { gap: 0.52, label: 'Feverish' },
+  exhausted: { gap: 0.4, label: 'Exhausted' },
+  overload: { gap: 0.33, label: 'Overload', skip: true }
+};
+SFX.heartbeat = (b, t, o = {}) => {         // one lub-dub
+  const c = b.ctx, out = voice(b, t, o, 0.04), hard = o.hard || 0;
+  [[0, 95, 1], [0.16, 78, 0.7]].forEach(([dt, f, v]) => {
+    const s = osc(c, 'sine', f, t + dt, 0.2);
+    sweep(s.frequency, t + dt, f, f * 0.5, 0.15);
+    chain(s, filt(c, 'lowpass', 220 + hard * 500), perc(c, t + dt, 0.95 * v, 0.006, 0.18), out);
+    // phone speakers barely play below ~150 Hz, so add an overtone and a soft thump they can reproduce
+    const h = osc(c, 'triangle', f * 2.2, t + dt, 0.12);
+    sweep(h.frequency, t + dt, f * 2.2, f * 1.2, 0.1);
+    chain(h, filt(c, 'lowpass', 700), perc(c, t + dt, 0.3 * v, 0.004, 0.1), out);
+    chain(noise(c, t + dt, 0.03), filt(c, 'lowpass', 900), perc(c, t + dt, 0.12 * v, 0.002, 0.03), out);
+    if (hard > 0.3) chain(noise(c, t + dt, 0.04), filt(c, 'lowpass', 600), perc(c, t + dt, 0.2 * hard * v, 0.003, 0.05), out);
+  });
+  return 0.4;
+};
+
+SFX.flatline = (b, t, o = {}) => {          // Host failure: last slowing beats, then a flat tone
+  const c = b.ctx, out = voice(b, t, o, 0.3);
+  const beats = [0, 0.75, 1.75];
+  beats.forEach((dt, i) => {
+    SFX.heartbeat(b, t + dt, { v: 1 - i * 0.25 });
+    const s = osc(c, 'sine', 960, t + dt, 0.14);
+    chain(s, adsr(c, t + dt, 0.13, 0.005, 0.08, 0.04), out);
+  });
+  const t2 = t + 3.1, flat = osc(c, 'sine', 960, t2, 3.2);
+  const g = c.createGain(); g.gain.setValueAtTime(0.0001, t2); g.gain.linearRampToValueAtTime(0.14, t2 + 0.02);
+  g.gain.setValueAtTime(0.14, t2 + 2.4); g.gain.linearRampToValueAtTime(0.0001, t2 + 3.1);
+  chain(flat, g, out);
+  const drone = osc(c, 'triangle', 110, t2, 3.2), dg = adsr(c, t2, 0.22, 0.8, 1.2, 1.2);
+  sweep(drone.frequency, t2, 110, 82, 3);
+  chain(drone, filt(c, 'lowpass', 500), dg, out);
+  return 6.4;
+};
+SFX.shutdown = (b, t, o = {}) => {          // Host failure: everything powers down
+  const c = b.ctx, out = voice(b, t, o, 0.35), D = 2.6;
+  const lp = filt(c, 'lowpass', 3000, 2);
+  sweep(lp.frequency, t, 3000, 80, D);
+  const g = adsr(c, t, 0.22, 0.02, D - 0.6, 0.6);
+  [45, 52, 57, 64].forEach(m => {           // A minor chord falling like a dying motor
+    const s = osc(c, 'sawtooth', mtof(m), t, D);
+    s.frequency.setValueAtTime(mtof(m), t);
+    s.frequency.setTargetAtTime(mtof(m) * 0.12, t + 0.15, 0.7);
+    s.connect(lp);
+  });
+  chain(lp, g, out);
+  const th = osc(c, 'sine', 60, t + D - 0.4, 1.2);
+  sweep(th.frequency, t + D - 0.4, 60, 30, 1);
+  chain(th, perc(c, t + D - 0.4, 0.8, 0.005, 1.1), out);
+  return D + 1.2;
+};
+
+function drum(b, t, v, out) {               // taiko-ish hit
+  const c = b.ctx, s = osc(c, 'sine', 120, t, 0.6);
+  sweep(s.frequency, t, 120, 48, 0.4);
+  chain(s, perc(c, t, v, 0.004, 0.6), out);
+  chain(noise(c, t, 0.08), filt(c, 'lowpass', 1200), perc(c, t, v * 0.4, 0.002, 0.08), out);
+}
+SFX.waveDrums = (b, t, o = {}) => {         // wave start: two drum hits and a swelling horn
+  const c = b.ctx, out = voice(b, t, o, 0.35);
+  drum(b, t, 0.9, out); drum(b, t + 0.22, 0.7, out);
+  const lp = filt(c, 'lowpass', 300, 3);
+  lp.frequency.setValueAtTime(300, t + 0.3); lp.frequency.exponentialRampToValueAtTime(2400, t + 0.9);
+  [50, 57, 62].forEach((m, i) => [0, 0.08].forEach(det => {
+    osc(c, 'sawtooth', mtof(m) * (1 + det * 0.01 * (i + 1)), t + 0.3, 1.3).connect(lp);
+  }));
+  chain(lp, adsr(c, t + 0.3, 0.12, 0.45, 0.4, 0.5), out);
+  return 1.8;
+};
+SFX.waveStabs = (b, t, o = {}) => {         // wave start: three rising alarm stabs
+  const c = b.ctx, out = voice(b, t, o, 0.25);
+  [[0, 57], [0.18, 60], [0.36, 64]].forEach(([dt, m], i) => {
+    const lp = filt(c, 'lowpass', 2600, 2);
+    [m, m + 7, m + 12].forEach(n => [-6, 6].forEach(cents => {
+      const s = osc(c, 'sawtooth', mtof(n), t + dt, 0.3); s.detune.value = cents; s.connect(lp);
+    }));
+    chain(lp, perc(c, t + dt, i === 2 ? 0.14 : 0.1, 0.004, i === 2 ? 0.7 : 0.16), out);
+    drum(b, t + dt, 0.35 + i * 0.15, out);
+  });
+  return 1.2;
+};
+SFX.victoryArp = (b, t, o = {}) => {        // victory: bright arpeggio into a held chord
+  const c = b.ctx, out = voice(b, t, o, 0.35);
+  [60, 64, 67, 72, 76].forEach((m, i) => {
+    const s = osc(c, 'square', mtof(m), t + i * 0.09, 0.25);
+    chain(s, filt(c, 'lowpass', 3000), perc(c, t + i * 0.09, 0.09, 0.004, 0.24), out);
+  });
+  const t2 = t + 0.5, lp = filt(c, 'lowpass', 2600);
+  [60, 64, 67, 71, 74].forEach(m => [-7, 7].forEach(cents => {
+    const s = osc(c, 'sawtooth', mtof(m), t2, 2.1); s.detune.value = cents; s.connect(lp);
+  }));
+  chain(lp, adsr(c, t2, 0.06, 0.05, 0.9, 1.1), out);
+  drum(b, t2, 0.6, out);
+  return 2.8;
+};
+SFX.victoryBells = (b, t, o = {}) => {      // victory: soft glassy bells
+  const c = b.ctx, out = voice(b, t, o, 0.5);
+  [[0, 72], [0.14, 76], [0.28, 79], [0.42, 83], [0.62, 84]].forEach(([dt, m], i) => {
+    const f = mtof(m), car = osc(c, 'sine', f, t + dt, 2), mod = osc(c, 'sine', f * 3.5, t + dt, 2), idx = c.createGain();
+    idx.gain.setValueAtTime(f * 2, t + dt); idx.gain.exponentialRampToValueAtTime(1, t + dt + 1.2);
+    chain(mod, idx, car.frequency);
+    chain(car, perc(c, t + dt, i === 4 ? 0.22 : 0.15, 0.002, i === 4 ? 2 : 1.2), out);
+  });
+  return 2.8;
+};
+SFX.tapClick = (b, t, o = {}) => {          // UI: soft click
+  const c = b.ctx, out = voice(b, t, o, 0);
+  chain(noise(c, t, 0.012), filt(c, 'bandpass', 2600, 2), perc(c, t, 0.6, 0.001, 0.012), out);
+  const s = osc(c, 'sine', 1200, t, 0.03);
+  chain(s, perc(c, t, 0.15, 0.001, 0.03), out);
+  return 0.05;
+};
+SFX.tapBlip = (b, t, o = {}) => {           // UI: cell-like blip
+  const c = b.ctx, out = voice(b, t, o, 0.05), p = o.p || 1;
+  const s = osc(c, 'sine', 660 * p, t, 0.07);
+  sweep(s.frequency, t, 660 * p, 990 * p, 0.04);
+  chain(s, perc(c, t, 0.18, 0.003, 0.07), out);
+  return 0.09;
+};
+SFX.pauseOpen = (b, t, o = {}) => {         // organ window opens, game pauses: muffled whoosh down
+  const c = b.ctx, out = voice(b, t, o, 0.2);
+  const lp = filt(c, 'lowpass', 4000, 1);
+  sweep(lp.frequency, t, 4000, 300, 0.3);
+  chain(noise(c, t, 0.32), lp, perc(c, t, 0.35, 0.02, 0.32), out);
+  const s = osc(c, 'sine', 520, t, 0.25);
+  sweep(s.frequency, t, 520, 260, 0.2);
+  chain(s, perc(c, t, 0.12, 0.005, 0.22), out);
+  return 0.4;
+};
+SFX.pauseClose = (b, t, o = {}) => {        // window closes, game resumes: whoosh up
+  const c = b.ctx, out = voice(b, t, o, 0.2);
+  const lp = filt(c, 'lowpass', 300, 1);
+  sweep(lp.frequency, t, 300, 5000, 0.25);
+  chain(noise(c, t, 0.28), lp, perc(c, t, 0.32, 0.12, 0.28), out);
+  const s = osc(c, 'sine', 260, t, 0.25);
+  sweep(s.frequency, t, 260, 560, 0.2);
+  chain(s, perc(c, t + 0.05, 0.12, 0.01, 0.2), out);
+  return 0.4;
+};
+
+// ---------- music ----------
+// Instruments: play(bus.music-side out, t, midi, dur, vel)
+const INST = {
+  kick(c, out, t, v = 1) {
+    const s = osc(c, 'sine', 150, t, 0.4);
+    sweep(s.frequency, t, 150, 44, 0.12);
+    chain(s, perc(c, t, 0.9 * v, 0.003, 0.38), out);
+    chain(noise(c, t, 0.012), filt(c, 'bandpass', 3000, 0.8), perc(c, t, 0.18 * v, 0.001, 0.012), out);
+  },
+  heartKick(c, out, t, v = 1) {             // softer, rounder kick for the heartbeat pattern
+    const s = osc(c, 'sine', 100, t, 0.3);
+    sweep(s.frequency, t, 100, 45, 0.14);
+    chain(s, filt(c, 'lowpass', 300), perc(c, t, 1.0 * v, 0.005, 0.28), out);
+    const h = osc(c, 'triangle', 220, t, 0.12);
+    sweep(h.frequency, t, 220, 110, 0.1);
+    chain(h, filt(c, 'lowpass', 700), perc(c, t, 0.25 * v, 0.004, 0.1), out);
+  },
+  snare(c, out, t, v = 1) {
+    chain(noise(c, t, 0.18), filt(c, 'bandpass', 1900, 0.9), perc(c, t, 0.5 * v, 0.002, 0.17), out);
+    const s = osc(c, 'triangle', 200, t, 0.1);
+    sweep(s.frequency, t, 200, 120, 0.08);
+    chain(s, perc(c, t, 0.35 * v, 0.002, 0.1), out);
+  },
+  clap(c, out, t, v = 1) {
+    const bp = filt(c, 'bandpass', 1300, 1.5); bp.connect(out);
+    [0, 0.012, 0.024].forEach((dt, i) => chain(noise(c, t + dt, 0.12), perc(c, t + dt, 0.45 * v, 0.001, i === 2 ? 0.14 : 0.012), bp));
+  },
+  hat(c, out, t, v = 1, open) {
+    chain(noise(c, t, open ? 0.22 : 0.05), filt(c, 'highpass', 7500), perc(c, t, 0.22 * v, 0.001, open ? 0.2 : 0.045), out);
+  },
+  shaker(c, out, t, v = 1) {
+    chain(noise(c, t, 0.06), filt(c, 'bandpass', 5500, 1.2), perc(c, t, 0.12 * v, 0.015, 0.06), out);
+  },
+  bass(c, out, t, m, d, v = 1) {
+    const f = mtof(m), lp = filt(c, 'lowpass', 220, 6);
+    lp.frequency.setValueAtTime(220 + 1300 * v, t); lp.frequency.exponentialRampToValueAtTime(200, t + Math.min(d, 0.25));
+    osc(c, 'sawtooth', f, t, d).connect(lp);
+    const sub = osc(c, 'sine', f / 2, t, d), sg = c.createGain(); sg.gain.value = 0.7; chain(sub, sg, lp);
+    chain(lp, adsr(c, t, 0.32 * v, 0.004, Math.max(d - 0.06, 0.01), 0.05), out);
+  },
+  fuzzBass(c, out, t, m, d, v = 1) {
+    const f = mtof(m), lp = filt(c, 'lowpass', 900, 3);
+    lp.frequency.setValueAtTime(1600, t); lp.frequency.exponentialRampToValueAtTime(350, t + d);
+    const s = osc(c, 'sawtooth', f, t, d), s2 = osc(c, 'square', f * 1.005, t, d), mix = c.createGain(); mix.gain.value = 0.5;
+    s.connect(mix); s2.connect(mix);
+    chain(mix, shaper(c, 3.5), lp, adsr(c, t, 0.2 * v, 0.003, Math.max(d - 0.05, 0.01), 0.04), out);
+  },
+  pluck(c, out, t, m, d, v = 1, type = 'square') {
+    const lp = filt(c, 'lowpass', 400, 4);
+    lp.frequency.setValueAtTime(4200, t); lp.frequency.exponentialRampToValueAtTime(500, t + 0.18);
+    osc(c, type, mtof(m), t, d + 0.2).connect(lp);
+    chain(lp, perc(c, t, 0.13 * v, 0.003, Math.max(d, 0.2)), out);
+  },
+  bell(c, out, t, m, d, v = 1) {
+    const f = mtof(m), car = osc(c, 'sine', f, t, d + 1.5), mod = osc(c, 'sine', f * 2, t, d + 1.5), idx = c.createGain();
+    idx.gain.setValueAtTime(f * 1.4, t); idx.gain.exponentialRampToValueAtTime(1, t + 1);
+    chain(mod, idx, car.frequency);
+    chain(car, perc(c, t, 0.12 * v, 0.003, d + 1.4), out);
+  },
+  pad(c, out, t, notes, d, v = 1, bright = 900) {
+    const lp = filt(c, 'lowpass', bright, 0.5);
+    notes.forEach(m => [-9, 9].forEach(cents => { const s = osc(c, 'sawtooth', mtof(m), t, d + 1.2); s.detune.value = cents; s.connect(lp); }));
+    chain(lp, adsr(c, t, 0.045 * v, Math.min(0.8, d * 0.4), Math.max(d - 0.8, 0.1), 1.0), out);
+  },
+  stab(c, out, t, notes, d, v = 1) {
+    const lp = filt(c, 'lowpass', 2200, 2);
+    lp.frequency.setValueAtTime(3000, t); lp.frequency.exponentialRampToValueAtTime(700, t + d);
+    notes.forEach(m => [-6, 6].forEach(cents => { const s = osc(c, 'sawtooth', mtof(m), t, d); s.detune.value = cents; s.connect(lp); }));
+    chain(lp, perc(c, t, 0.07 * v, 0.003, d), out);
+  },
+  chip(c, out, t, m, d, v = 1) {
+    const s = osc(c, 'square', mtof(m), t, d), vib = osc(c, 'sine', 6, t, d), vd = c.createGain();
+    vd.gain.setValueAtTime(0, t); vd.gain.linearRampToValueAtTime(mtof(m) * 0.012, t + Math.min(d, 0.3));
+    chain(vib, vd, s.frequency);
+    chain(s, filt(c, 'lowpass', 5000), adsr(c, t, 0.075 * v, 0.004, Math.max(d * 0.8 - 0.004, 0.01), 0.04), out);
+  },
+  triBass(c, out, t, m, d, v = 1) {
+    chain(osc(c, 'triangle', mtof(m), t, d), adsr(c, t, 0.4 * v, 0.003, Math.max(d * 0.85, 0.01), 0.03), out);
+  },
+  chipNoise(c, out, t, v = 1, long) {
+    chain(noise(c, t, long ? 0.15 : 0.04), filt(c, 'highpass', long ? 1500 : 5000), perc(c, t, (long ? 0.3 : 0.12) * v, 0.001, long ? 0.14 : 0.035), out);
+  },
+  bubble(c, out, t, v = 1) {
+    const f = 300 + R() * 900, s = osc(c, 'sine', f, t, 0.12);
+    sweep(s.frequency, t, f, f * 2.2, 0.06);
+    chain(s, perc(c, t, 0.05 * v, 0.004, 0.1), panner(c, R() * 1.6 - 0.8), out);
+  },
+  siren(c, out, t, m, d, v = 1) {
+    const s = osc(c, 'sawtooth', mtof(m), t, d), lfo = osc(c, 'sine', 5.5, t, d), ld = c.createGain();
+    ld.gain.value = mtof(m) * 0.02; chain(lfo, ld, s.frequency);
+    s.frequency.setValueAtTime(mtof(m - 1), t); s.frequency.linearRampToValueAtTime(mtof(m), t + 0.08);
+    chain(s, filt(c, 'lowpass', 1800, 2), adsr(c, t, 0.05 * v, 0.03, Math.max(d - 0.1, 0.01), 0.15), out);
+  }
+};
+
+// Pattern helpers: 'x' hit, '.' rest, 16 steps per bar.
+const hits = (pat, step) => pat[step % pat.length] !== '.';
+// Note lists as [step, midi, lengthInSteps] per bar.
+
+const TRACKS = {};
+
+// Calm: between waves, menus, the Clinic. A minor 9 colors, bubbles, bells.
+TRACKS.petri = {
+  name: 'Petri Dish', bpm: 84, bars: 8,
+  chords: [[57, 60, 64, 67, 71], [53, 57, 60, 64], [48, 55, 60, 64], [55, 59, 62, 69]],
+  bells: [[0, 76, 4], [4, 79, 4], [8, 83, 4], [12, 79, 4], [0, 77, 6], [6, 76, 2], [8, 72, 8], [0, 76, 4], [4, 79, 4], [8, 84, 6], [14, 83, 2], [0, 81, 8], [8, 79, 4], [12, 74, 4]],
+  step(c, out, t, s, sd) {
+    const bar = Math.floor(s / 16) % 8, st = s % 16, ch = this.chords[Math.floor(bar / 2)];
+    if (st === 0 && bar % 2 === 0) INST.pad(c, out, t, ch, sd * 32, 1.2, 1100);
+    if (st === 0) INST.bass(c, out, t, ch[0] - 12, sd * 10, 0.45);
+    if (st === 10 && bar % 2 === 1) INST.bass(c, out, t, ch[0] - 12, sd * 5, 0.35);
+    if (st === 0 || st === 10) INST.heartKick(c, out, t, 0.45);
+    if (st % 4 === 2) INST.shaker(c, out, t, 0.6);
+    // bell melody: a slow phrase over each pair of bars
+    const half = Math.floor(bar / 2), phrase = [this.bells.slice(0, 4), this.bells.slice(4, 7), this.bells.slice(7, 11), this.bells.slice(11)][half];
+    if (bar % 2 === 0) phrase.forEach(([at, m, len]) => { if (at === st) INST.bell(c, out, t, m, sd * len, 0.9); });
+    if (R() < 0.12) INST.bubble(c, out, t + R() * sd, 1);
+  }
+};
+
+// Main fight. D minor, four on the floor. layers 0..3 follow "intensity":
+// 0 calm (pad, bubbles), 1 fight (+drums, bass), 2 hot (+arp, claps), 3 fever (+fuzz, siren lead),
+// 4 crisis (+extra kicks, octave fuzz, doubled lead, alarm blips, a snare roll and riser into the loop).
+TRACKS.blood = {
+  name: 'Bloodstream', bpm: 124, bars: 8, adaptive: true,
+  chords: [[50, 53, 57], [46, 50, 53], [53, 57, 60], [48, 52, 55]],
+  bassPat: [0, 0, 12, 0, 0, 12, 0, 7, 0, 0, 12, 0, 0, 12, 10, 7],
+  arp: [0, 7, 12, 15, 12, 7, 3, 7],
+  lead: [[0, 74, 6], [6, 72, 2], [8, 69, 4], [12, 65, 4], [0, 70, 8], [8, 69, 4], [12, 65, 4], [0, 72, 6], [6, 74, 2], [8, 77, 8], [0, 76, 4], [4, 72, 4], [8, 67, 8]],
+  step(c, out, t, s, sd, lvl = 1) {
+    const bar = Math.floor(s / 16) % 8, st = s % 16, ch = this.chords[Math.floor(bar / 2)], root = ch[0];
+    if (st === 0 && bar % 2 === 0) INST.pad(c, out, t, ch.map(n => n + 12), sd * 32, lvl >= 3 ? 0.6 : 1, lvl >= 4 ? 2600 : lvl >= 1 ? 1400 : 800);
+    if (lvl === 0) { if (R() < 0.1) INST.bubble(c, out, t, 1); if (st === 0) INST.heartKick(c, out, t, 0.4); return; }
+    if (st % 4 === 0) INST.kick(c, out, t, 1);
+    if (st === 4 || st === 12) INST.snare(c, out, t, 0.8);
+    if (st % 4 === 2) INST.hat(c, out, t, 1, st === 14);
+    else if (lvl >= 2) INST.hat(c, out, t, 0.45);
+    const bassFn = lvl >= 3 ? INST.fuzzBass : INST.bass;
+    if (st % 2 === 0 || lvl >= 2) bassFn(c, out, t, root - 12 + this.bassPat[st], sd * 0.9, st % 4 === 0 ? 1 : 0.75);
+    if (lvl >= 2) {
+      if (st === 12 && bar % 2 === 1) INST.clap(c, out, t, 0.7);
+      if (st % 2 === 0) INST.pluck(c, out, t, root + 12 + this.arp[(st / 2) % 8], sd * 1.6, 0.9, 'sawtooth');
+    }
+    if (lvl >= 3) {
+      const ph = [this.lead.slice(0, 4), this.lead.slice(4, 7), this.lead.slice(7, 10), this.lead.slice(10)][Math.floor(bar / 2)];
+      if (bar % 2 === 0) ph.forEach(([at, m, len]) => { if (at === st) INST.siren(c, out, t, m, sd * len, 1); });
+      if (st === 6 || st === 14) INST.stab(c, out, t, ch.map(n => n + 12), sd * 1.5, 0.8);
+    }
+    if (lvl >= 4) {
+      if (st === 10 || st === 14) INST.kick(c, out, t, 0.75);
+      if (st % 4 === 0) INST.fuzzBass(c, out, t, root + this.bassPat[st], sd * 0.8, 0.6);
+      const ph = [this.lead.slice(0, 4), this.lead.slice(4, 7), this.lead.slice(7, 10), this.lead.slice(10)][Math.floor(bar / 2)];
+      if (bar % 2 === 0) ph.forEach(([at, m, len]) => { if (at === st) INST.siren(c, out, t, m + 12, sd * len, 0.45); });
+      if (st % 8 === 0 && bar < 7) INST.pluck(c, out, t, 81, sd * 0.6, 0.8, 'square');   // alarm blip on the A
+      if (bar === 7 && st >= 8) INST.snare(c, out, t, 0.35 + (st - 8) * 0.07);           // roll back into the loop
+      if (bar === 7 && st === 0) {                                                        // one-bar noise riser
+        const n = noise(c, t, sd * 16), hp = filt(c, 'bandpass', 400, 1.2), g = c.createGain();
+        sweep(hp.frequency, t, 400, 6000, sd * 16);
+        g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(0.25, t + sd * 15.5); g.gain.linearRampToValueAtTime(0.0001, t + sd * 16);
+        chain(n, hp, g, out);
+      }
+    }
+  }
+};
+
+// Late waves, high fatigue. E phrygian, heartbeat kick, fuzz bass, stabs.
+TRACKS.fever = {
+  name: 'Fever', bpm: 140, bars: 4,
+  roots: [40, 41, 40, 43],
+  step(c, out, t, s, sd) {
+    const bar = Math.floor(s / 16) % 4, st = s % 16, r = this.roots[bar];
+    if (st === 0 || st === 8) INST.heartKick(c, out, t, 1);
+    if (st === 8 && bar % 2 === 1) INST.snare(c, out, t, 0.9);
+    if ('x..x..x...x.x...'[st] === 'x') INST.fuzzBass(c, out, t, r, sd * 2, 1);
+    if (st === 0) INST.pad(c, out, t, [r + 24, r + 25, r + 31], sd * 16, 0.6, 1600);
+    if (st === 14 && bar === 3) INST.stab(c, out, t, [r + 24, r + 27, r + 31], sd * 2, 1);
+    if ((st === 6 || st === 14) && bar < 3) INST.stab(c, out, t, [r + 24, r + 25, r + 31], sd * 1, 0.7);
+    if (st % 2 === 0) INST.pluck(c, out, t, r + 36 + [0, 1, 7, 1, 12, 7, 1, 0][(st / 2) % 8], sd, 0.55, 'square');
+  }
+};
+
+// Playful, Plants vs Zombies style: chiptune square lead, triangle bass, noise drums. C major.
+TRACKS.parade = {
+  name: 'Germ Parade', bpm: 132, bars: 8,
+  chords: [48, 53, 55, 48, 45, 50, 55, 48],
+  third: [4, 4, 4, 4, 3, 3, 4, 4],
+  melody: [
+    [[0, 72, 2], [2, 76, 2], [4, 79, 3], [8, 77, 2], [10, 76, 2], [12, 74, 4]],
+    [[0, 72, 2], [3, 69, 1], [4, 72, 4], [10, 74, 2], [12, 77, 4]],
+    [[0, 79, 2], [2, 79, 2], [4, 81, 2], [6, 79, 2], [8, 77, 2], [10, 74, 2], [12, 71, 4]],
+    [[0, 72, 6], [8, 67, 2], [10, 69, 2], [12, 71, 2], [14, 72, 2]],
+    [[0, 76, 2], [2, 72, 2], [4, 69, 3], [8, 72, 2], [10, 76, 2], [12, 81, 4]],
+    [[0, 77, 2], [3, 74, 1], [4, 77, 4], [10, 81, 2], [12, 79, 4]],
+    [[0, 79, 1], [1, 81, 1], [2, 79, 2], [4, 77, 2], [6, 76, 2], [8, 74, 2], [10, 71, 2], [12, 67, 4]],
+    [[0, 72, 4], [4, 76, 2], [6, 79, 2], [8, 84, 4], [14, 72, 2]]
+  ],
+  step(c, out, t, s, sd) {
+    const bar = Math.floor(s / 16) % 8, st = s % 16, r = this.chords[bar];
+    if (st % 8 === 0) INST.triBass(c, out, t, r - 12, sd * 2, 1);
+    if (st % 8 === 4) INST.triBass(c, out, t, r - 5, sd * 2, 0.85);
+    if (st % 8 === 0) INST.chipNoise(c, out, t, 1, false), INST.kick(c, out, t, 0.6);
+    if (st % 8 === 4) INST.chipNoise(c, out, t, 1, true);
+    if (st % 2 === 1) INST.chipNoise(c, out, t, 0.5, false);
+    if (st % 4 === 2) INST.pluck(c, out, t, r + 12 + this.third[bar], sd, 0.6, 'square'), INST.pluck(c, out, t, r + 19, sd, 0.5, 'square');
+    this.melody[bar].forEach(([at, m, len]) => { if (at === st) INST.chip(c, out, t, m, sd * len, 1); });
+  }
+};
+
+// Live player with lookahead scheduling. One track at a time.
+function Player(bus) {
+  this.bus = bus; this.track = null; this.timer = null; this.level = 1;
+}
+Player.prototype.play = function (key) {
+  this.stop();
+  const c = this.bus.ctx, tr = TRACKS[key], out = c.createGain();
+  out.gain.value = 1; out.connect(this.bus.music);
+  const sd = 60 / tr.bpm / 4;
+  let next = c.currentTime + 0.08, s = 0, abs = 0;
+  this.track = key; this.out = out; this.cur = this.level; this.queued = null; this.sd = sd;
+  this.where = () => ({ next, s, abs, sd });
+  const tick = () => {
+    while (next < c.currentTime + 0.2) {
+      // a swell's level change is queued for an exact bar; it lands there together with its crash
+      if (this.queued && abs >= this.queued.at) { this.level = this.queued.level; this.queued = null; }
+      // with quantize on (the game), intensity changes land on the next bar so the music never jumps mid-beat
+      if (!this.quantize || s % 16 === 0) this.cur = this.level;
+      tr.step(c, out, next, s, sd, this.cur);
+      next += sd; s = (s + 1) % (tr.bars * 16); abs++;
+    }
+  };
+  tick();
+  this.timer = setInterval(tick, 25);
+};
+// Wave swell: a riser into the next bar line (or the one after, if the next is too close), a crash and a
+// low hit on the downbeat, and the music steps up to `level` exactly there. Returns seconds until the downbeat.
+Player.prototype.swell = function (level, big) {
+  if (!this.where || !this.out) return 0;
+  const c = this.bus.ctx, w = this.where(), sd = w.sd;
+  let steps = (16 - w.s % 16) % 16, t = w.next + steps * sd;
+  if (t - c.currentTime < 0.9) { steps += 16; t += 16 * sd; }
+  this.queued = { level, at: w.abs + steps };
+  const out = this.out, rs = Math.min(t - c.currentTime - 0.05, big ? 3.8 : 1.9), t0 = t - rs;
+  const n = noise(c, t0, rs), bp = filt(c, 'bandpass', 300, 1.4), g = c.createGain();     // riser
+  sweep(bp.frequency, t0, 300, big ? 7000 : 5000, rs);
+  g.gain.setValueAtTime(0.0001, t0); g.gain.exponentialRampToValueAtTime(big ? 0.32 : 0.22, t - 0.02); g.gain.linearRampToValueAtTime(0.0001, t);
+  chain(n, bp, g, out);
+  if (big) {                                                                              // final wave: a rising tone too
+    const o = osc(c, 'sawtooth', mtof(50), t0, rs), og = c.createGain();
+    o.frequency.setValueAtTime(mtof(50), t0); o.frequency.exponentialRampToValueAtTime(mtof(62), t);
+    og.gain.setValueAtTime(0.0001, t0); og.gain.exponentialRampToValueAtTime(0.05, t - 0.02); og.gain.linearRampToValueAtTime(0.0001, t);
+    chain(o, filt(c, 'lowpass', 1800), og, out);
+  }
+  chain(noise(c, t, 1.6), filt(c, 'highpass', 5000), perc(c, t, big ? 0.28 : 0.2, 0.002, 1.5), out);  // crash
+  INST.kick(c, out, t, 1); INST.heartKick(c, out, t, 0.8);                                // downbeat hit
+  return t - c.currentTime;
+};
+Player.prototype.stop = function () {
+  if (this.timer) clearInterval(this.timer);
+  if (this.out) {
+    const c = this.bus.ctx, g = this.out.gain, o = this.out;
+    g.setValueAtTime(g.value, c.currentTime); g.linearRampToValueAtTime(0.0001, c.currentTime + 0.25);
+    setTimeout(() => o.disconnect(), 400);
+  }
+  this.timer = null; this.track = null; this.out = null;
+};
+
+// Gate: keeps a busy fight from stacking every sound (Alex, 2026-10-08).
+// 1. Cooldown per moment: after a shot plays, further shots inside 100 ms are skipped.
+// 2. Bunching: skipped hits aren't lost; the next one that plays is a touch louder (up to +40%),
+//    so a hail of shots sounds denser without piling up voices.
+// 3. Budget: at most 6 fight sounds in any 250 ms, so everything together stays readable.
+// Moments outside the fight set (storm, organ hit, wave, victory...) only use their cooldown.
+const GATE = {
+  cooldown: { shot: 100, kill: 70, swallow: 120, nk: 100, divide: 150, burst: 250, net: 200, tap: 40, organHit: 400 },
+  fight: { shot: 1, kill: 1, swallow: 1, nk: 1, divide: 1, burst: 1, net: 1 },
+  budget: 6, window: 250
+};
+function Gate(conf) { this.c = conf || GATE; this.last = {}; this.skipped = {}; this.recent = []; this.stats = { asked: 0, played: 0 }; }
+// Returns a volume multiplier (>= 1) if the sound may play now, or 0 if it should be skipped.
+Gate.prototype.ask = function (moment, nowMs) {
+  const c = this.c; this.stats.asked++;
+  if (nowMs - (this.last[moment] || -1e9) < (c.cooldown[moment] || 0)) { this.skipped[moment] = (this.skipped[moment] || 0) + 1; return 0; }
+  if (c.fight[moment]) {
+    this.recent = this.recent.filter(x => nowMs - x < c.window);
+    if (this.recent.length >= c.budget) { this.skipped[moment] = (this.skipped[moment] || 0) + 1; return 0; }
+    this.recent.push(nowMs);
+  }
+  const n = this.skipped[moment] || 0;
+  this.skipped[moment] = 0; this.last[moment] = nowMs; this.stats.played++;
+  return 1 + Math.min(0.4, 0.12 * Math.log2(1 + n));
+};
+
+// Offline: schedule one full loop of a track (for render.js).
+function scheduleLoop(bus, key, t0, level, loops = 1) {
+  const tr = TRACKS[key], sd = 60 / tr.bpm / 4, n = tr.bars * 16 * loops;
+  for (let s = 0; s < n; s++) tr.step(bus.ctx, bus.music, t0 + s * sd, s % (tr.bars * 16), sd, level == null ? 1 : level);
+  return n * sd;
+}
+const loopLength = key => TRACKS[key].bars * 16 * 60 / TRACKS[key].bpm / 4;
+
+G.CytoSound = {
+  makeBus, SFX, TRACKS, HEART, Player, scheduleLoop, loopLength, Gate, GATE,
+  seed(n) { R = n == null ? Math.random : rng(n); }
+};
+})(typeof window !== 'undefined' ? window : globalThis);
+
+</script>
+<script>
+const C = CytoSound;
+const LIST = [
+  { id: 'blood', name: 'Bloodstream', sub: 'The fight', note: 'Plays during every wave and follows the danger: Calm, Fight, Hot, Fever, Crisis.', main: true },
+  { id: 'petri', name: 'Petri Dish', sub: 'Between waves', note: 'Slow and glassy. For menus and the quiet before a wave.' },
+  { id: 'parade', name: 'Germ Parade', sub: 'Side B', note: 'Playful 8-bit, closer to Plants vs Zombies.' },
+  { id: 'fever', name: 'Fever', sub: 'Side B', note: 'Tense and dark, for the late waves.' }
+];
+const LEVELS = ['Calm', 'Fight', 'Hot', 'Fever', 'Crisis'];
+// Auto: one fight told in 4-bar steps, then back to calm, then around again.
+const JOURNEY = [0, 1, 1, 2, 2, 3, 4, 4, 3, 2, 1, 0];
+
+let ctx = null, bus = null, player = null, an = null, vol = 0.8;
+let cur = 0, playing = false, startAt = 0, loopOn = true, auto = true, held = 1, barsDone = 0, lastBar = -1;
+const $ = id => document.getElementById(id);
+const fmt = s => Math.floor(s / 60) + ':' + String(Math.floor(s % 60)).padStart(2, '0');
+
+function audio() {
+  if (!ctx) {
+    try { if (navigator.audioSession) navigator.audioSession.type = 'playback'; } catch (e) {}
+    const AC = window.AudioContext || window.webkitAudioContext;
+    ctx = new AC({ latencyHint: 'playback' });
+    an = ctx.createAnalyser(); an.fftSize = 1024; an.connect(ctx.destination);
+    bus = C.makeBus(ctx, an); bus.master.gain.value = vol;
+    player = new C.Player(bus); player.quantize = true;
+    const b = ctx.createBuffer(1, 1, 22050), s = ctx.createBufferSource(); s.buffer = b; s.connect(ctx.destination); s.start(0);
+  }
+  if (ctx.state !== 'running') ctx.resume();
+}
+
+function renderList() {
+  const ol = $('tracks'); ol.textContent = '';
+  LIST.forEach((t, i) => {
+    const li = document.createElement('li'), b = document.createElement('button');
+    b.type = 'button'; b.className = 'track' + (t.main ? ' main' : '');
+    b.setAttribute('aria-current', i === cur);
+    const no = document.createElement('span'); no.className = 'no'; no.textContent = String(i + 1).padStart(2, '0');
+    const nm = document.createElement('b'); nm.textContent = t.name;
+    const len = document.createElement('em'); len.textContent = fmt(C.loopLength(t.id)) + ' loop';
+    const nt = document.createElement('span'); nt.textContent = t.note;
+    b.append(no, nm, len, nt);
+    b.onclick = () => { select(i); start(); };
+    li.append(b); ol.append(li);
+  });
+}
+function renderSeg() {
+  const seg = $('seg'); seg.textContent = '';
+  const a = document.createElement('button'); a.type = 'button'; a.className = 'auto'; a.textContent = 'Auto';
+  a.setAttribute('aria-pressed', auto); a.onclick = () => { auto = true; renderSeg(); };
+  seg.append(a);
+  LEVELS.forEach((l, i) => {
+    const b = document.createElement('button'); b.type = 'button'; b.textContent = l; b.dataset.k = i;
+    b.setAttribute('aria-pressed', !auto && held === i);
+    b.onclick = () => { auto = false; held = i; if (player) player.level = i; renderSeg(); };
+    seg.append(b);
+  });
+}
+function select(i) {
+  cur = i; const t = LIST[i];
+  $('nowname').textContent = t.name; $('nowsub').textContent = (i + 1 + '').padStart(2, '0') + ' · ' + t.sub;
+  $('heat').hidden = t.id !== 'blood';
+  const n = C.TRACKS[t.id].bars; $('bars').style.setProperty('--n', n);
+  $('bars').textContent = ''; for (let k = 0; k < n; k++) $('bars').append(document.createElement('i'));
+  renderList();
+}
+function start() {
+  audio();
+  const t = LIST[cur];
+  barsDone = 0; lastBar = -1;
+  player.level = t.id === 'blood' ? (auto ? JOURNEY[0] : held) : 1;
+  player.play(t.id); startAt = ctx.currentTime;
+  playing = true; $('play').classList.add('on'); $('play').setAttribute('aria-label', 'Stop');
+}
+function stop() {
+  if (player) player.stop();
+  playing = false; $('play').classList.remove('on'); $('play').setAttribute('aria-label', 'Play');
+}
+
+// Per frame: time, bar lights, Auto intensity, end of track when Loop is off, and the scope.
+const cv = $('scope'), g = cv.getContext('2d');
+let wave = null;
+function frame() {
+  requestAnimationFrame(frame);
+  if (!playing || !ctx) { drawIdle(); return; }
+  const t = LIST[cur], tr = C.TRACKS[t.id], el = Math.max(0, ctx.currentTime - startAt - 0.08);
+  const barLen = 60 / tr.bpm * 4, bar = Math.floor(el / barLen);
+  $('time').textContent = fmt(el);
+  if (bar !== lastBar) {
+    lastBar = bar;
+    [...$('bars').children].forEach((x, k) => x.classList.toggle('on', k === bar % tr.bars));
+    if (t.id === 'blood' && auto) {
+      // Auto: a level rise is announced the way a new wave is in the game, with a riser into the bar and a crash
+      const nowL = JOURNEY[Math.floor(bar / 4) % JOURNEY.length], nextL = JOURNEY[Math.floor((bar + 1) / 4) % JOURNEY.length];
+      if (bar % 4 === 3 && nextL > nowL && !player.queued) player.swell(nextL, nextL === 4);
+      else if (!player.queued) player.level = nowL;
+    }
+    if (t.id === 'blood' && auto) $('heatnote').textContent = 'Auto: ' + LEVELS[player.level] + '. Pick a level to hold it.';
+    // Loop off: play each track twice through (Bloodstream: one whole fight), then the next one.
+    const len = t.id === 'blood' ? JOURNEY.length * 4 : tr.bars * 2;
+    if (!loopOn && bar >= len) { select((cur + 1) % LIST.length); start(); return; }
+  }
+  draw();
+}
+function draw() {
+  const w = cv.width, h = cv.height;
+  if (!wave || wave.length !== an.fftSize) wave = new Uint8Array(an.fftSize);
+  an.getByteTimeDomainData(wave);
+  g.fillStyle = 'rgba(4,5,10,0.35)'; g.fillRect(0, 0, w, h);
+  const lvl = LIST[cur].id === 'blood' ? player.level : 1;
+  const col = lvl >= 3 ? '255,64,87' : lvl === 2 ? '255,154,60' : '63,230,255';
+  g.lineWidth = 3; g.strokeStyle = 'rgba(' + col + ',0.9)'; g.shadowColor = 'rgba(' + col + ',0.8)'; g.shadowBlur = 14;
+  g.beginPath();
+  for (let i = 0; i < wave.length; i++) {
+    const x = i / (wave.length - 1) * w, y = h / 2 + (wave[i] - 128) / 128 * h * 0.9;
+    i ? g.lineTo(x, y) : g.moveTo(x, y);
+  }
+  g.stroke(); g.shadowBlur = 0;
+}
+function drawIdle() {
+  const w = cv.width, h = cv.height;
+  g.fillStyle = 'rgb(4,5,10)'; g.fillRect(0, 0, w, h);
+  g.strokeStyle = 'rgba(63,230,255,0.35)'; g.lineWidth = 2;
+  g.beginPath(); g.moveTo(0, h / 2); g.lineTo(w, h / 2); g.stroke();
+}
+
+$('play').onclick = () => playing ? stop() : start();
+$('loop').onclick = () => { loopOn = !loopOn; $('loop').setAttribute('aria-pressed', loopOn); };
+$('vol').addEventListener('input', e => { vol = +e.target.value; if (bus) bus.master.gain.setTargetAtTime(vol, ctx.currentTime, 0.02); });
+document.addEventListener('visibilitychange', () => { if (document.hidden && playing) stop(); });
+select(0); renderSeg(); requestAnimationFrame(frame);
+</script>

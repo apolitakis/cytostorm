@@ -1,0 +1,11 @@
+--- releases/v38/ui.js
++++ ui.js (perf proposal)
+@@ -272,7 +272,7 @@
+   function resize() {
+     const r = stage.getBoundingClientRect();
+     cssW = r.width; cssH = r.height;
+-    dpr = Math.min(3, window.devicePixelRatio || 1);
++    dpr = Math.min(2, window.devicePixelRatio || 1); // 2x, not 3x: a 3x phone fills 2.25x the pixels for a barely sharper map (perf, 2026-10-10)
+     cv.width = Math.round(cssW * dpr); cv.height = Math.round(cssH * dpr);
+     portrait = true; // always vertical: Wound at the top, Lymph node at the bottom (Alex, 2026-10-07)
+     VW = portrait ? WIDTH : L; VH = portrait ? L : WIDTH;

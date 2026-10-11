@@ -1,0 +1,12 @@
+level     setForget    setForget2   smart        gunner       casual       focus        
+papercut  0/2 s2 10%   0/2 s2 100%  2/2 0%       2/2 100%     1/2 s1 100%  1/2 s1 50%   
+hospital  0/2 s2 0%    0/2 s2 0%    2/2 0%       0/2 s2 100%  0/2 s2 100%  2/2 0%       
+pool      0/2 s2 0%    0/2 s2 0%    2/2 0%       0/2 s2 100%  0/2 s1 52%   2/2 0%       
+flu       0/2 s2 100%  0/2 s2 100%  2/2 46%      0/2 s2 100%  0/2 s2 100%  0/2 s2 100%  
+soil      0/2 s2 0%    0/2 s2 0%    2/2 0%       0/2 s2 100%  0/2 s2 100%  0/2 s2 100%  
+foot      0/2 s2 50%   0/2 s2 0%    2/2 0%       1/2 s1 73%   0/2 s2 100%  2/2 0%       
+lungs     0/2 s2 0%    0/2 s2 0%    2/2 0%       0/2 s2 100%  0/2 s1 100%  2/2 0%       
+throat    0/2 s2 0%    0/2 s2 0%    2/2 0%       0/2 s2 100%  0/2 s2 100%  2/2 0%       
+coldsore  0/2 s2 76%   0/2 s2 0%    0/2 s2 100%  0/2 s2 100%  0/2 s2 100%  0/2 s2 100%  
+gut       0/2 s2 4%    0/2 s2 100%  2/2 50%      0/2 s2 100%  0/2 s2 100%  1/2 s1 50%   
+(wins/seeds, s = host-failure losses, then mean peak lymph timer)  941 s

@@ -10,16 +10,22 @@
 // Depends on the global ART (prototype/assets/assets.js). Styles are injected once.
 // ---------------------------------------------------------------------------
 const CytoTutorial = (function () {
-  const BASICS = ['goal', 'divide', 'cards', 'shutoff', 'modes', 'output', 'organs', 'toxin', 'storm', 'stormRisk'];
+  const BASICS = ['goal', 'divide', 'cards', 'shutoff', 'modes', 'output', 'organs', 'toxin', 'storm', 'stormRisk', 'surge'];
   // Antigen kind (sim.js KINDS) -> its intro clip
   const BY_KIND = { mrsa: 'mrsa', pseudo: 'pseudo', flu: 'flu', spore: 'spore', clos: 'spore', yeast: 'yeast', tb: 'tb', toxic: 'toxic', strep: 'strep', virus: 'herpes', worm: 'worm' };
   // Sandbox-only systems (toxin load stays out of the main game); not part of BASICS
   const SYSTEMS = ['toxload'];
   const ANTIGENS = ['mrsa', 'pseudo', 'flu', 'spore', 'yeast', 'tb', 'strep', 'toxic', 'herpes', 'worm'];
-  // Clips to play before a level: the basics before the first level, then one per new antigen
-  function forLevel(levelKey, newKinds) {
+  // The seven campaign units (Play V39): unit key (sim.js SPECIAL) -> its intro clip, and the level that adds each one
+  const UNITS = ['bcell', 'eos', 'plt', 'dc', 'treg', 'ifn', 'mast'];
+  const BY_UNIT = { bcell: 'bcell', eos: 'eos', plt: 'plt', dc: 'dc', treg: 'treg', ifn: 'ifn', mast: 'mast' };
+  const LEVEL_UNIT = { hospital: 'bcell', pool: 'eos', soil: 'plt', foot: 'dc', throat: 'treg', coldsore: 'ifn', gut: 'mast' };
+  // Clips to play before a level: the basics before the first level; later, one per new antigen, then the new unit's clip.
+  // newUnits is optional: without it the level's own unit (LEVEL_UNIT) is used, so Play's existing call needs no change.
+  function forLevel(levelKey, newKinds, newUnits) {
     if (levelKey === 'papercut') return BASICS.slice();
-    return [...new Set((newKinds || []).map(k => BY_KIND[k]).filter(Boolean))];
+    const units = newUnits || (LEVEL_UNIT[levelKey] ? [LEVEL_UNIT[levelKey]] : []);
+    return [...new Set([...(newKinds || []).map(k => BY_KIND[k]), ...units.map(k => BY_UNIT[k])].filter(Boolean))];
   }
   let readyP = null;
   const ready = () => readyP || (readyP = ART.loadAll());
@@ -146,11 +152,15 @@ const CytoTutorial = (function () {
     return { show: n => show(Math.max(0, Math.min(ids.length - 1, n))), close, get index() { return i; } };
   }
   // Render one frame of a clip into any canvas (for thumbnails or a custom host)
+  // A small canvas (a guide thumbnail) is laid out at THUMB_W wide and scaled down, so the HUD keeps its normal
+  // layout instead of crowding its labels on top of each other (10-10: Dendritic couriers, Regulatory T cells)
+  const THUMB_W = 320;
   function drawFrame(canvas, id, t) {
     const r = canvas.getBoundingClientRect(), dpr = Math.min(3, window.devicePixelRatio || 1);
     canvas.width = Math.round(r.width * dpr); canvas.height = Math.round(r.height * dpr);
-    CYT.render(canvas.getContext('2d'), CYT_CLIPS[id], t, r.width, r.height, dpr, 0);
+    const lw = Math.max(r.width, THUMB_W), lh = r.height * lw / Math.max(1, r.width);
+    CYT.render(canvas.getContext('2d'), CYT_CLIPS[id], t, lw, lh, dpr * r.width / lw, 0);
   }
-  return { BASICS, ANTIGENS, SYSTEMS, BY_KIND, CLIPS: CYT_CLIPS, SPEED, forLevel, ready, play, drawFrame, clipTime, length: id => realDur(CYT_CLIPS[id]), engine: CYT };
+  return { BASICS, ANTIGENS, UNITS, SYSTEMS, BY_KIND, BY_UNIT, LEVEL_UNIT, CLIPS: CYT_CLIPS, SPEED, forLevel, ready, play, drawFrame, clipTime, length: id => realDur(CYT_CLIPS[id]), engine: CYT };
 })();
 if (typeof window !== 'undefined') window.CytoTutorial = CytoTutorial;

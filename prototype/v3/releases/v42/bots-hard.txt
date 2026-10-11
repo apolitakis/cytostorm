@@ -1,0 +1,12 @@
+level     smart        
+papercut  1/1 1%       
+hospital  0/1 s1 100%  
+pool      1/1 100%     
+flu       0/1 s1 100%  
+soil      1/1 0%       
+foot      0/1 s1 100%  
+lungs     1/1 51%      
+throat    1/1 1%       
+coldsore  0/1 s1 100%  
+gut       0/1 s1 100%  
+(wins/seeds, s = host-failure losses, then mean peak lymph timer)  124 s

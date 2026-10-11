@@ -56,6 +56,13 @@
   window.__cyto = { get game() { return game; } }; // for browser tests and the console
   let paused = false, speedIdx = 2, acc = 0, last = 0;
   let modal = null; // 'start' | 'end' | 'guide' | null
+  // Menus don't stop the fight (Alex, 2026-10-10): the organ window and the guide let the sim run on behind them.
+  // Pause, the start/end screens, tutorial clips and feedback still stop it.
+  const LIVE_MODALS = new Set(['body', 'guide']);
+  const halted = () => paused || (!!modal && !LIVE_MODALS.has(modal));
+  // Adrenaline surge (Alex, 2026-10-10): no combat effect, it slows the fight 10x for a few real seconds so you can change your cells. 3 per map.
+  const SURGE = { n: 3, real: 10, slow: 0.1 };
+  let surgeLeft = SURGE.n, surgeT = 0;
   let endShown = false, guideFrom = null, collapseT = 0, stormHitT = 0;
   const overlay = { range: false, portrait: false };
 
@@ -64,6 +71,14 @@
     net: { name: 'Net neutrophils', art: 'neutrophil-net', color: '#FFD23F', what: 'Run into the thickest crowd and burst into a pen that traps it.' },
     nk: { name: 'NK cells', art: 'nk-cell', color: '#B9A6FF', what: 'Hunt infected cells. Ignore plain bacteria.' },
     mac: { name: 'Macrophages', art: 'macrophage-offense', color: '#FF7A3D', what: 'Swallow on Offense, power up shots on Support.' },
+    // campaign units (Alex, 2026-10-10): one per level from Hospital visit on
+    bcell: { name: 'B cells', art: 'b-cell', color: '#F2C14E', what: "Tag germs: they clump, slow, and get swallowed fast." },
+    eos: { name: 'Eosinophils', art: 'eosinophil', color: '#FF9A4D', what: "Latch onto domes, Tapeworm or Candida and pop." },
+    plt: { name: 'Platelets', art: 'platelet', color: '#E8E4FF', what: "Form a clot wall at the sector's far edge." },
+    dc: { name: 'Dendritic couriers', art: 'dendritic-cell', color: '#FF6FB5', what: "Carry a germ sample: that kind takes +50% damage." },
+    treg: { name: 'Regulatory T cells', art: 'treg', color: '#7EE08A', what: "Slow fatigue, but slow your other cells a bit." },
+    ifn: { name: 'Interferon cells', art: 'interferon-cell', color: '#BFE9FF', what: "A haze that blocks Herpes and slows flu." },
+    mast: { name: 'Mast cells', art: 'mast-cell', color: '#5B8CFF', what: "Mucus slows the sector when big germs come close." },
   };
   const ANTIGEN = {
     staph: { art: 'bacterium', marker: 'wave' }, mrsa: { art: 'mrsa', marker: 'mrsa' }, pseudo: { art: 'pseudomonas', marker: 'pseudomonas' },
@@ -100,8 +115,16 @@
     if (portrait) y = mid; else x = mid;
     zoomC = [VW <= 2 * hw ? VW / 2 : Math.max(hw, Math.min(VW - hw, x)), VH <= 2 * hh ? VH / 2 : Math.max(hh, Math.min(VH - hh, y))];
     zoomT = 1; pcv.hidden = true; $('#zoomOut').hidden = false; $('#zoomOut b').textContent = ZONES[z];
+    cv.style.touchAction = 'none'; // zoomed in, a drag pans the view instead of scrolling the page
   }
-  function zoomOut() { zoomT = 0; pcv.hidden = false; $('#zoomOut').hidden = true; }
+  function zoomOut() { zoomT = 0; pcv.hidden = false; $('#zoomOut').hidden = true; cv.style.touchAction = ''; }
+  // drag to look around while zoomed in (Alex, 2026-10-10), clamped to the map edges
+  function zoomPan(dx, dy) {
+    const s = scale * ZOOM, hw = mapW / 2 / (s * SX), hh = VH * scale / (2 * s);
+    const x = zoomC[0] - dx / (s * SX), y = zoomC[1] - dy / s;
+    zoomC = [VW <= 2 * hw ? VW / 2 : Math.max(hw, Math.min(VW - hw, x)), VH <= 2 * hh ? VH / 2 : Math.max(hh, Math.min(VH - hh, y))];
+    const z = zoneOf(portrait ? zoomC[1] : zoomC[0]), b = $('#zoomOut b'); if (b.textContent !== ZONES[z]) b.textContent = ZONES[z];
+  }
   // the side columns line up with each sector of the unzoomed map (zoom is for watching: the controls stay put)
   function placeSides() {
     if (!game || !cssW) return;
@@ -116,7 +139,7 @@
     const zn = game.zones[z], b = document.querySelector(`.zpwr[data-pz="${z}"]`);
     const hard = game.diff.unwatched ? ` Germs left unwatched there divide ${CONFIG.unwatched.div}× faster.` : '';
     if (!game.toggleZoneOn(z)) { toast('One zone has to keep making cells', 'bad'); b.classList.remove('no'); void b.offsetWidth; b.classList.add('no'); return; }
-    { const tot = Math.round(game.zones.reduce((a, q, i) => a + game.zoneOutput(i), 0) * 100); toast(zn.on ? `${zn.name}: making cells again (${tot}% of full output)` : `${zn.name} off: you now make ${tot}% of full output (vessel walls).${hard}`, zn.on ? 'good' : ''); }
+    { const tot = Math.round(game.zones.reduce((a, q, i) => a + game.zoneOutput(i), 0) * 100); toast(zn.on ? `${zn.name}: making cells again (${tot}% of full output)` : `${zn.name} off: your cells there die off, and you make ${tot}% of full output (vessel walls).${hard}`, zn.on ? 'good' : ''); }
     cardsHud(); if (openZone >= 0) sheetHud();
   }
   let portrait = false, VW = L, VH = WIDTH;
@@ -191,6 +214,11 @@
     bodySprite('neutrophil-net', C.net.radius * 1.1);
     bodySprite('neutrophil-trap', C.net.radius * 1.3);
     bodySprite('nk-cell', C.nk.radius * 1.1);
+    for (const [n, k] of [['b-cell', 'bcell'], ['b-cell-puff', 'bcell'], ['eosinophil', 'eos'], ['eosinophil-latched', 'eos'], ['platelet', 'plt'], ['platelet-stuck', 'plt'], ['dendritic-cell', 'dc'], ['dendritic-carrying', 'dc'], ['treg', 'treg'], ['interferon-cell', 'ifn'], ['mast-cell', 'mast']]) bodySprite(n, C[k].radius * 1.1);
+    bodySprite('eosinophil-pop', C.eos.pop * 0.6);
+    bodySprite('bacterium-opsonized', C.staph.radius * 1.25);
+    // fields, drawn scaled by their radius: unit-radius boxes
+    for (const [n, b, r] of [['antibody-cloud', 64, 30], ['interferon-haze', 128, 58], ['mucus', 128, 56]]) spr[n] = { c: prerender(n, b, b), w: b / r, h: b / r, ax: 0.5, ay: 0.5 };
     for (const n of ['macrophage-offense', 'macrophage-support', 'macrophage-infected']) bodySprite(n, C.macrophage.radius * 1.1);
     bodySprite('bacterium', C.staph.radius * 1.25); bodySprite('bacterium-hit', C.staph.radius * 1.25); bodySprite('bacterium-dividing', C.staph.radius * 1.5);
     bodySprite('bacterium', C.clos.radius * 1.25, 'clos');
@@ -274,7 +302,7 @@
   function resize() {
     const r = stage.getBoundingClientRect();
     cssW = r.width; cssH = r.height;
-    dpr = Math.min(3, window.devicePixelRatio || 1);
+    dpr = Math.min(2, window.devicePixelRatio || 1); // 2x, not 3x: a 3x phone fills 2.25x the pixels for a barely sharper map (perf, 2026-10-10)
     cv.width = Math.round(cssW * dpr); cv.height = Math.round(cssH * dpr);
     portrait = true; // always vertical: Wound at the top, Lymph node at the bottom (Alex, 2026-10-07)
     VW = portrait ? WIDTH : L; VH = portrait ? L : WIDTH;
@@ -402,6 +430,9 @@
         case 'leak': { const [lu, lv] = ORGAN_AT[f.organ][0]; burstParts(lu, lv, f.organ === 'liver' ? 'jaundice' : 'ecoliGlow', 6, 40, 0.5);
           toastOnce('leak-' + f.organ, f.organ === 'liver' ? 'Hepatitis reached the blood: the liver took a hit' : 'E. coli reached the blood: the kidneys took a hit', 'bad'); break; }
         case 'organFail': if (!game.result && !dev.noDeath) toast(`${(ORGANS.find(o => o.k === f.organ) || { name: f.organ }).name} failed (Immortal is on, so the match goes on)`, 'bad'); shake = Math.max(shake, 0.4); break;
+        case 'eosPop': if (parts.length < 900) parts.push({ u: f.u, v: f.v, vu: 0, vv: 0, life: 0.35, max: 0.35, kind: 'eosinophil-pop', rot: 0, grow: true }); break;
+        case 'primed': toast(`A dendritic courier reached the Lymph node: ${kindName(f.kind)} now takes 50% more damage`, 'good'); break;
+        case 'mucus': toastOnce('mucus', 'Mast cell mucus: everything in the sector slows down', ''); break;
         case 'dome': toastOnce('dome', 'Pseudomonas is growing a slime dome', 'bad'); break;
         case 'sprout': toastOnce('sprout', 'Candida sprouted a thread. Nets cut threads.', 'bad'); burstParts(f.u, f.v, 'lime', 5, 30, 0.5); break;
         case 'cut': burstParts(f.u, f.v, 'lime', Math.min(14, 3 + f.n), 70, 0.5); break;
@@ -514,6 +545,9 @@
     for (const d of g.domes) draw('biofilm-dome', d.u, d.v, null, 0.35 + 0.5 * d.hp / C.pseudo.domeHp, d.r);
     for (const w of g.webs) drawPen(w, ts);
     if (g.hyphae.length) drawHyphae(g, ts);
+    if (g.mucus) for (let z = 0; z < NZ; z++) if (g.mucus[z] > 0) { const a = Math.min(1, g.mucus[z] / 1.5) * 0.55, lo = ZB[z], hi = Math.min(ZB[z + 1], L), n = Math.max(1, Math.round((hi - lo) / 90)); for (let i = 0; i < n; i++) draw('mucus', lo + (i + 0.5) * (hi - lo) / n, MID_V, null, a, (hi - lo) / n * 0.75); }
+    if (g.clouds) for (const cl of g.clouds) draw('antibody-cloud', cl.u, cl.v, null, 0.25 + 0.6 * cl.life / cl.max, cl.r);
+    if (g.nIfn) for (const c of g.cells) if (c.type === 'ifn' && !c.dead) draw('interferon-haze', c.u, c.v, null, 0.5, C.ifn.haze);
     const pulse = 1 + 0.03 * Math.sin(ts * 6.283 / 1.6);
     const ringMul = (g.ringR || C.support.ring) / C.support.ring;
     for (const m of g.cells) if (m.type === 'mac' && m.mode === 'support' && !m.tb && m.stun <= 0) draw('support-ring', m.u, m.v, null, 0.7 + 0.3 * (pulse - 0.97) / 0.06, pulse * ringMul);
@@ -523,7 +557,7 @@
     }
 
     // Antigens
-    const blinks = [], evolved = [];
+    const blinks = [], evolved = [], tagged = [];
     let preyOf = null; // which macrophage is swallowing what: built once a frame (was a search of every cell per swallowed antigen)
     const pulseA = 0.65 + 0.35 * Math.sin(ts * 6.283);
     for (const a of g.ag) {
@@ -543,7 +577,7 @@
         if (a.flash > 0) { ctx.save(); ctx.globalCompositeOperation = 'lighter'; draw(en, a.u, a.v, er, al * 0.8, mul); ctx.restore(); }
       }
       else switch (a.k) {
-        case 'staph': draw(a.flash > 0 ? 'bacterium-hit' : a.age > a.div - 1.5 ? 'bacterium-dividing' : 'bacterium', a.u, a.v, a.rot, al, mul); break;
+        case 'staph': draw(a.flash > 0 ? 'bacterium-hit' : a.age > a.div - 1.5 ? 'bacterium-dividing' : a.tag > 0 ? 'bacterium-opsonized' : 'bacterium', a.u, a.v, a.rot, al, mul); break;
         case 'clos': draw(a.flash > 0 ? 'bacterium-hit' : 'clos', a.u, a.v, a.rot, al, mul); break;
         case 'toxic': draw('staph-toxic', a.u, a.v, a.rot, al * pulseA, mul); break;
         case 'worm': draw(a.prev ? 'tapeworm-segment' : 'tapeworm-head', a.u, a.v, a.rot, al, mul); break;
@@ -551,6 +585,7 @@
         case 'pseudo': draw('pseudomonas', a.u, a.v, a.anchored ? a.rot : Math.atan2(a.vv, a.vu), al, mul); break;
         default: draw(ANTIGEN[a.k].art, a.u, a.v, a.rot, al, mul);
       }
+      if (a.tag > 0 && a.k !== 'staph' && !a.eaten) tagged.push(a);
       if (a.tr && !a.eaten && !a.dead) evolved.push(a);
       // blink: strobe while reproducing, and a short warning strobe just before a division
       if (!a.eaten) {
@@ -569,6 +604,12 @@
         ctx.stroke();
       });
       ctx.globalAlpha = 1;
+    }
+    // antibody-tagged germs that have their own art: a thin gold ring (Staph swaps to its tagged sprite)
+    if (tagged.length) {
+      ctx.globalCompositeOperation = 'source-over'; ctx.globalAlpha = 0.8; ctx.lineWidth = 0.8; ctx.strokeStyle = UNIT.bcell.color; ctx.beginPath();
+      for (const a of tagged) { const [x, y] = P(a.u, a.v), r = a.r + 1.2; ctx.moveTo(x + r, y); ctx.arc(x, y, r, 0, 6.283); }
+      ctx.stroke(); ctx.globalAlpha = 1;
     }
     if (blinks.length && blinkGlow) {
       ctx.globalCompositeOperation = 'lighter'; ctx.globalAlpha = 1;
@@ -601,6 +642,17 @@
         draw(name, c.u, c.v, null, left < 3 ? 0.35 + 0.65 * left / 3 : 1);
       } else if (c.type === 'net') draw(c.infected && Math.floor(ts / 0.3) % 2 ? 'neutrophil-infected' : 'neutrophil-net', c.u, c.v, Math.atan2(c.vv, c.vu), 1);
       else if (c.type === 'nk') draw('nk-cell', c.u, c.v, ts * 0.5 + c.id, 1);
+      else if (c.type === 'bcell') draw(c.puff > 0 ? 'b-cell-puff' : 'b-cell', c.u, c.v, c.puff > 0 ? 0 : null, 1);
+      else if (c.type === 'eos') {
+        if (c.latch) { const t = c.latch, tu = t.dome ? t.dome.u : t.ag ? t.ag.u : t.h.u, tv = t.dome ? t.dome.v : t.ag ? t.ag.v : t.h.v, k = 1 - Math.max(0, c.charge) / C.eos.charge, p = 0.5 + 0.5 * Math.sin(ts * (8 + 16 * k));
+          draw('eosinophil-latched', c.u, c.v, Math.atan2(tv - c.v, tu - c.u) - Math.PI / 2, 0.7 + 0.3 * p, 1 + 0.12 * k * p); }
+        else draw('eosinophil', c.u, c.v, Math.atan2(c.vv, c.vu), 1);
+      }
+      else if (c.type === 'plt') draw(Math.abs(c.u - (Math.min(ZB[c.home + 1], L) - 8)) < 4 ? 'platelet-stuck' : 'platelet', c.u, c.v, c.id, 0.5 + 0.5 * Math.max(0, c.hp) / C.plt.hp);
+      else if (c.type === 'dc') draw(c.sample ? 'dendritic-carrying' : 'dendritic-cell', c.u, c.v, c.sample ? 0 : ts * 0.2 + c.id, 1);
+      else if (c.type === 'treg') draw('treg', c.u, c.v, null, 1);
+      else if (c.type === 'ifn') draw('interferon-cell', c.u, c.v, null, 1);
+      else if (c.type === 'mast') draw('mast-cell', c.u, c.v, c.id, 1, c.puff > 0 ? 1.12 : 1);
     }
 
     for (const s of g.shots) draw(s.tuned ? 'shot-tuned' : 'shot', s.u, s.v, Math.atan2(s.dv, s.du), 1);
@@ -612,6 +664,7 @@
         ctx.globalAlpha = f * 0.7; ctx.strokeStyle = p.color; ctx.lineWidth = 1 / vs;
         ctx.beginPath(); ctx.ellipse(x, y, (3 + 9 * (1 - f)) / SX, 3 + 9 * (1 - f), 0, 0, 6.283); ctx.stroke();
       } else if (p.kind === 'hit-spark' || p.kind === 'shot') draw(p.kind, p.u, p.v, p.rot, f, p.mul || 1);
+      else if (p.grow) draw(p.kind, p.u, p.v, p.rot, f, 0.5 + 0.9 * (1 - f));
       else draw(p.kind, p.u, p.v, p.rot, f);
     }
     ctx.globalCompositeOperation = 'source-over'; ctx.globalAlpha = 1;
@@ -764,7 +817,7 @@
     pctx.setTransform(1, 0, 0, 1, 0, 0); pctx.clearRect(0, 0, w, h);
     if (!game) return;
     pctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-    const W = w / dpr, H = h / dpr, D = game.duration;
+    const W = w / dpr, H = h / dpr;
     if (ws.sandbox) { // workshop: no script, so show what's on the map instead (along the rail when it's vertical)
       const cen = ws.census(), parts2 = Object.entries(cen).sort((a, b) => b[1] - a[1]).map(([k, n]) => `${n} ${kindName(k)}`);
       const vert = H > W * 2, len = vert ? H : W;
@@ -775,7 +828,13 @@
       else pctx.fillText(txt, 2, H / 2);
       return;
     }
-    progRail(pctx, W, H, Math.min(1, game.t / D), game.levelEvents().map(e => ({ at: Math.min(1, e.t / D), kind: markerKind(e), quorum: !!e.quorum })));
+    // V43 (Alex, 2026-10-10): no timeline. The waves still to come sit evenly spaced in order, the next one bigger;
+    // the fill steps down one badge as each wave lands. Nothing on the rail says when.
+    const wv = game.lv.waves, idx = game.waveIdx, list = [];
+    wv.forEach((w, i) => { if (i > 0 || w.t > 0) list.push({ i, kind: markerKind({ kind: 'wave', final: !!w.final, kinds: Object.keys(KINDS).filter(k => w[k] > 0) }), quorum: game.waveQuorum(w) }); });
+    const n = list.length, ev = list.map((e, j) => ({ at: (j + 1) / (n + 1), kind: e.kind, quorum: e.quorum, done: e.i < idx }));
+    const done = ev.filter(e => e.done), f = !n || done.length === n ? (game.t >= game.duration ? 1 : n / (n + 1)) : done.length ? done[done.length - 1].at : 0;
+    progRail(pctx, W, H, f, ev);
   }
   // ART.drawProgress turned on its side: fills top to bottom, markers stay upright
   function progRail(c, W, H, f, events) {
@@ -788,11 +847,11 @@
       c.fillStyle = gr; c.beginPath(); c.roundRect ? c.roundRect(x, y, bw, Math.max(bw, h * f), r) : c.rect(x, y, bw, h * f); c.fill();
       c.fillStyle = PAL.cellHi || '#7FF3FF'; c.fillRect(x - 2, y + h * f - 1, bw + 4, 2);
     }
-    const next = events.filter(e => e.at > f).sort((a, b) => a.at - b.at)[0];
+    const next = events.filter(e => !e.done && e.at > f).sort((a, b) => a.at - b.at)[0];
     for (const e of events) {
       const im = ART.ready['marker-' + e.kind]; if (!im) continue;
       const s = bw * (e.kind === 'wave-final' ? 3.2 : 2.6) * (e === next ? 1.15 : 1);
-      c.globalAlpha = e.at <= f ? 0.25 : 1;
+      c.globalAlpha = e.done || e.at < f ? 0.25 : 1;
       c.drawImage(im, W / 2 - s / 2, y + h * e.at - s / 2, s, s);
       // a Staph wave big enough to reach quorum as it lands: a steady purple ring around its badge
       if (e.quorum) { c.strokeStyle = '#B45CFF'; c.lineWidth = 2; c.beginPath(); c.arc(W / 2, y + h * e.at, s * 0.62, 0, 6.283); c.stroke(); }
@@ -839,8 +898,11 @@
     document.querySelectorAll('.sctl').forEach(el => {
       const z = +el.dataset.sz, zn = g.zones[z], sup = zn.mode === 'support';
       el.querySelectorAll('.mix i').forEach(i => { const v = zn.mix[i.dataset.u]; i.style.flexGrow = v; i.hidden = v < 0.004; });
-      const r = el.querySelector('.sresp'); r.classList.toggle('open', openZone === z); r.classList.toggle('off', !zn.on);
-      r.setAttribute('aria-label', `${zn.name} response: ${g.units.filter(u => zn.mix[u] > 0.004).map(u => `${Math.round(zn.mix[u] * 100)}% ${UNIT[u].name.toLowerCase()}`).join(', ')}`);
+      const r = el.querySelector('.sresp'), pz = !!zn.macPaused && zn.mix.mac > 0.004; r.classList.toggle('open', openZone === z); r.classList.toggle('off', !zn.on); r.classList.toggle('paused', pz);
+      // Support rings already cover the sector: macrophages pause and their share goes to the other cells (sim stepCover)
+      const rl = r.querySelector('.rl'); if (rl) { const t = pz ? 'Macs paused' : 'Response'; if (rl.textContent !== t) rl.textContent = t; }
+      const ra = `${zn.name} response: ${g.units.filter(u => zn.mix[u] > 0.004).map(u => `${Math.round(zn.mix[u] * 100)}% ${UNIT[u].name.toLowerCase()}`).join(', ')}${pz ? `. Macrophages paused: Support rings cover ${Math.round(zn.cover * 100)}% of the sector` : ''}`;
+      if (r.getAttribute('aria-label') !== ra) { r.setAttribute('aria-label', ra); r.title = pz ? `Macrophages paused: rings cover ${Math.round(zn.cover * 100)}%` : ''; }
       const st = el.querySelector('.sstance'), art = sup ? 'mode-support' : 'mode-offense', im = st.querySelector('img');
       if (im.dataset.art !== art) { im.dataset.art = art; im.src = artUrl(art); }
       st.classList.toggle('support', sup);
@@ -869,7 +931,8 @@
       <div class="mrow"><span>Use this response everywhere</span><button type="button" class="copyall" id="copyAll">Apply to all zones</button></div>
       <div class="mrow"><span>Make cells for the ${zn.name}</span><div class="seg2"><button type="button" data-on="1">On</button><button type="button" data-on="0">Off</button></div></div>
       <p class="shint" id="onHint"></p>
-      <div class="mrow"><span>Macrophages in the ${zn.name}</span><div class="seg2"><button type="button" data-mode="offense">Offense</button><button type="button" data-mode="support">Support</button></div></div>`;
+      <div class="mrow"><span>Macrophages in the ${zn.name}</span><div class="seg2"><button type="button" data-mode="offense">Offense</button><button type="button" data-mode="support">Support</button></div></div>
+      <p class="shint" id="coverHint"></p>`;
     sh.querySelectorAll('img[data-art]').forEach(i => { i.src = artUrl(i.dataset.art); });
     sh.querySelectorAll('[data-zt]').forEach(b => b.addEventListener('click', () => openSheet(+b.dataset.zt)));
     $('#sheetClose').addEventListener('click', closeSheet);
@@ -910,10 +973,12 @@
     }
     document.querySelectorAll('#sheet [data-mode]').forEach(b => b.setAttribute('aria-pressed', b.dataset.mode === zn.mode));
     document.querySelectorAll('#sheet [data-on]').forEach(b => b.setAttribute('aria-pressed', (b.dataset.on === '1') === zn.on));
+    const ch = $('#coverHint'), S = CONFIG.support;
+    if (ch) { const t = zn.mode !== 'support' ? '' : `Support rings cover ${Math.round(zn.cover * 100)}% of the ${zn.name}. ${zn.macPaused ? `Macrophages paused: their share goes to your other cells until coverage drops under ${pctOf(S.uncover)}.` : `Over ${pctOf(S.cover)}, it stops making macrophages and spends their share on your other cells.`}`; if (ch.textContent !== t) ch.textContent = t; ch.hidden = !t; }
     const others = game.zones.filter(q => q !== zn && q.on).map(q => q.name), last = zn.on && game.zonesOn() <= 1;
     const total = Math.round(game.zones.reduce((a, q, i) => a + game.zoneOutput(i), 0) * 100), z = game.zones.indexOf(zn);
     // vessel wall: focusing on fewer zones wastes output (sim zoneOutput)
-    const hint = !zn.on ? `Off: no new cells here. Its share goes to the ${others.join(' and ')}, but each vessel wall only lets so many cells through, so your body makes ${total}% of its full output.`
+    const hint = !zn.on ? `Off: no new cells here, and the cells still here die off (half every ${CONFIG.idle.half} s). Its share goes to the ${others.join(' and ')}, but each vessel wall only lets so many cells through, so your body makes ${total}% of its full output.`
       : last ? `The only zone still making cells. Its vessel wall can only take so many, so your body makes ${total}% of its full output.`
       : game.zonesOn() < NZ ? `Gets ${(game.zoneOutput(z) * NZ).toFixed(1).replace('.0', '')}× its usual share while another zone is off. The rest is lost at the vessel walls: ${total}% of full output.` : 'Switching a zone off sends its share to the others, but each vessel wall only lets so many cells through, so fewer zones on means less output overall.';
     const oh = $('#onHint'); if (oh && oh.textContent !== hint) oh.textContent = hint;
@@ -1080,12 +1145,14 @@
   }
 
   // ---- HUD ----
+  // V43 (Alex, 2026-10-10): waves left and what comes next, never when
   function nextEventText(g) {
-    const m = g.markers().filter(e => e.t > g.t).sort((a, b) => a.t - b.t)[0];
-    if (!m) return null;
-    const sp = m.kinds ? m.kinds.filter(k => k !== 'staph') : [];
-    const what = m.kind === 'toxin' ? 'toxin burst' : m.kind === 'hatch' ? 'spores hatch' : m.final ? 'final wave' : sp.length ? `wave with ${sp.map(kindName).join(' and ')}` : 'wave';
-    return `Next: ${what} in ${fmt(m.t - g.t)}`;
+    if (ws && ws.sandbox) return null; // workshop: the open sandbox has no waves (V43 would say 'Final wave is in')
+    const left = g.lv.waves.length - g.waveIdx;
+    if (left <= 0) return `<b>Final wave is in.</b> Hold on until the drip dries up, then clear what's left.`;
+    const m = g.lv.waves[g.waveIdx], sp = Object.keys(KINDS).filter(k => m[k] > 0 && k !== 'staph');
+    const what = m.final ? 'the final wave' : sp.length ? `a wave with ${sp.map(kindName).join(' and ')}` : 'a Staph wave';
+    return `<b>${left} wave${left > 1 ? 's' : ''} left.</b> Next: ${what}${g.waveQuorum(m) ? ', big enough to reach quorum' : ''}.`;
   }
   function hud() {
     const g = game; if (!g) return;
@@ -1121,6 +1188,7 @@
     if (document.activeElement !== $('#output')) $('#output').value = Math.round(g.output * 100);
     // Stress (Alex, 2026-10-08; was "body output"): the slider's setting, capped by the heart. Cell output follows it with diminishing returns
     const eff = g.effMul() * g.makeMul();
+    { const r = g.restLevel ? g.restLevel() : CONFIG.output.rest; if (r !== trackRest) setTrack(r); } // sustainable mark: Support sectors pull it down (support.upkeep, V41)
     $('#outVal').textContent = `${Math.round(g.effMul() * 100)}%`; $('#outVal').classList.toggle('cut', g.effMul() < g.outputMul() - 0.005);
     $('#outVal').title = `Cells made at ${g.prodMul().toFixed(2)}× the normal rate${g.makeMul() < 1 ? ', slowed by the liver' : ''}`;
     { // your cells against the cell limit (Alex, 2026-10-09); the hatched end of the bar is what a hurt spleen has cut
@@ -1209,7 +1277,7 @@ ${breach}${now}${heal}${hb.length ? `<li class="dim">Hurt by ${hb.join(', ')} in
       <h2>Organ status</h2>
       <p class="shint">Germs that sit in the Lymph node fill their organ's breach clock; a full clock costs that organ a bar. Fatigue past 100 (Overload) hurts every organ, the heart most. Each whole bar lost adds a penalty, and any organ at 0 is Host failure.</p>
       <div class="bodyview">${wsToxCard()}${ORGANS.map(card).join('')}</div>
-      <div class="btnrow"><button class="btn primary" id="bodyClose" type="button">Resume</button></div>`;
+      <div class="btnrow"><button class="btn primary" id="bodyClose" type="button">Close</button></div>`;
   }
   function showBody() {
     if (!game || modal || game.result) return;
@@ -1293,13 +1361,13 @@ ${breach}${now}${heal}${hb.length ? `<li class="dim">Hurt by ${hb.join(', ')} in
       else {
         const seen = store.get(TUT_KEY) || {}, watched = new Set(Object.keys(seen).flatMap(k => TUT.forLevel(k, newIn(k))));
         const btn = id => `<button type="button" class="clip${watched.has(id) ? ' seen' : ''}" data-clip="${id}"><canvas aria-hidden="true"></canvas><span>${esc(TUT.CLIPS[id].title)}</span></button>`;
-        body = `<p>Short clips of each mechanic. Tap one to watch it.</p><div class="clips"><h4>Basics</h4>${TUT.BASICS.map(btn).join('')}<h4>Antigens</h4>${TUT.ANTIGENS.filter(id => TUT.CLIPS[id]).map(btn).join('')}${(TUT.SYSTEMS || []).some(id => TUT.CLIPS[id]) ? `<h4>Systems</h4>${TUT.SYSTEMS.filter(id => TUT.CLIPS[id]).map(btn).join('')}` : ''}</div>`;
+        body = `<p>Short clips of each mechanic. Tap one to watch it.</p><div class="clips"><h4>Basics</h4>${TUT.BASICS.map(btn).join('')}<h4>Antigens</h4>${TUT.ANTIGENS.filter(id => TUT.CLIPS[id]).map(btn).join('')}${(TUT.SYSTEMS || []).some(id => TUT.CLIPS[id]) ? `<h4>Systems</h4>${TUT.SYSTEMS.filter(id => TUT.CLIPS[id]).map(btn).join('')}` : ''}${(TUT.UNITS || []).some(id => TUT.CLIPS[id]) ? `<h4>Cells</h4>${TUT.UNITS.filter(id => TUT.CLIPS[id]).map(btn).join('')}` : ''}</div>`;
       }
     }
     if (tab === 'goal') body = `
-      <p>Each level runs on a fixed script. The rail on the far left fills top to bottom over the level; badges show what each wave brings, and a purple ring marks a Staph wave big enough to set off a quorum burst.</p>
+      <p>Each level sends the same waves in the same order, but never at quite the same moment, so watch the field, not the clock. The rail on the far left lists the waves still to come, top to bottom, with a badge for what each brings (the next one is bigger); a purple ring marks a Staph wave big enough to set off a quorum burst. Between waves a drip of germs keeps coming, swelling and easing.</p>
       <ol class="howto">
-        <li><b>Win</b> once the bar is full and every antigen on the map is dead.</li>
+        <li><b>Win</b> once the last wave is in, the drip has dried up and every antigen on the map is dead.</li>
         <li><b>Lose</b> if any organ runs out of bars (Host failure). Germs in the Lymph node fill their organ's breach clock (${C.lymph.fill} s to fill; bigger crowds fill it a little faster), and each full clock costs that organ a bar. Fatigue past 100 hurts every organ.</li>
         <li><b>Stars:</b> 1 for winning, 2 if no breach clock passed half, 3 if nothing ever reached the Lymph node.</li>
       </ol>`;
@@ -1308,7 +1376,16 @@ ${breach}${now}${heal}${hb.length ? `<li class="dim">Hurt by ${hb.join(', ')} in
       unit('neutrophil-net', 'Net neutrophil', 'Area damage. Runs to the thickest crowd in its zone and bursts into a glowing pen around it.', [`${C.net.damage} damage to everything small inside. For ${C.net.stick} s the pen keeps them in (they still jostle) and keeps other antigens out, tightening as it fades.`, `Great on swarms like Influenza, useless on MRSA. Costs ${C.marrow.net}.`]),
       unit('nk-cell', 'NK cell', 'The hunter of hidden things. Ignores plain bacteria.', ['Pops neutrophils carrying Herpes before they burst, and TB-infected macrophages.', `Lives ${C.nk.life} s. Costs ${C.marrow.nk}.`]),
       unit('macrophage-offense', 'Macrophage on Offense', `The swallower. Eats the nearest antigen in its zone, one every ${C.macrophage.eatEvery} s.`, ['Tears slime domes apart bite by bite.', "Can't swallow MRSA. <b>Swallowing TB infects it.</b>", `Never dies of age; only TB and toxin bursts kill it. At most ${C.caps.mac} at once. Costs ${C.marrow.mac}.`]),
-      unit('macrophage-support', 'Macrophage on Support', 'The booster. Stays put with a ring around it.', [`Neutrophils inside move <b>${Math.round((C.support.speedMul - 1) * 100)}% faster</b> and fire <b>tuned shots</b>: one hit kills, and they pierce MRSA.`]),
+      unit('macrophage-support', 'Macrophage on Support', 'The booster. Spreads out from other Support macrophages and holds a ring around it.', [`Neutrophils inside move <b>${Math.round((C.support.speedMul - 1) * 100)}% faster</b> and fire <b>tuned shots</b>: one hit kills, and they pierce MRSA.`, `When rings cover over ${pctOf(C.support.cover)} of a sector, it stops making macrophages and spends their share on your other cells (the Response button says <b>Macs paused</b>).`]),
+      // campaign units: only the ones this level makes
+      ...[['bcell', 'b-cell', 'B cell', 'The tagger. Hangs back and puffs an antibody cloud at the nearest germ every few seconds.', [`Tagged germs (gold) clump together and drift slower for ${C.bcell.tag} s.`, '<b>Macrophages swallow tagged germs twice as fast, MRSA included.</b>', `Lives ${C.bcell.life} s. Costs ${C.marrow.bcell}.`]],
+        ['eos', 'eosinophil', 'Eosinophil', 'The big-game hunter. Ignores small germs.', ['Latches onto a slime dome, a Tapeworm segment or Candida, charges, then pops.', `One pop is worth ${C.eos.domeDmg} macrophage bites on a dome or ${C.eos.wormDmg} damage to a Tapeworm segment, and cuts fungus threads around it.`, `Dies when it pops. Costs ${C.marrow.eos}.`]],
+        ['plt', 'platelet', 'Platelet', 'The wall. Lines up across the far edge of its sector.', ['Germs pile up against the clot wall instead of flowing on. Each platelet breaks after a few seconds of pushing.', 'Viruses and the Tapeworm slip through.', `Costs ${C.marrow.plt}.`]],
+        ['dc', 'dendritic-cell', 'Dendritic courier', 'The messenger. Grabs a sample from a germ kind nobody has carried yet and walks it to the Lymph node.', [`Once it arrives, <b>every hit on that kind does ${Math.round((C.dc.boost - 1) * 100)}% more</b> for the rest of the level.`, `At most ${C.caps.dc} at once. Costs ${C.marrow.dc}.`]],
+        ['treg', 'treg', 'Regulatory T cell', 'The brake. Kills nothing.', [`Each one cuts fatigue build-up and overload organ damage by ${Math.round(C.treg.calm * 100)}% (up to ${Math.round(C.treg.calmMax * 100)}%).`, `Each one also slows your other cells' shooting and swallowing by ${(C.treg.drag * 100).toFixed(1)}% (up to ${Math.round(C.treg.dragMax * 100)}%).`, `Costs ${C.marrow.treg}.`]],
+        ['ifn', 'interferon-cell', 'Interferon cell', 'The shield. Stays among your neutrophils with a pale haze around it.', ['Herpes cannot hijack a cell inside the haze.', `Flu inside the haze moves at ${Math.round(C.ifn.fluSlow * 100)}% speed.`, `Costs ${C.marrow.ifn}.`]],
+        ['mast', 'mast-cell', 'Mast cell', 'The alarm. Sits where it is made.', [`When a Tapeworm or Candida comes close, it floods the sector with mucus for ${C.mast.mucus} s: germs move at ${Math.round(C.mast.slow * 100)}%, your cells at ${Math.round(C.mast.ownSlow * 100)}%.`, `Then it rests ${C.mast.every} s. Costs ${C.marrow.mast}.`]],
+      ].filter(x => game && game.units.includes(x[0])).map(x => unit(x[1], x[2], x[3], x[4])),
     ].join('') + '<p>Each zone has its own response, the cells made for it (the Response button beside each sector, right of the map). New cells come out of the blood vessel along their zone and stay near it.</p>';
     if (tab === 'enemies') body = [
       unit('bacterium', 'Staph', `The grunt. Drifts toward the Lymph node and doubles every ${C.staph.doubling} s.`, [`${C.staph.hp} hits, 1 tuned hit, or one swallow.`]),
@@ -1325,31 +1402,32 @@ ${breach}${now}${heal}${hb.length ? `<li class="dim">Hurt by ${hb.join(', ')} in
       unit('hepatitis', 'Hepatitis (workshop only)', 'The liver leaker. Fast swarms of 18, one hit kills.', [`Swims for the left blood vessel. Each one that gets in adds ${Math.round(WS.leakers.leak * 100)}% to the liver's breach clock. Net neutrophils catch the swarm.`]),
       unit('e-coli', 'E. coli (workshop only)', 'The kidney leaker. Takes 2 hits and divides.', [`Each one that reaches the blood adds ${Math.round(WS.leakers.leak * 100)}% to the kidneys' breach clock. ${dev.toxinLoad ? 'Shooting it dumps extra toxin; <b>swallowing it is the clean answer</b>.' : 'Swallowing it is the quickest answer.'}`]),
       unit('tapeworm-head', 'Tapeworm', 'The boss. Crawls from the Wound to the Lymph node.', [`Too big to swallow. Tuned shots hit ${C.worm.tunedDamage}× harder. Each broken segment becomes a small fast worm.`]),
-      unit('toxin-burst', 'Quorum burst', `Staph counts its neighbours. When ${CONFIG.quorum.n} or more Staph-family germs crowd together, a red bubble forms around the crowd, and if it's still that big after ${CONFIG.quorum.fuse} s it pops. The crowd's bubble pulls nearby Staph in, and a yellow wick burns down around it.`, [`The pop kills every one of your cells within ${CONFIG.quorum.pop} units, and about half the germs at its core.`, 'Thin a glowing crowd to stop it: Nets, more neutrophils in that zone, or Offense macrophages. Big Staph waves can land at quorum.']),
+      unit('toxin-burst', 'Quorum burst', `Staph counts its neighbours. When ${CONFIG.quorum.n} or more Staph-family germs crowd together, a red bubble forms around the crowd, and if it's still that big after ${CONFIG.quorum.fuse} s it pops. The crowd's bubble pulls nearby Staph in, and a yellow wick burns down around it.`, [`The pop kills every one of your cells close to it and most out to ${CONFIG.quorum.pop} units (a few on the rim survive), and about half the germs at its core.`, 'Thin a glowing crowd to stop it: Nets, more neutrophils in that zone, or Offense macrophages. Big Staph waves can land at quorum.']),
       unit('bacterium', 'Evolution', `Germs adapt to how you kill them. A few seconds before each wave, any bacterium or fungus that died mostly one way (${pctOf(CONFIG.evolve.share)} or more of its kills) evolves the counter, and everything of that kind arriving from then on carries it, offspring too.`, ['Mostly shot: <b style="color:#FFD23F">thick wall</b>, plain shots need an extra hit. Mostly swallowed: <b style="color:#7FF3FF">capsule</b>, two gulps. Mostly netted: <b style="color:#B9F27C">slick coat</b>, Nets do half. Mostly stormed: <b style="color:#B07CFF">hardy core</b>, the storm kills half as many.', `A ring in that colour marks an evolved germ. At most ${CONFIG.evolve.max} traits per kind per level. Mix your kills and nothing evolves.`]),
     ].join('');
     if (tab === 'controls') body = `
       <ol class="howto">
         <li><b>Response</b> (right of the map, one per sector): tap it to open a slider for each cell type; moving one shares out the rest so the response stays at 100%. Each slider has <b>0%</b> and <b>100%</b> buttons: 100% makes only that type, 0% hands its share to the others. <b>Apply to all zones</b> copies the response to every zone (stances and On/Off stay). <b>Responses</b> 1-3 keep one you like (Save, or hold the slot) and apply it with a tap; they're kept between matches. Each zone gets a third of the new cells. Left of the map, each sector shows its germ count and its share of new cells (100% = a normal sector at 100% stress).</li>
-        <li><b>Stance</b>: the round button under Response (or a tap on the sector itself) flips its macrophages between Offense and Support.</li>
-        <li><b>Stress</b> slider, or its 50/100/150/200% buttons: ${Math.round(C.output.min * 100)}% to ${Math.round(C.output.max * 100)}%. More stress makes cells faster, with diminishing returns: 200% stress makes 1.5× the cells. A hurt heart caps it. Above ${Math.round(C.output.rest * 100)}% fatigue builds; below it your body recovers. The heart shows fatigue: it fills and beats faster as you tire. Tired at ${C.fatigue.tired} (cells move slower), Feverish at ${C.fatigue.feverish} (shots spray, neutrophils die sooner), Exhausted at ${C.fatigue.exhausted} (Support rings shrink). Running hot has an upside: <b>fever slows division</b>, so bacteria divide at ${pctOf(C.fever.tired)}, ${pctOf(C.fever.feverish)} and ${pctOf(C.fever.exhausted)} of their speed in those states (viruses don't care).</li>
+        <li><b>Stance</b>: the round button under Response flips its macrophages between Offense and Support.</li>
+        <li><b>Stress</b> slider, or its 25/50/100/150/200% buttons: ${Math.round(C.output.min * 100)}% to ${Math.round(C.output.max * 100)}%. More stress makes cells faster, with diminishing returns: 200% stress makes 1.5× the cells. A hurt heart caps it. Above ${Math.round(C.output.rest * 100)}% fatigue builds; below it your body recovers. Sectors on Support inflame the body and lower that line (down to ${Math.round((C.output.rest - (C.support.upkeep || 0)) * 100)}% with every sector on Support); the Stress track shows where it is. The heart shows fatigue: it fills and beats faster as you tire. Tired at ${C.fatigue.tired} (cells move slower), Feverish at ${C.fatigue.feverish} (shots spray, neutrophils die sooner), Exhausted at ${C.fatigue.exhausted} (Support rings shrink). Running hot has an upside: <b>fever slows division</b>, so bacteria divide at ${pctOf(C.fever.tired)}, ${pctOf(C.fever.feverish)} and ${pctOf(C.fever.exhausted)} of their speed in those states (viruses don't care).</li>
         <li><b>Overload</b>: fatigue can go past 100, up to ${C.fatigue.max}. Up there every organ loses health each second, faster the further over you are, but you also recover ${C.organs.overRecover}× faster.</li>
         <li><b>Organs</b>: heart, kidneys, lungs, liver, spleen and brain, 4 bars each, in the button by the fatigue label (key O). Each whole bar lost adds a penalty; any organ at 0 is Host failure. Germs in the Lymph node hurt one organ each (Staph the spleen, MRSA the heart, Influenza the lungs, Herpes the brain…), shown as clocks on the Lymph node ring. The liver and lungs heal a bar every ${C.organs.heal} s while you're Fine; the rest don't heal during a match. Tap the button for Organ status (it pauses).</li>
-        <li><b>Storm</b>: hold the button for ${C.storm.charge} s to charge it (the heart shows where fatigue would land), then release to fire. Letting go early or sliding off cancels. After a ${C.storm.windup} s wind-up it kills about ${Math.round(C.storm.kill * 100)}% of antigens and ${Math.round(C.storm.friendly * 100)}% of your neutrophils, stuns macrophages, and adds ${C.storm.cost} fatigue plus ${C.storm.after} s of afterburn. Past 100 that hurts your organs: the heart turns orange if you'd lose some bars, red with a crack if an organ would fail.</li>
+        <li><b>Storm</b>: hold the button for ${C.storm.charge} s to charge it (the heart shows where fatigue would land), then release to fire. Letting go early or sliding off cancels. After a ${C.storm.windup} s wind-up it kills antigens harder the deeper they are (${C.storm.depth.map(x => Math.round(x * 100) + '%').join(', ')} from Wound to Lymph node) and ${Math.round(C.storm.friendly * 100)}% of your neutrophils, stuns macrophages, and adds ${C.storm.cost} fatigue plus ${C.storm.after} s of afterburn. Past 100 that hurts your organs: the heart turns orange if you'd lose some bars, red with a crack if an organ would fail.</li>
         <li><b>Speed</b>: the 1× button at the top cycles 1×, 2×, 3× (key F).</li>
-        <li><b>Power buttons</b>: next to each sector's stance button. Tap it to stop making cells there (green = on, grey dashed = off); its share goes to the zones still on, minus what the vessel walls lose. One zone always stays on. On <b>Hard</b>, a sector you switch off is unwatched: germs there divide ${C.unwatched.div}× faster.</li><li><b>Cells</b> (under the heart): your cells on the field against the most you can have. At the limit no new cells are made; a hurt spleen cuts the limit (the hatched end).</li>
-        <li><b>Zoom</b>: double-tap a sector on the map to watch it up close. Double-tap again, tap the chip at the top, or press Esc to zoom back out. It's for watching only: a single tap still flips the zone's stance.</li>
+        <li><b>Power buttons</b>: next to each sector's stance button. Tap it to stop making cells there (green = on, grey dashed = off); your cells left in an off sector die off, half every ${C.idle.half} s; its share goes to the zones still on, minus what the vessel walls lose. One zone always stays on. A sector you switch off is unwatched: germs there divide ${C.unwatched.div}× faster.</li><li><b>Cells</b> (under the heart): your cells on the field against the most you can have. At the limit no new cells are made; a hurt spleen cuts the limit (the hatched end).</li>
+        <li><b>Zoom</b>: double-tap a sector on the map to watch it up close. Double-tap again, tap the chip at the top, or press Esc to zoom back out. While zoomed in, drag to look around. It's for watching only: tapping the map changes nothing, so switch stance with the round button beside each sector.</li>
         <li><b>Sound</b>: the speaker button at the top mutes music and sound effects (key M). It remembers your choice.</li>
+        <li><b>Adrenaline surge</b> (the syringe above Pause, or A): time slows ${Math.round(1 / SURGE.slow)}× for ${SURGE.real} s so you can change your cells. It does nothing in the fight itself. ${SURGE.n} per map; tap it again to end one early. Menus like Organ status and this guide don't stop the fight.</li>
         <li><b>Workshop</b> (top right): pick a combo or a real level, set spawn rates for antigens and your cells, turn on cheats, and change any number live.</li>
         <li><b>Toxin load</b> (when on, the blood vessel turns green as it builds, and a green strip on the organ button shows the level; with Organ health off it gets its own bar): shots, nets and the storm fill it; swallows don't. Your liver and kidneys clear it fast when you're rested and slowly when you're tired, and whatever is left feeds the heart. With Toxin puddles on, kills over the mark leave green puddles that slow your cells.</li>
         <li><b>Leakers in the Sandbox</b>: the liver and kidneys are also drawn in the blood vessel at the Lymph node end. Each Hepatitis or E. coli that reaches the blood adds ${Math.round(WS.leakers.leak * 100)}% to that organ's breach clock. With Toxin load on, they also clear toxin (liver ${Math.round(WS.organs.liverShare * 100)}%, kidneys the rest), toxin over ${WS.organs.kidneyToxAt} wears the kidneys down, and a green strip under the organ button shows the level.</li>
-        <li><b>Pause</b>: the II button, or Space. Keyboard: <b>1 2 3 4</b> flip zones, <b>-</b> / <b>=</b> stress, hold <b>S</b> to charge the storm, <b>Shift+1/2/3</b> apply a saved response to the open zone (or every zone when none is open).</li>
+        <li><b>Pause</b>: the II button, or Space. It's the only thing that stops the fight. Keyboard: <b>A</b> adrenaline surge, <b>1 2 3 4</b> flip zones, <b>-</b> / <b>=</b> stress, hold <b>S</b> to charge the storm, <b>Shift+1/2/3</b> apply a saved response to the open zone (or every zone when none is open).</li>
       </ol>`;
     return `
       <span class="eyebrow">Guide</span>
       <div class="tabs">${tabs.map(([k, n]) => `<button type="button" data-tab="${k}" aria-pressed="${k === tab}">${n}</button>`).join('')}</div>
       <div class="gsec">${body}</div>
-      <div class="btnrow"><button class="btn primary" id="guideClose" type="button">${guideFrom === 'start' ? 'Back' : 'Resume'}</button></div>`;
+      <div class="btnrow"><button class="btn primary" id="guideClose" type="button">${guideFrom === 'start' ? 'Back' : 'Close'}</button></div>`;
   }
   function showGuide(from, tab) {
     guideFrom = from;
@@ -1361,7 +1439,7 @@ ${breach}${now}${heal}${hb.length ? `<li class="dim">Hurt by ${hb.join(', ')} in
         const all = clips.map(x => x.dataset.clip);
         playClips(all, { eyebrow: 'How to play', start: all.indexOf(b.dataset.clip), doneLabel: 'Back to guide' }, () => showGuide(from, 'howto'));
       }));
-      TUT.ready().then(() => { if (modal === 'guide') clips.forEach(b => { try { TUT.drawFrame(b.querySelector('canvas'), b.dataset.clip, TUT.CLIPS[b.dataset.clip].dur * 0.6); } catch (e) { /* thumbnail only */ } }); }).catch(() => {});
+      TUT.ready().then(() => { if (modal === 'guide') clips.forEach(b => { try { TUT.drawFrame(b.querySelector('canvas'), b.dataset.clip, TUT.CLIPS[b.dataset.clip].thumb ?? TUT.CLIPS[b.dataset.clip].dur * 0.6); } catch (e) { /* thumbnail only */ } }); }).catch(() => {});
     }
     $('#guideClose').addEventListener('click', () => { if (guideFrom === 'start') showStart(); else closeModal(); });
   }
@@ -1388,12 +1466,17 @@ ${breach}${now}${heal}${hb.length ? `<li class="dim">Hurt by ${hb.join(', ')} in
         <div><b>${Math.round(r.fatiguePeak)}</b><span>fatigue peak</span></div>
         <div><b>${s.made}</b><span>cells made</span></div>
       </div>
-      <canvas id="graph" aria-label="Antigens in each zone over the match"></canvas>
-      <div class="legend"><span style="--c:${PAL.germ}">Wound</span><span style="--c:${PAL.antibody}">Tissue</span><span style="--c:${PAL.cell}">Deep tissue</span><span style="--c:${PAL.damage}">Lymph node</span><span style="--c:rgba(180,92,255,.5)">toxin burst</span></div>
+      <div class="gviews" role="tablist" aria-label="Fight charts">${GVIEWS.map(v => `<button type="button" role="tab" data-gv="${v.k}">${v.name}</button>`).join('')}</div>
+      <canvas id="graph"></canvas>
+      <div class="legend" id="glegend"></div>
       ${!r.win ? '<div class="btnrow"><button class="btn primary" id="keepGoing" type="button">Keep going with No death</button></div>' : ''}
       <div class="btnrow">${r.win && nextKey ? `<button class="btn primary" id="next" type="button">Next: ${esc(LEVELS[nextKey].name)}</button>` : ''}<button class="btn ${r.win && nextKey ? '' : 'primary'}" id="again" type="button">Play again</button><button class="btn" id="levelsBtn" type="button">Levels</button></div>
       <button class="linkbtn" id="fbEnd" type="button">Send feedback with a log of this fight</button>`);
-    drawGraph();
+    graphView = 'main'; drawGraph();
+    document.querySelectorAll('[data-gv]').forEach(b => b.addEventListener('click', () => { graphView = b.dataset.gv; drawGraph(); }));
+    // double-tap (or double-click) the chart: germs vs cells <-> germs by sector (Alex, 2026-10-10)
+    let gTap = 0;
+    $('#graph').addEventListener('pointerup', () => { const now = performance.now(); if (now - gTap < 350) { gTap = 0; graphView = graphView === 'sector' ? 'main' : 'sector'; drawGraph(); } else gTap = now; });
     if ($('#next')) $('#next').addEventListener('click', () => { pickLevel(nextKey); });
     $('#again').addEventListener('click', () => { closeModal(); newGame(); });
     $('#levelsBtn').addEventListener('click', () => { newGame(); showStart(); });
@@ -1403,25 +1486,65 @@ ${breach}${now}${heal}${hb.length ? `<li class="dim">Hurt by ${hb.join(', ')} in
     });
     $('#fbEnd').addEventListener('click', () => showFeedback('end'));
   }
+  // ---- postgame charts (Alex, 2026-10-10): germs vs your cells first; double-tap to split germs by sector; fatigue on its own tab ----
+  const GVIEWS = [{ k: 'main', name: 'Germs vs cells' }, { k: 'sector', name: 'By sector' }, { k: 'fatigue', name: 'Fatigue' }];
+  const SECTOR_COL = () => [PAL.germ, PAL.antibody, PAL.cell, PAL.damage];
+  let graphView = 'main';
   function drawGraph() {
-    const c = $('#graph'), r = c.getBoundingClientRect(), k = Math.min(3, window.devicePixelRatio || 1);
+    const c = $('#graph'); if (!c) return;
+    const r = c.getBoundingClientRect(), k = Math.min(3, window.devicePixelRatio || 1);
     c.width = r.width * k; c.height = r.height * k;
     const g = c.getContext('2d'); g.scale(k, k);
-    const W = r.width, H = r.height, padL = 26, padB = 16, h = game.history;
-    const T = game.duration > 1e6 ? Math.max(game.t, 1) : Math.max(game.duration, game.t), maxY = Math.max(10, ...h.map(p => Math.max(...p.z)));
-    const X = t => padL + (W - padL - 4) * t / T, Y = v => (H - padB) - (H - padB - 6) * v / maxY;
-    g.font = `10px ${MONO}`; g.fillStyle = PAL.uiDim; g.strokeStyle = 'rgba(221,230,245,0.12)'; g.lineWidth = 1;
-    g.textAlign = 'right'; g.textBaseline = 'middle';
-    for (const v of [0, Math.round(maxY / 2), maxY]) { g.beginPath(); g.moveTo(padL, Y(v)); g.lineTo(W, Y(v)); g.stroke(); g.fillText(v, padL - 4, Y(v)); }
+    const W = r.width, H = r.height, padL = 30, padR = graphView === 'fatigue' ? 58 : 6, padB = 16, padT = 8, hist = game.history, view = graphView;
+    const ev = game.log.events, at = e => ev.filter(x => x.e === e).map(x => x.t);
+    const waves = at('wave'), pops = at('quorum'), storms = at('storm');
+    const F = CONFIG.fatigue;
+    const series = view === 'main' ? [{ name: 'Germs', col: PAL.germ, v: p => p.z.reduce((a, b) => a + b, 0) }, { name: 'Your cells', col: PAL.cell, v: p => p.n }]
+      : view === 'sector' ? ZONES.map((name, z) => ({ name, col: SECTOR_COL()[z], v: p => p.z[z] }))
+      : [{ name: 'Fatigue', col: PAL.cellHi, v: p => p.fatigue }];
+    const T = game.duration > 1e6 ? Math.max(game.t, 1) : Math.max(game.duration, game.t);
+    const maxY = view === 'fatigue' ? F.max : Math.max(10, ...hist.map(p => Math.max(...series.map(s => s.v(p)))));
+    const X = t => padL + (W - padL - padR) * t / T, Y = v => (H - padB) - (H - padB - padT) * v / maxY;
+    g.font = `10px ${MONO}`; g.lineWidth = 1;
+    // grid
+    g.strokeStyle = 'rgba(221,230,245,0.1)'; g.fillStyle = PAL.uiDim; g.textAlign = 'right'; g.textBaseline = 'middle';
+    const ticks = view === 'fatigue' ? [0, 50, 100, 150] : [0, Math.round(maxY / 2), maxY];
+    for (const v of ticks) { g.beginPath(); g.moveTo(padL, Y(v)); g.lineTo(W - padR, Y(v)); g.stroke(); g.fillText(v, padL - 4, Y(v)); }
     g.textAlign = 'center'; g.textBaseline = 'top';
-    for (let t = 0; t <= T; t += 60) { g.textAlign = X(t) > W - 20 ? 'right' : 'center'; g.fillText(fmt(t), Math.min(X(t), W), H - padB + 3); }
-    g.fillStyle = 'rgba(180,92,255,0.5)';
-    for (const tx of game.toxins) g.fillRect(X(tx.at) - 1, 4, 2, H - padB - 4);
-    [PAL.germ, PAL.antibody, PAL.cell, PAL.damage].forEach((col, z) => {
-      g.strokeStyle = col; g.lineWidth = 2; g.lineJoin = 'round'; g.beginPath();
-      h.forEach((p, i) => (i ? g.lineTo : g.moveTo).call(g, X(p.t), Y(p.z[z])));
+    for (let t = 0; t <= T; t += 60) { g.textAlign = X(t) > W - padR - 20 ? 'right' : 'center'; g.fillText(fmt(t), Math.min(X(t), W - padR), H - padB + 3); }
+    if (view === 'fatigue') {
+      // the states, as bands with their names on the right
+      const bands = [[F.tired, F.feverish, 'Tired'], [F.feverish, F.exhausted, 'Feverish'], [F.exhausted, 100, 'Exhausted'], [100, F.max, 'Overload']];
+      g.textAlign = 'left'; g.textBaseline = 'middle';
+      bands.forEach(([a, b, name], i) => {
+        g.fillStyle = `rgba(255,59,78,${0.04 + i * 0.04})`; g.fillRect(padL, Y(b), W - padL - padR, Y(a) - Y(b));
+        g.fillStyle = i === 3 ? PAL.damage : PAL.uiDim; g.fillText(name, W - padR + 4, (Y(a) + Y(b)) / 2);
+      });
+    }
+    // what happened: waves (ticks on top), quorum bursts (purple), storms (gold)
+    g.fillStyle = 'rgba(221,230,245,0.35)';
+    for (const t of waves) { const x = X(t); g.beginPath(); g.moveTo(x - 3, 0); g.lineTo(x + 3, 0); g.lineTo(x, 5); g.fill(); }
+    g.fillStyle = 'rgba(180,92,255,0.35)'; for (const t of pops) g.fillRect(X(t) - 0.75, padT, 1.5, H - padB - padT);
+    g.fillStyle = PAL.kill; for (const t of storms) g.fillRect(X(t) - 1, padT, 2, H - padB - padT);
+    // lines; the main view also fills under the germs so the two populations read as a tug of war
+    series.forEach((s, i) => {
+      if (view === 'main' && i === 0 && hist.length) {
+        g.beginPath(); g.moveTo(X(hist[0].t), Y(0)); hist.forEach(p => g.lineTo(X(p.t), Y(s.v(p)))); g.lineTo(X(hist[hist.length - 1].t), Y(0)); g.closePath();
+        g.fillStyle = 'rgba(255,61,203,0.12)'; g.fill();
+      }
+      g.strokeStyle = s.col; g.lineWidth = 2; g.lineJoin = 'round'; g.beginPath();
+      hist.forEach((p, j) => (j ? g.lineTo : g.moveTo).call(g, X(p.t), Y(s.v(p))));
       g.stroke();
     });
+    // labels and legend
+    document.querySelectorAll('[data-gv]').forEach(b => b.setAttribute('aria-selected', b.dataset.gv === view));
+    const peak = s => Math.round(Math.max(0, ...hist.map(s.v)));
+    const marks = [waves.length && '<span class="mk wave">wave</span>', pops.length && `<span style="--c:rgba(180,92,255,.6)">quorum burst</span>`, storms.length && `<span style="--c:${PAL.kill}">storm</span>`].filter(Boolean);
+    $('#glegend').innerHTML = series.map(s => `<span style="--c:${s.col}">${s.name}${view !== 'fatigue' ? ` <i>peak ${peak(s)}</i>` : ''}</span>`).join('') + marks.join('') +
+      (view === 'main' ? '<em>Double-tap the chart to split germs by sector</em>' : view === 'sector' ? '<em>Double-tap to go back</em>' : '');
+    c.setAttribute('aria-label', view === 'main' ? `Germs and your cells over the fight. Germs peaked at ${peak(series[0])}, your cells at ${peak(series[1])}.`
+      : view === 'sector' ? `Germs in each sector over the fight: ${series.map(s => `${s.name} peaked at ${peak(s)}`).join(', ')}.`
+      : `Fatigue over the fight, peaking at ${Math.round(game.result ? game.result.fatiguePeak : game.fatiguePeak)}.`);
   }
 
   // ---- feedback: notes plus a log of the whole fight, shared through the share sheet ----
@@ -1448,7 +1571,7 @@ ${breach}${now}${heal}${hb.length ? `<li class="dim">Hurt by ${hb.join(', ')} in
     return {
       game: 'Cytostorm', build: 'v3', format: 1, sent: new Date().toISOString(),
       device: { ua: navigator.userAgent, screen: `${screen.width}x${screen.height}`, layout: portrait ? 'portrait' : 'landscape' },
-      level: g.key, levelName: g.lv.name, seed: g.seed, difficulty: g.difficulty,
+      level: g.key, levelName: g.lv.name, seed: g.seed, jseed: g.jseed, waveTimes: g.lv.waves.map(w => w.t), difficulty: g.difficulty,
       feedback: { tags: [...fbTags], notes: fbNotes },
       summary: fightSummary(g),
       tuning: tuningDiff(), customLevels: !!store.get('immuneWorkshopV3.levels'),
@@ -1518,15 +1641,17 @@ ${breach}${now}${heal}${hb.length ? `<li class="dim">Hurt by ${hb.join(', ')} in
     if (c) {
       if (c.mix) for (let z = 0; z < NZ; z++) game.setMix(z, c.mix);
       if (c.zones) c.zones.forEach((m, z) => game.setZone(z, m));
-      if (c.output != null) game.setOutput(c.output);
+      if (c.stress != null) { const O = CONFIG.output; game.setOutput(Math.max(0, Math.min(1, Math.log(c.stress / O.min) / Math.log(O.max / O.min)))); } // Stress multiplier -> slider position
       if (c.boss) ws.spawnGroup('worm');
       if (c.organs) for (const k in c.organs) ws.setOrgan(k, c.organs[k]);
       if (c.fatigue != null) game.fatigue = c.fatigue;
     }
+    game.rollWaves(1 + Math.floor(Math.random() * 1e9)); // V43: wave timing differs every attempt (the sim seed is fixed)
     if (SPEEDS[speedIdx] !== 1) game.logInput({ a: 'speed', x: SPEEDS[speedIdx] }, 'speed');
     for (const k in spawnAcc) spawnAcc[k] = 0;
     paused = false; acc = 0; endShown = false; fbTags = new Set(); fbNotes = ''; parts = []; quorumPops = []; shake = 0; flashT = 0; collapseT = 0; stormHitT = 0; toasted.clear();
     zoomT = 0; zoomE = 0; $("#zoomOut").hidden = true;
+    surgeLeft = SURGE.n; surgeT = 0; surgeHud();
     $('#pauseBtn').setAttribute('aria-label', 'Pause');
     $('#pauseCard').hidden = true; $('#devPause').textContent = 'Pause';
     closeSheet(); buildSides();
@@ -1537,15 +1662,17 @@ ${breach}${now}${heal}${hb.length ? `<li class="dim">Hurt by ${hb.join(', ')} in
   const MAX_STEPS = 4; // catch-up cap per frame: a slow phone slows the game down instead of freezing
   function frame(now) {
     const dt = Math.min(0.1, (now - (last || now)) / 1000); last = now;
-    if (game && !paused && !modal && !game.result) {
-      acc += dt * SPEEDS[speedIdx];
+    if (game && surgeT > 0 && !halted() && !game.result) { surgeT -= dt; if (surgeT <= 0) { surgeT = 0; toast('Surge over: back to full speed'); } surgeHud(); }
+    const simSpeed = SPEEDS[speedIdx] * (surgeT > 0 ? SURGE.slow : 1);
+    if (game && !halted() && !game.result) {
+      acc += dt * simSpeed;
       let n = 0;
       while (acc >= STEP && n < MAX_STEPS && !game.result) { devSpawn(STEP); ws.step(STEP); acc -= STEP; n++; }
       if (n === MAX_STEPS) acc = 0;
     }
     if (game) {
       consumeFx();
-      const pdt = paused || modal ? 0 : dt * SPEEDS[speedIdx];
+      const pdt = halted() ? 0 : dt * simSpeed;
       for (const p of parts) { p.life -= pdt; p.u += p.vu * pdt; p.v += p.vv * pdt; p.vu *= 0.92; p.vv *= 0.92; if (p.vr) p.rot += p.vr * pdt; }
       if (parts.length) parts = parts.filter(p => p.life > 0);
       shake = Math.max(0, shake - pdt * 2.5); flashT = Math.max(0, flashT - pdt); stormHitT = Math.max(0, stormHitT - pdt);
@@ -1554,9 +1681,10 @@ ${breach}${now}${heal}${hb.length ? `<li class="dim">Hurt by ${hb.join(', ')} in
     }
     render(now);
     soundTick(now);
+    strainTick(now);
     drawProg();
     stepCharge(now);
-    if (game) drawHeart(paused || modal ? 0 : dt, now / 1000);
+    if (game) drawHeart(halted() ? 0 : dt, now / 1000);
     hudT -= dt;
     if (hudT <= 0) { hudT = 0.1; hud(); }
     requestAnimationFrame(frame);
@@ -1598,10 +1726,10 @@ ${breach}${now}${heal}${hb.length ? `<li class="dim">Hurt by ${hb.join(', ')} in
   // music, heartbeat and danger follow the match; new neutrophil shots are spotted here (sim.js has no shot event)
   function soundTick(now) {
     if (!AU || !auOn) return;
-    const g = game, live = !!(g && !g.result), run = live && !paused && !modal;
+    const g = game, live = !!(g && !g.result), run = live && !halted();
     const track = live ? 'blood' : null;
     if (track !== auTrack) { auTrack = track; AU.music(track, track ? 0 : null); }
-    AU.heartbeat(run ? (g.fatigue > 100 ? 'overload' : ['fine', 'tired', 'feverish', 'exhausted'][g.tier] || 'fine') : null);
+    AU.heartbeat(null); // the beat is scheduled by strainTick so it can get louder with fatigue
     if (!run) return;
     let n = 0;
     for (const s of g.shots) if (!s.snd) { s.snd = 1; if (n++ < 2) sfx('shot', s); }
@@ -1612,6 +1740,30 @@ ${breach}${now}${heal}${hb.length ? `<li class="dim">Hurt by ${hb.join(', ')} in
     }
   }
 
+  // ---- strain (Alex, 2026-10-10): a red vignette creeps in from the edges and the heartbeat pounds harder as fatigue grows ----
+  // 0 below 25 fatigue, faint at Tired (35), stronger at Feverish (60), heavy at Exhausted (85) and Overload (100+)
+  const STRAIN = [[0, 0], [25, 0], [35, 0.18], [60, 0.4], [85, 0.7], [100, 0.85], [150, 1]];
+  const lerpTab = (tab, x) => { for (let i = 1; i < tab.length; i++) if (x <= tab[i][0]) { const [x0, y0] = tab[i - 1], [x1, y1] = tab[i]; return y0 + (y1 - y0) * (x - x0) / (x1 - x0 || 1); } return tab[tab.length - 1][1]; };
+  const BEAT_GAP = [[0, 0.95], [35, 0.72], [60, 0.52], [85, 0.4], [100, 0.36], [150, 0.33]]; // seconds between beats (audio HEART gaps)
+  let strainLv = -1, beatAt = 0, beatN = 0;
+  function strainTick(now) {
+    const g = game, el = $('#strain'), run = !!(g && !g.result && !halted());
+    const lv = g && !g.result ? lerpTab(STRAIN, g.fatigue) : 0;
+    if (Math.abs(lv - strainLv) > 0.01) {
+      strainLv = lv;
+      el.style.opacity = lv.toFixed(3);
+      el.style.setProperty('--clear', `${Math.round(60 - 30 * lv)}%`);
+    }
+    if (!run) { beatAt = 0; return; }
+    if (!beatAt) beatAt = now + 300;
+    if (now < beatAt) return;
+    const f = g.fatigue;
+    beatN++;
+    beatAt = now + 1000 * lerpTab(BEAT_GAP, f) * (f > 100 && beatN % 3 === 0 ? 1.6 : 1); // Overload skips a beat
+    if (lv >= 0.4) { el.classList.remove('thump'); void el.offsetWidth; el.classList.add('thump'); }
+    if (AU && auOn) AU.play('heartbeat', { vol: 0.15 + 1.05 * lv }); // barely there when Fine, pounding at Overload
+  }
+
   // ---- input ----
   function tapZone(z) {
     if (!game || game.result) return;
@@ -1620,30 +1772,59 @@ ${breach}${now}${heal}${hb.length ? `<li class="dim">Hurt by ${hb.join(', ')} in
     toast(`${zn.name}: ${zn.mode === 'support' ? 'Support' : 'Offense'}`, zn.mode === 'support' ? 'good' : '');
     hud();
   }
-  let tapT = 0, tapX = 0, tapY = 0, tapTimer = null;
+  // The map is for watching (Alex, 2026-10-10): a tap changes nothing (stance lives on the button beside each sector),
+  // a double tap zooms in or out, and while zoomed in a drag pans the view
+  let tapT = 0, tapX = 0, tapY = 0, drag = null;
   $('#zoomOut').addEventListener('click', zoomOut);
   cv.addEventListener('pointerdown', e => {
     if (!game || modal) return;
     if (openZone >= 0) { closeSheet(); return; }
     const r = cv.getBoundingClientRect(), x = (e.clientX - r.left - vox) / (vs * SX), y = (e.clientY - r.top - voy) / vs;
+    if (zoomT && zoomE === 1) { drag = { id: e.pointerId, x: e.clientX, y: e.clientY, moved: 0 }; try { cv.setPointerCapture(e.pointerId); } catch (x) { /* fine */ } }
     if (x < 0 || y < 0 || x > VW || y > VH) return;
-    // a single tap flips the zone's stance; a double tap zooms in or out instead (so the first tap waits a moment)
     const now = performance.now();
-    if (tapTimer && now - tapT < 320 && Math.hypot(e.clientX - tapX, e.clientY - tapY) < 40) {
-      clearTimeout(tapTimer); tapTimer = null;
+    if (now - tapT < 320 && Math.hypot(e.clientX - tapX, e.clientY - tapY) < 40) {
+      tapT = 0; drag = null;
       if (zoomT) zoomOut(); else zoomTo(x, y);
       return;
     }
     tapT = now; tapX = e.clientX; tapY = e.clientY;
-    const z = zoneOf(portrait ? y : x);
-    clearTimeout(tapTimer); tapTimer = setTimeout(() => { tapTimer = null; tapZone(z); }, 300);
   });
+  cv.addEventListener('pointermove', e => {
+    if (!drag || e.pointerId !== drag.id || !zoomT) return;
+    const dx = e.clientX - drag.x, dy = e.clientY - drag.y;
+    drag.x = e.clientX; drag.y = e.clientY; drag.moved += Math.abs(dx) + Math.abs(dy);
+    if (drag.moved > 6) tapT = 0; // a drag is not half of a double tap
+    zoomPan(dx, dy);
+  });
+  const endDrag = e => { if (drag && e.pointerId === drag.id) drag = null; };
+  cv.addEventListener('pointerup', endDrag); cv.addEventListener('pointercancel', endDrag);
   function setPaused(p) {
     paused = p; $('#pauseBtn').setAttribute('aria-label', paused ? 'Resume' : 'Pause');
     $('#pauseCard').hidden = !paused;
     $('#devPause').textContent = paused ? 'Resume' : 'Pause';
   }
   $('#pauseBtn').addEventListener('click', () => setPaused(!paused));
+  function surgeTap() {
+    if (!game || game.result || modal) return;
+    if (surgeT > 0) { surgeT = 0; game.logInput({ a: 'surge', on: false }); toast('Surge over: back to full speed'); surgeHud(); return; }
+    if (surgeLeft <= 0) { toast('No adrenaline surges left this map', 'bad'); return; }
+    surgeLeft--; surgeT = SURGE.real; if (paused) setPaused(false);
+    game.logInput({ a: 'surge', on: true, left: surgeLeft });
+    toast(`Adrenaline surge: time slows ${Math.round(1 / SURGE.slow)}× for ${SURGE.real} s. ${surgeLeft} left`, 'good');
+    surgeHud();
+  }
+  function surgeHud() {
+    const b = $('#surgeBtn'); if (!b) return;
+    const on = surgeT > 0;
+    b.classList.toggle('on', on); b.disabled = !on && (surgeLeft <= 0 || !!(game && game.result));
+    b.style.setProperty('--left', on ? (surgeT / SURGE.real).toFixed(3) : 0);
+    $('#surgeN').textContent = surgeLeft;
+    const l = on ? `Adrenaline surge running: ${Math.ceil(surgeT)} s left. Tap to end it` : `Adrenaline surge: slow time ${Math.round(1 / SURGE.slow)}× for ${SURGE.real} s to change your cells. ${surgeLeft} left this map`;
+    if (b.getAttribute('aria-label') !== l) { b.setAttribute('aria-label', l); b.title = l; }
+    $('#stage').classList.toggle('surging', on);
+  }
+  $('#surgeBtn').addEventListener('click', surgeTap);
   $('#resumeBtn').addEventListener('click', () => setPaused(false));
   $('#fbPause').addEventListener('click', () => showFeedback('pause'));
   $('#output').addEventListener('input', e => { if (game) { game.setOutput(+e.target.value / 100); hud(); } });
@@ -1666,6 +1847,7 @@ ${breach}${now}${heal}${hb.length ? `<li class="dim">Hurt by ${hb.join(', ')} in
     if (e.key === '=' || e.key === '+') game.setOutput(game.output + 0.1);
     if ((e.key === 's' || e.key === 'S') && !e.repeat) stormStart();
     if (e.key === 'f' || e.key === 'F') $('#ffBtn').click();
+    if ((e.key === 'a' || e.key === 'A') && !e.repeat) surgeTap();
     if (e.key === 'o' || e.key === 'O') showBody();
     if (e.key === 'm' || e.key === 'M') setMuted(!AU.muted);
     if (e.key === 'Escape') { if (openZone < 0 && zoomT) zoomOut(); closeSheet(); }
@@ -1779,6 +1961,9 @@ ${breach}${now}${heal}${hb.length ? `<li class="dim">Hurt by ${hb.join(', ')} in
     try { navigator.clipboard.writeText(txt).then(() => toast('Tuning copied'), fallback); } catch (e) { fallback(); }
   });
 
+  // Stress track: cool up to the stress the body can sustain, hot above it
+  let trackRest = null;
+  function setTrack(r) { const O = CONFIG.output; trackRest = r; $('#output').style.setProperty('--track', ART.outputTrackCSS(Math.max(0, Math.log(Math.max(r, O.min) / O.min) / Math.log(O.max / O.min)))); }
   // ---- workshop panel ----
   const TOX_SLIDERS = [
     [WS, 'toxload', 'perKill', 'Per messy kill', 0, 10, 0.1], [WS, 'toxload', 'perEndo', 'Per Pseudomonas or Clostridium', 0, 20, 0.1],
@@ -1796,9 +1981,12 @@ ${breach}${now}${heal}${hb.length ? `<li class="dim">Hurt by ${hb.join(', ')} in
   const MAIN_SLIDERS = [ // the sim's own rules, so the same numbers as the Tune list
     [CONFIG, 'fever', 'tired', 'Division speed when Tired', 0.1, 1, 0.05], [CONFIG, 'fever', 'feverish', 'When Feverish', 0.1, 1, 0.05], [CONFIG, 'fever', 'exhausted', 'When Exhausted', 0.1, 1, 0.05],
     [CONFIG, 'quorum', 'n', 'Quorum: germs in one crowd', 4, 40, 1], [CONFIG, 'quorum', 'fuse', 'Quorum: seconds of glow before it pops', 1, 15, 0.5], [CONFIG, 'quorum', 'pop', 'Quorum: pop kills your cells within', 20, 200, 5],
-    [CONFIG, 'wall', 'soft', 'Vessel wall softness', 0.02, 1, 0.02], [CONFIG, 'trickle', 'mul', 'Trickle between waves ×', 0, 5, 0.25],
+    [CONFIG, 'wall', 'soft', 'Vessel wall softness', 0.02, 1, 0.02], [CONFIG, 'trickle', 'mul', 'Trickle between waves ×', 0, 6, 0.1], [CONFIG, 'trickle', 'ebb', 'Trickle ebb and flow (0 = steady)', 0, 1, 0.05], [CONFIG, 'wave', 'jitter', 'Wave timing jitter ± s (from the next game)', 0, 30, 1],
     [CONFIG, 'output', 'curve', 'Stress curve (1 = straight line)', 0.2, 1, 0.005], [CONFIG, 'pseudo', 'shield', 'Slime dome lets through', 0, 1, 0.05],
     [CONFIG, 'evolve', 'share', 'Evolution: one kill method’s share', 0.3, 1, 0.05], [CONFIG, 'evolve', 'wall', 'Evolved thick wall: plain shot damage', 0.1, 1, 0.05],
+    [CONFIG, 'idle', 'half', 'Cells in a switched-off sector: half-life (s)', 5, 120, 5], [CONFIG, 'support', 'spread', 'Support rings: spread', 1, 3, 0.1], [CONFIG, 'support', 'upkeep', 'Support upkeep: rest line drop with every sector on Support', 0, 1, 0.05],
+    [CONFIG, 'bacteria', 'drift', 'Germ drift toward the Lymph node (a blob’s speed)', 0, 40, 1], [CONFIG, 'bacteria', 'driftSpread', 'Drift spread: each germ rides at 1 ± this', 0, 0.9, 0.05],
+    [CONFIG, 'pseudo', 'drag', 'Under a slime dome, germs drift at this × the flow', 0, 1, 0.05],
   ];
   const ORGAN_SLIDERS = [
     [WS, 'organs', 'kidneyToxAt', 'Kidneys hurt above toxin', 0, 100, 1], [WS, 'organs', 'kidneyToxBars', 'Kidney bars lost per second there', 0, 0.2, 0.005],
@@ -1972,7 +2160,7 @@ ${breach}${now}${heal}${hb.length ? `<li class="dim">Hurt by ${hb.join(', ')} in
   buildTuning();
   buildWorkshop();
   $('#seed').value = seed;
-  { const O = CONFIG.output; $('#output').style.setProperty('--track', ART.outputTrackCSS(Math.log(O.rest / O.min) / Math.log(O.max / O.min))); }
+  setTrack(CONFIG.output.rest);
   ART.loadAll().then(() => {
     Object.assign(img, ART.ready);
     resize();
