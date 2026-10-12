@@ -4806,7 +4806,7 @@ const DEFAULTS = {
   fatigue:    { tired: 35, feverish: 60, exhausted: 85, tiredSpeed: 0.85, feverSpread: 0.3, feverLife: 0.7, exhaustedRing: 0.6, max: 150 },
   organs:     { dmg: 0.008, knee: 25, overRecover: 4, heal: 60, otherFloor: 1, wHeart: 1, wKidney: 0.8, wLungs: 0.6, wLiver: 0.6, wSpleen: 0.4, wBrain: 0.5, heart3: 1.75, heart2: 1.5, heart1: 1.25, kidney3: 0.75, kidney2: 0.5, kidney1: 0.25, lungs3: 0.9, lungs2: 0.8, lungs1: 0.7, liver3: 0.85, liver2: 0.7, liver1: 0.55, spleen3: 450, spleen2: 360, spleen1: 270, brain3: 1.2, brain2: 1.4, brain1: 1.6, brainJitter: 150, brainDelay: 3 },
   physics:    { stiff: 0.6, bounce: 0.25, flowGrip: 1.5, brownian: 45 },
-  neutrophil: { speed: 52, accel: 320, radius: 3, range: 54, fireEvery: 0.7, life: 25, turnEvery: 0.3, zigzag: 1.4, stray: 0.2, standoff: 28, shotSpeed: 420, spread: 0.32, leash: 25 },
+  neutrophil: { speed: 52, accel: 320, radius: 3, range: 54, fireEvery: 0.75, life: 25, turnEvery: 0.3, zigzag: 1.4, stray: 0.2, standoff: 28, shotSpeed: 420, spread: 0.32, leash: 25 },
   net:        { speed: 64, radius: 3.4, burst: 30, damage: 1, fuse: 8, stick: 2.5 },
   nk:         { speed: 34, radius: 4, life: 60, reach: 9 },
   // Campaign units (Alex, 2026-10-10; notes/campaign-features-brainstorm.md section 2): one new cell per level from 2 on
@@ -4941,7 +4941,7 @@ const HINTS = {
   'neutrophil.accel': 'How fast a neutrophil can change velocity. Lower feels heavier.',
   'neutrophil.radius': 'Body size for collisions.',
   'neutrophil.range': 'Firing range.',
-  'neutrophil.fireEvery': 'Seconds between shots.',
+  'neutrophil.fireEvery': 'Seconds between shots. 0.7 -> 0.75 in V45 (Alex, 2026-10-11: a small neutrophil nerf so counters pay a little more).',
   'neutrophil.life': 'Seconds a neutrophil lives.',
   'neutrophil.turnEvery': 'Seconds between zigzag turns.',
   'neutrophil.zigzag': 'How far each turn can veer off the target line (radians).',

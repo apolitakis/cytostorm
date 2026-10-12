@@ -2,7 +2,7 @@
 
 Owned by the "Campaign builds" thread (fresh thread from 2026-10-10 18:47; before that "Immune mechanics brainstorm" / "Campaign builds to V12"). Built 2026-10-08 from the "Locked for building" section of notes/campaign-brainstorm.md, Alex's spec. Playable at https://claude.ai/artifact/So5dsH9Ess5Q3EgKJG2Zdn (see the coordinator's memory for the current version).
 
-It wraps the main game without editing it. At build time it reads prototype/v3/src (owned by "Build the web prototype"), the art kit, the tutorial clips and the sound, all read-only. Rebuild on each main-game handoff, from the frozen release folder it names, never live src (which can hold half-built work): `V3=releases/v44 python3 build.py` writes `index.html`. Then republish the same Artifact.
+It wraps the main game without editing it. At build time it reads prototype/v3/src (owned by "Build the web prototype"), the art kit, the tutorial clips and the sound, all read-only. Rebuild on each main-game handoff, from the frozen release folder it names, never live src (which can hold half-built work): `V3=releases/v45 python3 build.py` writes `index.html`. Then republish the same Artifact.
 
 ## Files
 
@@ -50,6 +50,14 @@ Done (section 2 of notes/campaign-features-brainstorm.md): B cells (Stage 2 Elbo
 - **Vaccines:** 120 Samples each, for any germ in a map you've played. Shots and nets do +1 damage to it, and macrophages swallow it twice as fast. Vaccinated Influenza stops splitting, and vaccinated Herpes can't hide in your cells.
 - **Loadout:** neutrophils and macrophages always come, plus up to 2 specialists. Each specialist unlocks free on the stage that introduces it (B cells at Elbow ... Mast cells at Belly; Net at Nose, NK at Chest). Until you choose, each stage packs its own unit plus a counter (see the units section above).
 - **Treatments:** passive, cost on that map only. Antibiotics (shots and nets do x2 to bacteria; 1 in 5 arriving bacteria turn MRSA). Antifungals (threads creep and bud a third as fast, yeast hp halved; fatigue recovers 1% slower). Antivirals (no Herpes hiding, no flu split; bacteria divide 20% faster). Steroids (fatigue builds half as fast, storm costs 30; marrow x0.7). Fever reducer (tiers +10; cost: CONFIG.fever.on = 0, so fever stops slowing bacterial division).
+
+## Bot check (2026-10-11, Play V45 from releases/v45, Normal, ramp on): Campaign V16
+
+V45 = neutrophils fire every 0.75 s (was 0.7). Sanity pass, default loadouts:
+- No build, 1 seed: idle 0/10, smart 1/10 (wins only Chest). Extra seeds, smart no build: Finger 1/3, Elbow 2/3, Ear 0/3, Nose 1/3.
+- Small build ("third", ~800 Samples), smart 3 seeds: Finger 3/3, Elbow 3/3, Ear 1/3, Nose 3/3.
+- Late build, 1 seed: idle 4/10 (Finger, Nose, Neck, Belly), smart 10/10.
+- Not balanced yet: Stage 1 (Finger) is a coin flip for good play with no upgrades, Ear is the hardest early stage, and late-build idle still wins 4.
 
 ## Bot check (2026-10-10, Play V43 sim (= V44) from releases/v43, Normal, ramp on): Campaign V15
 

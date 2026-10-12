@@ -1,0 +1,12 @@
+level     gunner       offenseHeavy smart        
+papercut  0/1 s1 100%  0/1 s1 100%  1/1 0%       
+hospital  0/1 s1 100%  0/1 s1 100%  1/1 0%       
+pool      0/1 s1 100%  1/1 0%       1/1 0%       
+flu       0/1 s1 100%  0/1 s1 100%  1/1 0%       
+soil      0/1 s1 100%  0/1 s1 100%  1/1 100%     
+foot      0/1 s1 100%  0/1 s1 100%  0/1 s1 100%  
+lungs     0/1 s1 100%  0/1 s1 100%  1/1 0%       
+throat    0/1 s1 100%  0/1 s1 100%  1/1 1%       
+coldsore  0/1 s1 100%  0/1 s1 100%  1/1 0%       
+gut       0/1 s1 100%  0/1 s1 100%  0/1 s1 100%  
+(wins/seeds, s = host-failure losses, then mean peak lymph timer)  317 s
