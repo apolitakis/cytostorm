@@ -70,7 +70,7 @@ git -c user.name=Claude -c user.email=noreply@anthropic.com commit -q -m "Nightl
 
 $(git diff --cached --shortstat)
 
-Co-Authored-By: Claude Opus 5.5 (1M context) <noreply@anthropic.com>
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
 Claude-Session: https://claude.ai/code/session_011tyXw1uPuY4aMdegrTERoz"
 git push -u origin main
 [ "$(git ls-remote origin refs/heads/main | cut -f1)" = "$(git rev-parse HEAD)" ] && echo "pushed $(git rev-parse --short HEAD)"
